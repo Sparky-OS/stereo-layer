@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Edition CI: the local image contains the reviewed stereo reader and output APIs.
+image: photos-layer-build:1
+stages: [validate, build]
+format:
+  stage: validate
+  script:
+    - find src autotests -name '*.cpp' -o -name '*.h' | xargs clang-format --dry-run --Werror
+gcc:
+  stage: build
+  script:
+    - cmake -S . -B _build -G Ninja -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    - cmake --build _build -j4
+    - QT_QPA_PLATFORM=offscreen ctest --test-dir _build --output-on-failure --output-junit junit.xml
+clang:
+  stage: build
+  script:
+    - cmake -S . -B _build -G Ninja -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+    - cmake --build _build -j4
+    - QT_QPA_PLATFORM=offscreen ctest --test-dir _build --output-on-failure --output-junit junit.xml
