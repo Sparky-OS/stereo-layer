@@ -28,7 +28,7 @@ On an active anaglyph output, the original image remains 2D. Conversion is used 
 
 ## Build and verification
 
-CMake uses ECM, Qt 6, libstereo-declare and the edition's KScreen stereo API. `BUILD_TESTING=ON` enables picture/reader/geometry checks and a three-screen KScreen Fake test. `BUILD_EXAMPLES=ON` builds the widget/QML client. Local KDE CI runs clean GCC and clang builds in `photos-layer-build:2`, the edition image prepared for this workspace. This image is local; the pipeline is not claimed to run on an external registry.
+CMake uses ECM, Qt 6, libstereo-declare and the edition's KScreen stereo API. `BUILD_TESTING=ON` enables picture/reader/geometry checks, a three-screen KScreen Fake test and an unlinked QML consumer import test. `BUILD_EXAMPLES=ON` builds the widget/QML client. Local KDE CI runs clean GCC and clang builds in `photos-layer-build:2`, the edition image prepared for this workspace. This image is local; the pipeline is not claimed to run on an external registry.
 
 Compositor evidence, package recipes for the review image and measurements are kept outside this repository in the partner workspace's REPORT.md and evidence/layer/. The backend currently targets Linux native Wayland and uses 8-bit RGB shared-memory buffers, matching the ported Gwenview path. X11, deep-colour presentation and other operating systems are not verified. Viewer migrations are subsequent milestones.
 

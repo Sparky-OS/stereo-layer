@@ -33,6 +33,7 @@ qt6_generate_wayland_protocol_client_sources(StereoLayer FILES ${WAYLAND_PROTOCO
 qt_add_qml_module(StereoLayer URI org.sparky.stereo VERSION 1.0
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml/org/sparky/stereo
     SOURCES src/quick/pictureitem.h src/quick/pictureitem.cpp)
+set_target_properties(StereoLayerplugin PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}")
 install(TARGETS StereoLayerplugin DESTINATION ${KDE_INSTALL_QMLDIR}/org/sparky/stereo)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/qml/org/sparky/stereo/qmldir ${CMAKE_CURRENT_BINARY_DIR}/qml/org/sparky/stereo/StereoLayer.qmltypes DESTINATION ${KDE_INSTALL_QMLDIR}/org/sparky/stereo)
 install(TARGETS StereoLayer EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
