@@ -125,6 +125,9 @@ Picture Picture::fromAnaglyph(const QImage &image, AnaglyphColorPair pair)
     if (image.isNull() || pair == AnaglyphColorPair::None) {
         return result;
     }
+    result.original = image;
+    result.anaglyph = pair;
+    result.source = Source::User;
     result.left = QImage(image.size(), QImage::Format_RGB32);
     result.right = QImage(image.size(), QImage::Format_RGB32);
     for (int y = 0; y < image.height(); ++y) {

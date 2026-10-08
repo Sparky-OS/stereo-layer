@@ -29,9 +29,10 @@ QImage renderEyes(const Picture &picture, const QSize &eyePixels, qreal zoom, co
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
     const QRectF rect = destination(picture.left.size(), eyePixels, zoom, pan);
     painter.setClipRect(QRect(QPoint(), eyePixels));
-    painter.drawImage(rect, picture.left);
+    painter.drawImage(rect, (zoom == 1 ? picture.left.scaled(rect.size().toSize(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation) : picture.left));
     painter.setClipRect(QRect(QPoint(eyePixels.width(), 0), eyePixels));
-    painter.drawImage(rect.translated(eyePixels.width(), 0), picture.right);
+    painter.drawImage(rect.translated(eyePixels.width(), 0),
+        (zoom == 1 ? picture.right.scaled(rect.size().toSize(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation) : picture.right));
     return image;
 }
 QImage renderMono(const QImage &source, const QSize &pixels, qreal zoom, const QPointF &pan)
@@ -42,7 +43,8 @@ QImage renderMono(const QImage &source, const QSize &pixels, qreal zoom, const Q
     image.fill(Qt::black);
     QPainter painter(&image);
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
-    painter.drawImage(destination(source.size(), pixels, zoom, pan), source);
+    const QRectF rect = destination(source.size(), pixels, zoom, pan);
+    painter.drawImage(rect, (zoom == 1 ? source.scaled(rect.size().toSize(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation) : source));
     return image;
 }
 }

@@ -119,6 +119,10 @@ void PictureTest::detector()
                     : colorPair == Picture::AnaglyphColorPair::GreenMagenta ? QColor(right, left, right)
                                                                             : QColor(left, left, right));
         }
+    const auto direct = Picture::fromAnaglyph(image, colorPair);
+    QCOMPARE(direct.original, image);
+    QCOMPARE(direct.anaglyph, colorPair);
+    QVERIFY(direct.approximateColor);
     QCOMPARE(Picture::detectAnaglyph(image), colorPair);
     QCOMPARE(Picture::detectAnaglyph(image.scaled(1024, 512)), colorPair);
     const auto stereo = Picture::fromImages(image, {}, {}, {}, {}, {}, OutputMode::Stereo);
