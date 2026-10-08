@@ -4,6 +4,7 @@
 #include "picture.h"
 #include "panorama_p.h"
 
+#include <QByteArrayView>
 #include <QFile>
 #include <QFileInfo>
 #include <QImageReader>
@@ -31,6 +32,61 @@ bool hasJpsDescriptor(const QByteArray &data)
         }
         if (marker == 0xe3 && length >= 16 && data.mid(offset + 4, 8) == "_JPSJPS_") {
             return true;
+        }
+        offset += 2 + length;
+    }
+    return false;
+}
+
+bool hasStereoMpfIndex(const QByteArray &data)
+{
+    if (!data.startsWith(QByteArray::fromHex("ffd8")))
+        return false;
+    qsizetype offset = 2;
+    while (offset + 4 <= data.size() && uchar(data[offset]) == 0xff) {
+        const uchar marker = uchar(data[offset + 1]);
+        if (marker == 0xda || marker == 0xd9)
+            break;
+        const auto length = qFromBigEndian<quint16>(data.constData() + offset + 2);
+        if (length < 2 || offset + 2 + length > data.size())
+            break;
+        if (marker == 0xe2 && length >= 14 && data.mid(offset + 4, 4) == QByteArrayLiteral("MPF\0")) {
+            const QByteArrayView tiff(data.constData() + offset + 8, length - 6);
+            if (tiff.size() < 8 || (tiff.first(2) != "II" && tiff.first(2) != "MM"))
+                return false;
+            const bool little = tiff.startsWith("II");
+            const auto read16
+                = [&](qsizetype at) { return little ? qFromLittleEndian<quint16>(tiff.data() + at) : qFromBigEndian<quint16>(tiff.data() + at); };
+            const auto read32
+                = [&](qsizetype at) { return little ? qFromLittleEndian<quint32>(tiff.data() + at) : qFromBigEndian<quint32>(tiff.data() + at); };
+            const qint64 ifd = read32(4);
+            if (read16(2) != 42 || ifd < 8 || ifd + 2 > tiff.size())
+                return false;
+            const int fields = read16(ifd);
+            if (ifd + 2 + qint64(fields) * 12 + 4 > tiff.size())
+                return false;
+            bool twoImages = false;
+            qint64 entries = -1;
+            for (qsizetype at = ifd + 2; at < ifd + 2 + fields * 12; at += 12) {
+                if (read16(at) == 0xb001 && read16(at + 2) == 4 && read32(at + 4) == 1)
+                    twoImages = read32(at + 8) == 2;
+                if (read16(at) == 0xb002 && read16(at + 2) == 7 && read32(at + 4) == 32)
+                    entries = read32(at + 8);
+            }
+            const qint64 attributeIfd = read32(ifd + 2 + fields * 12);
+            if (attributeIfd != 0) {
+                if (attributeIfd < 8 || attributeIfd + 2 > tiff.size())
+                    return false;
+                const int attributes = read16(attributeIfd);
+                if (attributeIfd + 2 + qint64(attributes) * 12 + 4 > tiff.size())
+                    return false;
+                for (qsizetype at = attributeIfd + 2; at < attributeIfd + 2 + attributes * 12; at += 12) {
+                    if (read16(at) == 0xb101 && read16(at + 2) == 4 && read32(at + 4) == 1 && read32(at + 8) == 0)
+                        return false;
+                }
+            }
+            return twoImages && entries >= 8 && entries + 32 <= tiff.size() && (read32(entries) & 0x07ffffff) == 0x020002
+                && (read32(entries + 16) & 0x07ffffff) == 0x020002;
         }
         offset += 2 + length;
     }
@@ -88,7 +144,11 @@ Picture Picture::fromImages(const QImage &image, const QImage &second, const QSt
     EyeOrder order = metadata.endsWith(QLatin1String("RightFirst")) || metadata == QLatin1String("anaglyphRedRight") ? EyeOrder::RightFirst
                                                                                                                      : EyeOrder::LeftFirst;
     Source source = Source::None;
-    const bool fallback = format == "jps" && !hasJpsDescriptor(header);
+    const bool fallback = format == "jps" && (metadata.isEmpty() || (metadata == QLatin1String("sideBySideRightFirst") && !hasJpsDescriptor(header)));
+    if (format == "mpo" && metadata.isEmpty() && !hasStereoMpfIndex(header)) {
+        result.source = Source::FileMark;
+        return result;
+    }
     if (!metadata.isEmpty() && !fallback) {
         source = Source::FileMark;
         if (metadata == QLatin1String("mono")) {
@@ -111,15 +171,15 @@ Picture Picture::fromImages(const QImage &image, const QImage &second, const QSt
             result.anaglyph = AnaglyphColorPair::RedCyan;
         else
             return result;
-    } else if (!second.isNull()) {
-        packing = Layout::MultiView;
-        order = EyeOrder::LeftFirst;
-        source = Source::Format;
     } else if (options.inputLayout != Layout::None || options.anaglyph != AnaglyphColorPair::None) {
         packing = options.inputLayout;
         order = options.inputOrder;
         result.anaglyph = options.anaglyph;
         source = Source::User;
+    } else if (!second.isNull()) {
+        packing = Layout::MultiView;
+        order = EyeOrder::LeftFirst;
+        source = Source::Format;
     } else if (fallback) {
         packing = Layout::SideBySide;
         order = EyeOrder::RightFirst;

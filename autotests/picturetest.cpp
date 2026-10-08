@@ -13,6 +13,7 @@ class PictureTest : public QObject
     Q_OBJECT
 private Q_SLOTS:
     void marksAndChoices();
+    void mpoFallback();
     void padding();
     void outputPolicy();
     void viewControls();
@@ -44,12 +45,42 @@ void PictureTest::marksAndChoices()
     const auto user = Picture::fromImages(image, {}, QStringLiteral("sideBySideRightFirst"), "jps", {}, options, OutputMode::Stereo);
     QCOMPARE(user.source, Picture::Source::User);
     QCOMPARE(user.left.size(), QSize(16, 4));
+    for (const QString &layout : { QStringLiteral("mono"), QStringLiteral("sideBySideLeftFirst"), QStringLiteral("topBottomRightFirst") }) {
+        const auto picture = Picture::fromImages(image, {}, layout, "jps", {}, options, OutputMode::Stereo);
+        QCOMPARE(picture.source, Picture::Source::FileMark);
+        QCOMPARE(picture.isStereo(), layout != QLatin1String("mono"));
+    }
     options = {};
     const auto ratio = Picture::fromImages(image, {}, {}, "png", {}, options, OutputMode::Stereo);
     QCOMPARE(ratio.source, Picture::Source::Shape);
     QCOMPARE(ratio.right.pixelColor(0, 0), QColor(Qt::blue));
     const auto mono = Picture::fromImages(image, {}, QStringLiteral("mono"), "jpg", {}, options, OutputMode::Stereo);
     QVERIFY(!mono.isStereo());
+}
+void PictureTest::mpoFallback()
+{
+    for (const QString &name : { QStringLiteral("unknown"), QStringLiteral("equal"), QStringLiteral("composite"), QStringLiteral("multangle") }) {
+        const QString path = QFINDTESTDATA(QStringLiteral("readers/test_mpo_") + name + QStringLiteral(".mpo"));
+        QVERIFY(!path.isEmpty());
+        const auto picture = Picture::load(path, {}, OutputMode::Stereo);
+        const bool disparity = name == QLatin1String("unknown") || name == QLatin1String("equal");
+        QVERIFY2(picture.isStereo() == disparity, qPrintable(name));
+        if (disparity) {
+            QCOMPARE(picture.source, Picture::Source::Format);
+            Picture::Options options;
+            options.inputLayout = Picture::Layout::MultiView;
+            options.inputOrder = Picture::EyeOrder::RightFirst;
+            const auto chosen = Picture::load(path, options, OutputMode::Stereo);
+            QCOMPARE(chosen.source, Picture::Source::User);
+            QCOMPARE(chosen.left, picture.right);
+            QCOMPARE(chosen.right, picture.left);
+        } else {
+            QVERIFY(!picture.original.isNull());
+            Picture::Options options;
+            options.inputLayout = Picture::Layout::MultiView;
+            QVERIFY(!Picture::load(path, options, OutputMode::Stereo).isStereo());
+        }
+    }
 }
 void PictureTest::padding()
 {

@@ -2,7 +2,7 @@
 
 Shared stereo picture policy and presentation for Qt 6 applications on Sparky Stereo OS.
 
-The library consumes `Stereo3DLayout` from the edition's Qt and KImageFormats readers. File marks precede input choices, format fallbacks and shape detection. Photo Sphere XMP vetoes shape detection. Unmarked JPS order is a format fallback, so an input choice can override it. Unknown MPO viewpoints retain the two frames in stored order; Swap Eyes remains available.
+The library consumes `Stereo3DLayout` from the edition's Qt and KImageFormats readers. File marks precede input choices, format fallbacks and shape detection. Photo Sphere XMP vetoes shape detection. Unmarked JPS order is a format fallback, so an input choice can override it. MPO disparity records with unknown viewpoint order retain the two frames in stored order; an input order or Swap Eyes can override that fallback. MPF composite and multiple-angle records stay 2D. A bounded MPF index check distinguishes those records when the reader has no typed layout.
 
 A picture's stereo surface contains full side-by-side views, left first. The window's controls stay on its ordinary surface. Widget and Quick adapters share the Wayland backend and renderer. A connection owns declaration state for all its surfaces; releasing one does not release another.
 
