@@ -28,10 +28,10 @@ On an active anaglyph output, the original image remains 2D. Conversion is used 
 
 ## Build and verification
 
-CMake uses ECM, Qt 6, libstereo-declare and the edition's KScreen stereo API. `BUILD_TESTING=ON` enables picture/reader/geometry checks, a three-screen KScreen Fake test and an unlinked QML consumer import test. `BUILD_EXAMPLES=ON` builds the widget/QML client. Local KDE CI runs clean GCC and clang builds in `photos-layer-build:2`, the edition image prepared for this workspace. This image is local; the pipeline is not claimed to run on an external registry.
+CMake uses ECM, Qt 6, libstereo-declare and KScreen's stereo API. libstereo-declare is in [our plasma-wayland-protocols branch](https://invent.kde.org/danielcamposramos/plasma-wayland-protocols/-/tree/stereo3d-6.7/stereo-declare) and the stereo API in [our libkscreen branch](https://invent.kde.org/danielcamposramos/libkscreen/-/tree/stereo3d-6.7). `BUILD_TESTING=ON` enables picture/reader/geometry checks, a three-screen KScreen Fake test and an unlinked QML consumer import test. `BUILD_EXAMPLES=ON` builds the widget/QML client. Clean GCC and clang builds pass all of them.
 
-Compositor evidence, package recipes for the review image and measurements are kept outside this repository in the partner workspace's REPORT.md and evidence/layer/. The backend currently targets Linux native Wayland and uses 8-bit RGB shared-memory buffers, matching the ported Gwenview path. X11, deep-colour presentation and other operating systems are not verified. Viewer migrations are subsequent milestones.
+Headless KWin runs with both eyes captured check fit, zoom and pan, swap, hide, the selected 2D view and ordinary pictures: one declaration per picture, none for ordinary images, and nothing outside the picture differs between the eyes. The backend targets Linux native Wayland and uses 8-bit RGB shared-memory buffers, matching the ported Gwenview path. X11, deep-colour presentation and other operating systems are not verified. Viewer migrations are subsequent milestones.
 
-Sparky Stereo OS, an edition of SparkyLinux, created by Paweł "pavroo" Pijanowski <pavroo@onet.eu> and Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>.
+Sparky Stereo OS, Daniel Ramos's (Capitain Jack) edition of SparkyLinux (https://sparkylinux.org, by Paweł "pavroo" Pijanowski).
 
 Code derived from Gwenview and the Marble/Krita window pattern retains GPL-2.0-or-later licensing and its original credits.

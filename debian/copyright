@@ -2,9 +2,8 @@ Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: stereo-layer
 Upstream-Contact: Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>
 Source: https://sparkylinux.org
-Comment: Sparky Stereo OS, an edition of SparkyLinux, created by
- Paweł "pavroo" Pijanowski <pavroo@onet.eu> and
- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>.
+Comment: Sparky Stereo OS, Daniel Ramos's (Capitain Jack) edition of
+ SparkyLinux (https://sparkylinux.org, by Paweł "pavroo" Pijanowski).
 
 Files: *
 Copyright: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
