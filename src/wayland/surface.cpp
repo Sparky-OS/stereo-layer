@@ -195,7 +195,6 @@ struct Surface::Private {
     bool declared = false;
     bool shown = false;
     QRect placed;
-    qint64 cacheKey = 0;
 };
 Surface::Surface()
     : d(std::make_unique<Private>())
@@ -260,8 +259,6 @@ bool Surface::show(QWindow *parent, const QRect &rect, const QImage &packed)
     }
     auto &c = *d->connection;
     wl_display_dispatch_queue_pending(c.display, c.queue);
-    if (d->shown && d->placed == rect && d->cacheKey == packed.cacheKey())
-        return true;
     Buffer *buffer = nullptr;
     for (auto &candidate : d->buffers) {
         if (candidate.busy)
@@ -302,7 +299,6 @@ bool Surface::show(QWindow *parent, const QRect &rect, const QImage &packed)
     wl_surface_commit(d->surface);
     wl_display_flush(c.display);
     d->shown = true;
-    d->cacheKey = packed.cacheKey();
     return true;
 }
 }
