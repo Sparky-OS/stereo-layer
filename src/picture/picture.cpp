@@ -5,6 +5,7 @@
 #include "panorama_p.h"
 
 #include <QFile>
+#include <QFileInfo>
 #include <QImageReader>
 #include <QtEndian>
 #include <algorithm>
@@ -13,7 +14,7 @@ namespace Stereo
 {
 namespace
 {
-bool hasJpsDescriptor(const QByteArray& data)
+bool hasJpsDescriptor(const QByteArray &data)
 {
     if (!data.startsWith(QByteArray::fromHex("ffd8"))) {
         return false;
@@ -36,7 +37,7 @@ bool hasJpsDescriptor(const QByteArray& data)
     return false;
 }
 
-Picture unpackPng(const QImage& image, Picture::EyeOrder order)
+Picture unpackPng(const QImage &image, Picture::EyeOrder order)
 {
     const int padding = 15 - ((image.width() - 1) % 16);
     if (padding > 7 || image.width() <= padding) {
@@ -51,17 +52,19 @@ Picture unpackPng(const QImage& image, Picture::EyeOrder order)
 }
 }
 
-Picture Picture::load(const QString& path, const Options& options, OutputMode output)
+Picture Picture::load(const QString &path, const Options &options, OutputMode output)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
         return {};
     }
     const QByteArray header = file.peek(1024 * 1024);
-    QImageReader reader(&file);
+    const QByteArray extension = QFileInfo(path).suffix().toLatin1().toLower();
+    QImageReader reader(&file, extension == "jps" || extension == "mpo" ? extension : QByteArray());
     QString metadata = reader.text(QStringLiteral("Stereo3DLayout"));
-    const QByteArray format = reader.format();
-    const bool multiView = reader.imageCount() >= 2 && format == "mpo";
+    const QByteArray detectedFormat = reader.format();
+    const QByteArray format = extension == "jps" || extension == "mpo" || extension == "pns" ? extension : detectedFormat;
+    const bool multiView = reader.imageCount() >= 2 && (format == "mpo" || metadata.startsWith(QLatin1String("multiView")));
     const QImage image = reader.read();
     if (metadata.isEmpty()) {
         metadata = image.text(QStringLiteral("Stereo3DLayout"));
@@ -73,8 +76,8 @@ Picture Picture::load(const QString& path, const Options& options, OutputMode ou
     return fromImages(image, second, metadata, format, header, options, output);
 }
 
-Picture Picture::fromImages(const QImage& image, const QImage& second, const QString& metadata, const QByteArray& format, const QByteArray& header,
-    const Options& options, OutputMode output)
+Picture Picture::fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
+    const Options &options, OutputMode output)
 {
     Picture result;
     result.original = image;
@@ -89,6 +92,7 @@ Picture Picture::fromImages(const QImage& image, const QImage& second, const QSt
     if (!metadata.isEmpty() && !fallback) {
         source = Source::FileMark;
         if (metadata == QLatin1String("mono")) {
+            result.source = Source::FileMark;
             return result;
         }
         if (metadata.startsWith(QLatin1String("sideBySide")))
@@ -168,7 +172,7 @@ Picture Picture::fromImages(const QImage& image, const QImage& second, const QSt
     return result;
 }
 
-Picture Picture::fromPackedImage(const QImage& image, Layout layout, EyeOrder order)
+Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder order)
 {
     Picture result;
     result.layout = layout;

@@ -13,7 +13,7 @@ public:
     Surface();
     ~Surface();
     static bool isSupported();
-    bool show(QWindow* parent, const QRect& rect, const QImage& packed);
+    bool show(QWindow *parent, const QRect &rect, const QImage &packed);
     void hide();
     void reset();
 

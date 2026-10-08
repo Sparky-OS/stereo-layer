@@ -4,6 +4,8 @@
 #include "render.h"
 #include "screenmode.h"
 #include "surface_p.h"
+#include <QPointer>
+#include <QQmlContext>
 #include <QQuickWindow>
 #include <QSGFlatColorMaterial>
 #include <QSGSimpleRectNode>
@@ -19,12 +21,16 @@ struct PictureItem::Private {
     Picture picture;
     ScreenMode output;
     Surface surface;
+    QImage packed;
+    QSize pixels;
+    bool dirty = true;
+    QPointer<QQuickWindow> window;
     QTimer timer;
     qreal zoom = 1;
     QPointF pan;
     bool active = false;
 };
-PictureItem::PictureItem(QQuickItem* parent)
+PictureItem::PictureItem(QQuickItem *parent)
     : QQuickItem(parent)
     , d(std::make_unique<Private>())
 {
@@ -38,7 +44,7 @@ PictureItem::PictureItem(QQuickItem* parent)
         syncWindow(window());
 }
 PictureItem::~PictureItem() = default;
-bool PictureItem::prepareWindow(QQuickWindow* window)
+bool PictureItem::prepareWindow(QQuickWindow *window)
 {
     if (window->handle())
         return window->format().alphaBufferSize() > 0;
@@ -47,9 +53,12 @@ bool PictureItem::prepareWindow(QQuickWindow* window)
     window->setFormat(format);
     return true;
 }
-void PictureItem::syncWindow(QQuickWindow* window)
+void PictureItem::syncWindow(QQuickWindow *window)
 {
     d->surface.reset();
+    if (d->window)
+        disconnect(d->window, nullptr, &d->output, nullptr);
+    d->window = window;
     d->output.setScreen(window ? window->screen() : nullptr);
     if (window) {
         prepareWindow(window);
@@ -58,7 +67,7 @@ void PictureItem::syncWindow(QQuickWindow* window)
     polish();
 }
 QUrl PictureItem::source() const { return d->source; }
-void PictureItem::setSource(const QUrl& source)
+void PictureItem::setSource(const QUrl &source)
 {
     if (d->source == source)
         return;
@@ -68,9 +77,11 @@ void PictureItem::setSource(const QUrl& source)
 }
 void PictureItem::reload()
 {
-    const QString path = d->source.isLocalFile()     ? d->source.toLocalFile()
-        : d->source.scheme() == QLatin1String("qrc") ? QLatin1String(":") + d->source.path()
-                                                     : QString();
+    const QUrl resolved = qmlContext(this) ? qmlContext(this)->resolvedUrl(d->source) : d->source;
+    const QString path = resolved.isLocalFile()     ? resolved.toLocalFile()
+        : resolved.scheme() == QLatin1String("qrc") ? QLatin1String(":") + resolved.path()
+                                                    : QString();
+    d->dirty = true;
     d->picture = path.isEmpty() ? Picture {} : Picture::load(path, d->options, d->output.mode());
     polish();
     update();
@@ -126,16 +137,18 @@ void PictureItem::setZoom(qreal zoom)
 {
     if (std::isfinite(zoom) && zoom > 0 && zoom != d->zoom) {
         d->zoom = zoom;
+        d->dirty = true;
         polish();
         update();
         Q_EMIT transformChanged();
     }
 }
 QPointF PictureItem::pan() const { return d->pan; }
-void PictureItem::setPan(const QPointF& pan)
+void PictureItem::setPan(const QPointF &pan)
 {
     if (std::isfinite(pan.x()) && std::isfinite(pan.y()) && pan != d->pan) {
         d->pan = pan;
+        d->dirty = true;
         polish();
         update();
         Q_EMIT transformChanged();
@@ -149,11 +162,20 @@ void PictureItem::updatePolish()
     bool active = false;
     const QRectF mapped = mapRectToScene(boundingRect());
     // Native subsurfaces cannot follow scene-graph rotation, opacity or clipping.
-    const bool aligned = qFuzzyIsNull(rotation()) && qFuzzyCompare(scale(), qreal(1)) && qFuzzyCompare(opacity(), qreal(1)) && !clip();
+    bool aligned = qFuzzyIsNull(rotation()) && qFuzzyCompare(scale(), qreal(1)) && qFuzzyCompare(opacity(), qreal(1)) && !clip();
+    for (QQuickItem *ancestor = parentItem(); ancestor; ancestor = ancestor->parentItem()) {
+        aligned &= qFuzzyIsNull(ancestor->rotation()) && qFuzzyCompare(ancestor->scale(), qreal(1)) && qFuzzyCompare(ancestor->opacity(), qreal(1))
+            && !ancestor->clip();
+    }
     if (window() && window()->isVisible() && isVisible() && aligned && d->picture.isStereo() && window()->format().alphaBufferSize() > 0) {
         const qreal ratio = window()->devicePixelRatio();
         const QSize pixels(qRound(mapped.width() * ratio), qRound(mapped.height() * ratio));
-        active = d->surface.show(window(), mapped.toAlignedRect(), renderEyes(d->picture, pixels, d->zoom, d->pan * ratio));
+        if (d->dirty || d->pixels != pixels) {
+            d->packed = renderEyes(d->picture, pixels, d->zoom, d->pan * ratio);
+            d->pixels = pixels;
+            d->dirty = false;
+        }
+        active = d->surface.show(window(), mapped.toAlignedRect(), d->packed);
     } else {
         d->surface.reset();
     }
@@ -163,21 +185,21 @@ void PictureItem::updatePolish()
         Q_EMIT stereoActiveChanged();
     }
 }
-QSGNode* PictureItem::updatePaintNode(QSGNode* node, UpdatePaintNodeData*)
+QSGNode *PictureItem::updatePaintNode(QSGNode *node, UpdatePaintNodeData *)
 {
     delete node;
     if (!window() || boundingRect().isEmpty())
         return nullptr;
     if (d->active) {
-        auto* hole = new QSGSimpleRectNode(boundingRect(), Qt::transparent);
+        auto *hole = new QSGSimpleRectNode(boundingRect(), Qt::transparent);
         hole->material()->setFlag(QSGMaterial::Blending, false);
         return hole;
     }
-    auto* texture = window()->createTextureFromImage(
+    auto *texture = window()->createTextureFromImage(
         renderMono(d->picture.original, QSize(qMax(1, qRound(width())), qMax(1, qRound(height()))), d->zoom, d->pan));
     if (!texture)
         return nullptr;
-    auto* image = new QSGSimpleTextureNode;
+    auto *image = new QSGSimpleTextureNode;
     image->setTexture(texture);
     image->setOwnsTexture(true);
     image->setRect(boundingRect());

@@ -3,3 +3,5 @@ IndentWidth: 4
 ColumnLimit: 150
 BreakBeforeBraces: Linux
 NamespaceIndentation: None
+PointerAlignment: Right
+ReferenceAlignment: Pointer

@@ -2,21 +2,21 @@
 # Edition CI: the local image contains the reviewed stereo reader and output APIs.
 stages: [validate, build]
 format:
-  image: photos-layer-build:1
+  image: photos-layer-build:2
   stage: validate
   script:
-    - find src autotests -name '*.cpp' -o -name '*.h' | xargs clang-format --dry-run --Werror
+    - find src autotests examples -name '*.cpp' -o -name '*.h' | xargs clang-format --dry-run --Werror
 gcc:
-  image: photos-layer-build:1
+  image: photos-layer-build:2
   stage: build
   script:
-    - cmake -S . -B _build -G Ninja -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    - cmake -S . -B _build -G Ninja -DBUILD_TESTING=ON -DBUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
     - cmake --build _build -j4
     - QT_QPA_PLATFORM=offscreen ctest --test-dir _build --output-on-failure --output-junit junit.xml
 clang:
-  image: photos-layer-build:1
+  image: photos-layer-build:2
   stage: build
   script:
-    - cmake -S . -B _build -G Ninja -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+    - cmake -S . -B _build -G Ninja -DBUILD_TESTING=ON -DBUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
     - cmake --build _build -j4
     - QT_QPA_PLATFORM=offscreen ctest --test-dir _build --output-on-failure --output-junit junit.xml

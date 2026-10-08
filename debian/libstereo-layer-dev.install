@@ -1,0 +1,3 @@
+usr/include/stereo-layer/*
+usr/lib/*/libstereo-layer.so
+usr/lib/*/cmake/StereoLayer/*

@@ -26,12 +26,12 @@ public:
         bool swapEyes = false;
     };
 
-    static Picture load(const QString& path, const Options& options, OutputMode output);
-    static Picture fromImages(const QImage& image, const QImage& second, const QString& metadata, const QByteArray& format, const QByteArray& header,
-        const Options& options, OutputMode output);
-    static Picture fromPackedImage(const QImage& image, Layout layout, EyeOrder order);
-    static Picture fromAnaglyph(const QImage& image, AnaglyphColorPair pair);
-    static AnaglyphColorPair detectAnaglyph(const QImage& image);
+    static Picture load(const QString &path, const Options &options, OutputMode output);
+    static Picture fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
+        const Options &options, OutputMode output);
+    static Picture fromPackedImage(const QImage &image, Layout layout, EyeOrder order);
+    static Picture fromAnaglyph(const QImage &image, AnaglyphColorPair pair);
+    static AnaglyphColorPair detectAnaglyph(const QImage &image);
     static QString colorDisclaimer();
 
     bool isStereo() const;

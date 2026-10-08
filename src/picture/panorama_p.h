@@ -5,5 +5,5 @@
 #include <QByteArray>
 namespace Stereo
 {
-bool hasEquirectangularPanoramaMark(const QByteArray& data);
+bool hasEquirectangularPanoramaMark(const QByteArray &data);
 }

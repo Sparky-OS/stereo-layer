@@ -11,10 +11,10 @@ class STEREO_LAYER_EXPORT ScreenMode : public QObject
 {
     Q_OBJECT
 public:
-    explicit ScreenMode(QObject* parent = nullptr);
+    explicit ScreenMode(QObject *parent = nullptr);
     ~ScreenMode() override;
-    void setScreen(QScreen* screen);
-    QScreen* screen() const;
+    void setScreen(QScreen *screen);
+    QScreen *screen() const;
     OutputMode mode() const;
 Q_SIGNALS:
     void modeChanged();

@@ -24,11 +24,11 @@ class STEREO_LAYER_EXPORT PictureItem : public QQuickItem
     Q_PROPERTY(bool approximateColor READ approximateColor NOTIFY pictureChanged)
     Q_PROPERTY(QString colorDisclaimer READ colorDisclaimer CONSTANT)
 public:
-    explicit PictureItem(QQuickItem* parent = nullptr);
+    explicit PictureItem(QQuickItem *parent = nullptr);
     ~PictureItem() override;
-    static bool prepareWindow(QQuickWindow* window);
+    static bool prepareWindow(QQuickWindow *window);
     QUrl source() const;
-    void setSource(const QUrl& source);
+    void setSource(const QUrl &source);
     bool swapEyes() const;
     void setSwapEyes(bool swap);
     int inputLayout() const;
@@ -42,7 +42,7 @@ public:
     qreal zoom() const;
     void setZoom(qreal zoom);
     QPointF pan() const;
-    void setPan(const QPointF& pan);
+    void setPan(const QPointF &pan);
     bool stereoActive() const;
     bool approximateColor() const;
     QString colorDisclaimer() const;
@@ -55,12 +55,12 @@ Q_SIGNALS:
 
 protected:
     void updatePolish() override;
-    QSGNode* updatePaintNode(QSGNode* node, UpdatePaintNodeData*) override;
+    QSGNode *updatePaintNode(QSGNode *node, UpdatePaintNodeData *) override;
 
 private:
     struct Private;
     std::unique_ptr<Private> d;
     void reload();
-    void syncWindow(QQuickWindow* window);
+    void syncWindow(QQuickWindow *window);
 };
 }

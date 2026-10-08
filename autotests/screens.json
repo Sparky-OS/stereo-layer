@@ -1,0 +1,5 @@
+{"screens": [
+    {"name": "anaglyph", "x": 0, "y": 0, "width": 800, "height": 800},
+    {"name": "stereo", "x": 800, "y": 0, "width": 800, "height": 800},
+    {"name": "ordinary", "x": 1600, "y": 0, "width": 800, "height": 800}
+]}

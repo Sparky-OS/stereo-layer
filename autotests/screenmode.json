@@ -1,0 +1,87 @@
+{
+  "screen": {
+    "id": 1,
+    "currentSize": {
+      "width": 2400,
+      "height": 800
+    },
+    "minSize": {
+      "width": 1,
+      "height": 1
+    },
+    "maxSize": {
+      "width": 8192,
+      "height": 8192
+    }
+  },
+  "outputs": [
+    {
+      "id": 1,
+      "name": "anaglyph",
+      "connected": true,
+      "enabled": true,
+      "currentModeId": "1",
+      "anaglyph": true,
+      "modes": [
+        {
+          "id": "1",
+          "name": "active",
+          "size": {
+            "width": 800,
+            "height": 800
+          },
+          "refreshRate": 60
+        }
+      ],
+      "type": "HDMI"
+    },
+    {
+      "id": 2,
+      "name": "stereo",
+      "connected": true,
+      "enabled": true,
+      "currentModeId": "1",
+      "modes": [
+        {
+          "id": "1",
+          "name": "active",
+          "size": {
+            "width": 800,
+            "height": 800
+          },
+          "refreshRate": 60
+        }
+      ],
+      "type": "HDMI"
+    },
+    {
+      "id": 3,
+      "name": "ordinary",
+      "connected": true,
+      "enabled": true,
+      "currentModeId": "1",
+      "anaglyph": true,
+      "modes": [
+        {
+          "id": "1",
+          "name": "active",
+          "size": {
+            "width": 800,
+            "height": 800
+          },
+          "refreshRate": 60
+        },
+        {
+          "id": "2",
+          "name": "available",
+          "size": {
+            "width": 800,
+            "height": 800
+          },
+          "refreshRate": 60
+        }
+      ],
+      "type": "HDMI"
+    }
+  ]
+}

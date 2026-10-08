@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
 #include "widgetlayer.h"
 #include "render.h"
+#include "screenmode.h"
 #include "surface_p.h"
 #include <QEvent>
 #include <QPaintEvent>
@@ -20,13 +21,13 @@ class WindowBackground : public QObject
 {
 public:
     using QObject::QObject;
-    bool eventFilter(QObject* object, QEvent* event) override
+    bool eventFilter(QObject *object, QEvent *event) override
     {
         if (event->type() != QEvent::Paint)
             return false;
-        auto* window = static_cast<QWidget*>(object);
-        QRegion region = static_cast<QPaintEvent*>(event)->region();
-        for (auto* widget : window->findChildren<QWidget*>()) {
+        auto *window = static_cast<QWidget *>(object);
+        QRegion region = static_cast<QPaintEvent *>(event)->region();
+        for (auto *widget : window->findChildren<QWidget *>()) {
             if (widget->property("stereoLayerActive").toBool() && widget->isVisible())
                 region -= QRect(widget->mapTo(window, QPoint()), widget->size());
         }
@@ -43,6 +44,10 @@ public:
 struct WidgetLayer::Private {
     QPointer<QWidget> area;
     Picture picture;
+    QString source;
+    Picture::Options options;
+    ScreenMode output;
+    QPointer<QWindow> window;
     Surface surface;
     QTimer timer;
     qreal zoom = 1;
@@ -53,7 +58,7 @@ struct WidgetLayer::Private {
     QSize pixels;
     bool dirty = true;
 };
-WidgetLayer::WidgetLayer(QWidget* area, QObject* parent)
+WidgetLayer::WidgetLayer(QWidget *area, QObject *parent)
     : QObject(parent ? parent : area)
     , d(std::make_unique<Private>())
 {
@@ -61,6 +66,15 @@ WidgetLayer::WidgetLayer(QWidget* area, QObject* parent)
     area->setAutoFillBackground(false);
     area->installEventFilter(this);
     connect(area, &QObject::destroyed, this, [this] { d->surface.reset(); });
+    connect(&d->output, &ScreenMode::modeChanged, this, [this] {
+        if (!d->source.isEmpty()) {
+            d->picture = Picture::load(d->source, d->options, d->output.mode());
+            d->dirty = true;
+            update();
+            if (d->area)
+                d->area->update();
+        }
+    });
     d->timer.setInterval(33);
     connect(&d->timer, &QTimer::timeout, this, &WidgetLayer::update);
     d->timer.start();
@@ -72,8 +86,10 @@ WidgetLayer::~WidgetLayer()
         d->area->window()->update();
     }
 }
-bool WidgetLayer::prepareWindow(QWidget* window)
+bool WidgetLayer::prepareWindow(QWidget *window)
 {
+    if (window->property("stereoLayerPrepared").toBool())
+        return true;
     if (window->windowHandle() || window->testAttribute(Qt::WA_WState_Created))
         return false;
     if (!isSupported())
@@ -86,15 +102,26 @@ bool WidgetLayer::prepareWindow(QWidget* window)
     return true;
 }
 bool WidgetLayer::isSupported() { return Surface::isSupported(); }
-void WidgetLayer::setPicture(const Picture& picture)
+void WidgetLayer::setPicture(const Picture &picture)
 {
+    d->source.clear();
     d->picture = picture;
     d->dirty = true;
     update();
     if (d->area)
         d->area->update();
 }
-void WidgetLayer::setTransform(qreal zoom, const QPointF& pan)
+void WidgetLayer::setSource(const QString &path, const Picture::Options &options)
+{
+    d->source = path;
+    d->options = options;
+    d->picture = Picture::load(path, options, d->output.mode());
+    d->dirty = true;
+    update();
+    if (d->area)
+        d->area->update();
+}
+void WidgetLayer::setTransform(qreal zoom, const QPointF &pan)
 {
     d->zoom = zoom;
     d->pan = pan;
@@ -105,7 +132,7 @@ void WidgetLayer::setTransform(qreal zoom, const QPointF& pan)
 }
 void WidgetLayer::setPaintArea(bool enabled) { d->paintArea = enabled; }
 bool WidgetLayer::isActive() const { return d->active; }
-void WidgetLayer::paint(QPainter* painter)
+void WidgetLayer::paint(QPainter *painter)
 {
     if (!d->area)
         return;
@@ -117,7 +144,7 @@ void WidgetLayer::paint(QPainter* painter)
         painter->drawImage(d->area->rect(), renderMono(d->picture.original, pixels, d->zoom, d->pan));
     }
 }
-bool WidgetLayer::eventFilter(QObject* object, QEvent* event)
+bool WidgetLayer::eventFilter(QObject *object, QEvent *event)
 {
     if (object == d->area && event->type() == QEvent::Paint && d->paintArea) {
         QPainter painter(d->area);
@@ -132,6 +159,15 @@ bool WidgetLayer::eventFilter(QObject* object, QEvent* event)
 }
 void WidgetLayer::update()
 {
+    QWindow *window = d->area ? d->area->window()->windowHandle() : nullptr;
+    if (window != d->window) {
+        if (d->window)
+            disconnect(d->window, nullptr, &d->output, nullptr);
+        d->window = window;
+        if (window)
+            connect(window, &QWindow::screenChanged, &d->output, &ScreenMode::setScreen);
+        d->output.setScreen(window ? window->screen() : nullptr);
+    }
     const bool visible = d->area && d->area->isVisible() && !d->area->size().isEmpty();
     bool active = false;
     if (visible && d->picture.isStereo() && d->area->window()->testAttribute(Qt::WA_TranslucentBackground)) {
@@ -144,7 +180,7 @@ void WidgetLayer::update()
         }
         active = d->surface.show(d->area->window()->windowHandle(), QRect(d->area->mapTo(d->area->window(), QPoint()), d->area->size()), d->packed);
     } else if (!visible) {
-        d->surface.hide();
+        d->surface.reset();
     } else {
         d->surface.reset();
     }

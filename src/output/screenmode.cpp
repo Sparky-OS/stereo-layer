@@ -16,12 +16,12 @@ struct ScreenMode::Private {
     KScreen::ConfigPtr config;
     OutputMode mode = OutputMode::Unknown;
 };
-ScreenMode::ScreenMode(QObject* parent)
+ScreenMode::ScreenMode(QObject *parent)
     : QObject(parent)
     , d(std::make_unique<Private>())
 {
     connect(KScreen::ConfigMonitor::instance(), &KScreen::ConfigMonitor::configurationChanged, this, &ScreenMode::update);
-    auto* operation = new KScreen::GetConfigOperation(KScreen::ConfigOperation::NoEDID, this);
+    auto *operation = new KScreen::GetConfigOperation(KScreen::ConfigOperation::NoEDID, this);
     connect(operation, &KScreen::ConfigOperation::finished, this, [this, operation] {
         if (!operation->hasError()) {
             d->config = operation->config();
@@ -35,7 +35,7 @@ ScreenMode::~ScreenMode()
     if (d->config)
         KScreen::ConfigMonitor::instance()->removeConfig(d->config);
 }
-void ScreenMode::setScreen(QScreen* screen)
+void ScreenMode::setScreen(QScreen *screen)
 {
     if (d->screen == screen)
         return;
@@ -46,13 +46,13 @@ void ScreenMode::setScreen(QScreen* screen)
         connect(screen, &QObject::destroyed, this, &ScreenMode::update);
     update();
 }
-QScreen* ScreenMode::screen() const { return d->screen; }
+QScreen *ScreenMode::screen() const { return d->screen; }
 OutputMode ScreenMode::mode() const { return d->mode; }
 void ScreenMode::update()
 {
     OutputMode mode = OutputMode::Unknown;
     if (d->screen && d->config) {
-        for (const auto& output : d->config->outputs()) {
+        for (const auto &output : d->config->outputs()) {
             if (output->name() != d->screen->name() || !output->isEnabled() || !output->isConnected())
                 continue;
             const auto active = output->currentMode();
@@ -60,7 +60,7 @@ void ScreenMode::update()
                 break;
             switch (active->stereo3D()) {
             case KScreen::Mode::Stereo3D::None:
-                mode = OutputMode::Mono;
+                mode = output->stereoPairMode() == KScreen::Output::StereoPairMode::None ? OutputMode::Mono : OutputMode::Stereo;
                 break;
             case KScreen::Mode::Stereo3D::AnaglyphModern:
             case KScreen::Mode::Stereo3D::AnaglyphCrt:

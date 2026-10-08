@@ -5,6 +5,6 @@
 #include <QPointF>
 namespace Stereo
 {
-STEREO_LAYER_EXPORT QImage renderEyes(const Picture& picture, const QSize& eyePixels, qreal zoom = 1, const QPointF& pan = {});
-STEREO_LAYER_EXPORT QImage renderMono(const QImage& image, const QSize& pixels, qreal zoom = 1, const QPointF& pan = {});
+STEREO_LAYER_EXPORT QImage renderEyes(const Picture &picture, const QSize &eyePixels, qreal zoom = 1, const QPointF &pan = {});
+STEREO_LAYER_EXPORT QImage renderMono(const QImage &image, const QSize &pixels, qreal zoom = 1, const QPointF &pan = {});
 }

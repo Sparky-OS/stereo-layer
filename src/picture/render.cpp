@@ -7,19 +7,19 @@ namespace Stereo
 {
 namespace
 {
-QRectF destination(const QSize& image, const QSize& pixels, qreal zoom, const QPointF& pan)
+QRectF destination(const QSize &image, const QSize &pixels, qreal zoom, const QPointF &pan)
 {
     const QSize fitted = image.scaled(pixels, Qt::KeepAspectRatio);
     const QSizeF scaled(fitted.width() * zoom, fitted.height() * zoom);
     return QRectF(QPointF((pixels.width() - scaled.width()) / 2, (pixels.height() - scaled.height()) / 2) + pan, scaled);
 }
-bool valid(const QSize& pixels, qreal zoom, const QPointF& pan)
+bool valid(const QSize &pixels, qreal zoom, const QPointF &pan)
 {
     return !pixels.isEmpty() && pixels.width() <= 8192 && pixels.height() <= 16384 && qint64(pixels.width()) * pixels.height() <= 64 * 1024 * 1024
         && std::isfinite(zoom) && zoom > 0 && std::isfinite(pan.x()) && std::isfinite(pan.y());
 }
 }
-QImage renderEyes(const Picture& picture, const QSize& eyePixels, qreal zoom, const QPointF& pan)
+QImage renderEyes(const Picture &picture, const QSize &eyePixels, qreal zoom, const QPointF &pan)
 {
     if (!picture.isStereo() || !valid(eyePixels, zoom, pan))
         return {};
@@ -34,7 +34,7 @@ QImage renderEyes(const Picture& picture, const QSize& eyePixels, qreal zoom, co
     painter.drawImage(rect.translated(eyePixels.width(), 0), picture.right);
     return image;
 }
-QImage renderMono(const QImage& source, const QSize& pixels, qreal zoom, const QPointF& pan)
+QImage renderMono(const QImage &source, const QSize &pixels, qreal zoom, const QPointF &pan)
 {
     if (source.isNull() || !valid(pixels, zoom, pan))
         return {};

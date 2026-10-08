@@ -17,17 +17,17 @@ struct ColorEdges {
     std::array<QVector<double>, 3> channels;
 };
 
-ColorEdges colorEdges(const QImage& image)
+ColorEdges colorEdges(const QImage &image)
 {
     const QImage sample = image.scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation).convertToFormat(QImage::Format_RGB32);
     ColorEdges edges;
     edges.width = std::max(0, sample.width() - 2);
     edges.height = sample.height();
-    for (auto& channel : edges.channels) {
+    for (auto &channel : edges.channels) {
         channel.reserve(edges.width * edges.height);
     }
     for (int y = 0; y < edges.height; ++y) {
-        const auto* row = reinterpret_cast<const QRgb*>(sample.constScanLine(y));
+        const auto *row = reinterpret_cast<const QRgb *>(sample.constScanLine(y));
         for (int x = 0; x < edges.width; ++x) {
             edges.channels[0].append(qRed(row[x + 2]) - qRed(row[x]));
             edges.channels[1].append(qGreen(row[x + 2]) - qGreen(row[x]));
@@ -37,7 +37,7 @@ ColorEdges colorEdges(const QImage& image)
     return edges;
 }
 
-double channelCorrelation(const ColorEdges& edges, int firstChannel, int secondChannel, int offset, int limit)
+double channelCorrelation(const ColorEdges &edges, int firstChannel, int secondChannel, int offset, int limit)
 {
     double firstSum = 0;
     double secondSum = 0;
@@ -48,8 +48,8 @@ double channelCorrelation(const ColorEdges& edges, int firstChannel, int secondC
     if (count <= 0) {
         return 0;
     }
-    const auto& first = edges.channels[firstChannel];
-    const auto& second = edges.channels[secondChannel];
+    const auto &first = edges.channels[firstChannel];
+    const auto &second = edges.channels[secondChannel];
     for (int y = 0; y < edges.height; ++y) {
         for (int x = limit; x < edges.width - limit; ++x) {
             const int index = y * edges.width + x;
@@ -68,7 +68,7 @@ double channelCorrelation(const ColorEdges& edges, int firstChannel, int secondC
     return denominator == 0 ? 0 : numerator / denominator;
 }
 
-double anaglyphScore(const ColorEdges& edges, Picture::AnaglyphColorPair pair)
+double anaglyphScore(const ColorEdges &edges, Picture::AnaglyphColorPair pair)
 {
     const int firstChannel = pair == Picture::AnaglyphColorPair::RedCyan ? 0 : (pair == Picture::AnaglyphColorPair::GreenMagenta ? 1 : 2);
     const int secondChannel = (firstChannel + 1) % 3;
@@ -91,7 +91,7 @@ double anaglyphScore(const ColorEdges& edges, Picture::AnaglyphColorPair pair)
     return best >= 0.2 ? best - zero : 0;
 }
 
-int anaglyphChannel(const QColor& color, Picture::AnaglyphColorPair pair, bool left, int channel)
+int anaglyphChannel(const QColor &color, Picture::AnaglyphColorPair pair, bool left, int channel)
 {
     const int red = color.red();
     const int green = color.green();
@@ -119,7 +119,7 @@ int anaglyphChannel(const QColor& color, Picture::AnaglyphColorPair pair, bool l
 }
 }
 
-Picture Picture::fromAnaglyph(const QImage& image, AnaglyphColorPair pair)
+Picture Picture::fromAnaglyph(const QImage &image, AnaglyphColorPair pair)
 {
     Picture result;
     if (image.isNull() || pair == AnaglyphColorPair::None) {
@@ -142,7 +142,7 @@ Picture Picture::fromAnaglyph(const QImage& image, AnaglyphColorPair pair)
     return result;
 }
 
-Picture::AnaglyphColorPair Picture::detectAnaglyph(const QImage& image)
+Picture::AnaglyphColorPair Picture::detectAnaglyph(const QImage &image)
 {
     if (image.isNull()) {
         return AnaglyphColorPair::None;

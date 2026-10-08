@@ -19,54 +19,54 @@ namespace Stereo
 namespace
 {
 struct Globals {
-    wl_compositor* compositor = nullptr;
-    wl_subcompositor* subcompositor = nullptr;
-    wl_shm* shm = nullptr;
-    wp_viewporter* viewporter = nullptr;
+    wl_compositor *compositor = nullptr;
+    wl_subcompositor *subcompositor = nullptr;
+    wl_shm *shm = nullptr;
+    wp_viewporter *viewporter = nullptr;
     bool stereo = false;
 };
 
-void registryGlobal(void* data, wl_registry* registry, uint32_t name, const char* interface, uint32_t version)
+void registryGlobal(void *data, wl_registry *registry, uint32_t name, const char *interface, uint32_t version)
 {
-    auto* globals = static_cast<Globals*>(data);
+    auto *globals = static_cast<Globals *>(data);
     if (!strcmp(interface, wl_compositor_interface.name)) {
-        globals->compositor = static_cast<wl_compositor*>(wl_registry_bind(registry, name, &wl_compositor_interface, qMin(version, 4u)));
+        globals->compositor = static_cast<wl_compositor *>(wl_registry_bind(registry, name, &wl_compositor_interface, qMin(version, 4u)));
     } else if (!strcmp(interface, wl_subcompositor_interface.name)) {
-        globals->subcompositor = static_cast<wl_subcompositor*>(wl_registry_bind(registry, name, &wl_subcompositor_interface, 1));
+        globals->subcompositor = static_cast<wl_subcompositor *>(wl_registry_bind(registry, name, &wl_subcompositor_interface, 1));
     } else if (!strcmp(interface, wl_shm_interface.name)) {
-        globals->shm = static_cast<wl_shm*>(wl_registry_bind(registry, name, &wl_shm_interface, 1));
+        globals->shm = static_cast<wl_shm *>(wl_registry_bind(registry, name, &wl_shm_interface, 1));
     } else if (!strcmp(interface, wp_viewporter_interface.name)) {
-        globals->viewporter = static_cast<wp_viewporter*>(wl_registry_bind(registry, name, &wp_viewporter_interface, 1));
+        globals->viewporter = static_cast<wp_viewporter *>(wl_registry_bind(registry, name, &wp_viewporter_interface, 1));
     } else if (!strcmp(interface, "kde_stereo_content_manager_v1")) {
         globals->stereo = true;
     }
 }
 
-void registryGlobalRemove(void*, wl_registry*, uint32_t) { }
+void registryGlobalRemove(void *, wl_registry *, uint32_t) { }
 
 const wl_registry_listener registryListener = { registryGlobal, registryGlobalRemove };
 
-wl_display* waylandDisplay()
+wl_display *waylandDisplay()
 {
     if (QGuiApplication::platformName() != QLatin1String("wayland")) {
         return nullptr;
     }
-    auto* app = qGuiApp->nativeInterface<QNativeInterface::QWaylandApplication>();
+    auto *app = qGuiApp->nativeInterface<QNativeInterface::QWaylandApplication>();
     return app ? app->display() : nullptr;
 }
 
-wl_registry* readGlobals(wl_display* display, wl_event_queue* queue, Globals& globals)
+wl_registry *readGlobals(wl_display *display, wl_event_queue *queue, Globals &globals)
 {
-    auto* wrapper = static_cast<wl_display*>(wl_proxy_create_wrapper(display));
-    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(wrapper), queue);
-    wl_registry* registry = wl_display_get_registry(wrapper);
+    auto *wrapper = static_cast<wl_display *>(wl_proxy_create_wrapper(display));
+    wl_proxy_set_queue(reinterpret_cast<wl_proxy *>(wrapper), queue);
+    wl_registry *registry = wl_display_get_registry(wrapper);
     wl_proxy_wrapper_destroy(wrapper);
     wl_registry_add_listener(registry, &registryListener, &globals);
     wl_display_roundtrip_queue(display, queue);
     return registry;
 }
 
-void destroyGlobals(Globals& globals)
+void destroyGlobals(Globals &globals)
 {
     if (globals.compositor) {
         wl_compositor_destroy(globals.compositor);
@@ -84,18 +84,18 @@ void destroyGlobals(Globals& globals)
 }
 
 struct Buffer {
-    wl_buffer* buffer = nullptr;
-    uchar* data = nullptr;
+    wl_buffer *buffer = nullptr;
+    uchar *data = nullptr;
     size_t size = 0;
     QSize pixels;
     bool busy = false;
 };
 
-void bufferRelease(void* data, wl_buffer*) { static_cast<Buffer*>(data)->busy = false; }
+void bufferRelease(void *data, wl_buffer *) { static_cast<Buffer *>(data)->busy = false; }
 
 const wl_buffer_listener bufferListener = { bufferRelease };
 
-void destroyBuffer(Buffer& buffer)
+void destroyBuffer(Buffer &buffer)
 {
     if (buffer.buffer) {
         wl_buffer_destroy(buffer.buffer);
@@ -106,7 +106,7 @@ void destroyBuffer(Buffer& buffer)
     buffer = {};
 }
 
-bool createBuffer(Buffer& buffer, wl_shm* shm, wl_event_queue* queue, const QSize& pixels)
+bool createBuffer(Buffer &buffer, wl_shm *shm, wl_event_queue *queue, const QSize &pixels)
 {
     if (pixels.isEmpty() || pixels.width() > 16384 || pixels.height() > 16384 || qint64(pixels.width()) * pixels.height() > 128 * 1024 * 1024) {
         return false;
@@ -120,18 +120,18 @@ bool createBuffer(Buffer& buffer, wl_shm* shm, wl_event_queue* queue, const QSiz
         }
         return false;
     }
-    void* data = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    void *data = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (data == MAP_FAILED) {
         close(fd);
         return false;
     }
-    wl_shm_pool* pool = wl_shm_create_pool(shm, fd, int(size));
+    wl_shm_pool *pool = wl_shm_create_pool(shm, fd, int(size));
     close(fd);
-    wl_buffer* wlBuffer = wl_shm_pool_create_buffer(pool, 0, pixels.width(), pixels.height(), stride, WL_SHM_FORMAT_XRGB8888);
+    wl_buffer *wlBuffer = wl_shm_pool_create_buffer(pool, 0, pixels.width(), pixels.height(), stride, WL_SHM_FORMAT_XRGB8888);
     wl_shm_pool_destroy(pool);
-    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(wlBuffer), queue);
+    wl_proxy_set_queue(reinterpret_cast<wl_proxy *>(wlBuffer), queue);
     buffer.buffer = wlBuffer;
-    buffer.data = static_cast<uchar*>(data);
+    buffer.data = static_cast<uchar *>(data);
     buffer.size = size;
     buffer.pixels = pixels;
     wl_buffer_add_listener(wlBuffer, &bufferListener, &buffer);
@@ -139,9 +139,9 @@ bool createBuffer(Buffer& buffer, wl_shm* shm, wl_event_queue* queue, const QSiz
 }
 
 struct Connection {
-    wl_display* display = nullptr;
-    wl_event_queue* queue = nullptr;
-    wl_registry* registry = nullptr;
+    wl_display *display = nullptr;
+    wl_event_queue *queue = nullptr;
+    wl_registry *registry = nullptr;
     Globals globals;
     bool initialized = false;
     Connection()
@@ -187,14 +187,15 @@ std::shared_ptr<Connection> connection()
 struct Surface::Private {
     std::shared_ptr<Connection> connection;
     QPointer<QWindow> parent;
-    wl_surface* parentSurface = nullptr;
-    wl_surface* surface = nullptr;
-    wl_subsurface* subsurface = nullptr;
-    wp_viewport* viewport = nullptr;
+    wl_surface *parentSurface = nullptr;
+    wl_surface *surface = nullptr;
+    wl_subsurface *subsurface = nullptr;
+    wp_viewport *viewport = nullptr;
     Buffer buffers[3];
     bool declared = false;
     bool shown = false;
     QRect placed;
+    qint64 cacheKey = 0;
 };
 Surface::Surface()
     : d(std::make_unique<Private>())
@@ -212,8 +213,10 @@ void Surface::reset()
         wl_subsurface_destroy(d->subsurface);
     if (d->surface)
         wl_surface_destroy(d->surface);
-    for (auto& buffer : d->buffers)
+    for (auto &buffer : d->buffers)
         destroyBuffer(buffer);
+    if (d->parent)
+        d->parent->requestUpdate();
     d = std::make_unique<Private>();
 }
 void Surface::hide()
@@ -225,7 +228,7 @@ void Surface::hide()
         d->shown = false;
     }
 }
-bool Surface::show(QWindow* parent, const QRect& rect, const QImage& packed)
+bool Surface::show(QWindow *parent, const QRect &rect, const QImage &packed)
 {
     Q_ASSERT(QThread::currentThread() == qGuiApp->thread());
     if (!parent || !parent->isVisible() || rect.isEmpty() || packed.isNull()) {
@@ -234,7 +237,7 @@ bool Surface::show(QWindow* parent, const QRect& rect, const QImage& packed)
     }
     if (QGuiApplication::platformName() != QLatin1String("wayland"))
         return false;
-    auto* native = parent->nativeInterface<QNativeInterface::Private::QWaylandWindow>();
+    auto *native = parent->nativeInterface<QNativeInterface::Private::QWaylandWindow>();
     if (!native || !native->surface())
         return false;
     if (d->parent != parent || d->parentSurface != native->surface())
@@ -245,20 +248,22 @@ bool Surface::show(QWindow* parent, const QRect& rect, const QImage& packed)
             return false;
         d->parent = parent;
         d->parentSurface = native->surface();
-        auto& globals = d->connection->globals;
+        auto &globals = d->connection->globals;
         d->surface = wl_compositor_create_surface(globals.compositor);
         d->subsurface = wl_subcompositor_get_subsurface(globals.subcompositor, d->surface, native->surface());
         wl_subsurface_place_below(d->subsurface, native->surface());
         wl_subsurface_set_desync(d->subsurface);
         d->viewport = wp_viewporter_get_viewport(globals.viewporter, d->surface);
-        wl_region* empty = wl_compositor_create_region(globals.compositor);
+        wl_region *empty = wl_compositor_create_region(globals.compositor);
         wl_surface_set_input_region(d->surface, empty);
         wl_region_destroy(empty);
     }
-    auto& c = *d->connection;
+    auto &c = *d->connection;
     wl_display_dispatch_queue_pending(c.display, c.queue);
-    Buffer* buffer = nullptr;
-    for (auto& candidate : d->buffers) {
+    if (d->shown && d->placed == rect && d->cacheKey == packed.cacheKey())
+        return true;
+    Buffer *buffer = nullptr;
+    for (auto &candidate : d->buffers) {
         if (candidate.busy)
             continue;
         if (candidate.buffer && candidate.pixels != packed.size())
@@ -278,7 +283,7 @@ bool Surface::show(QWindow* parent, const QRect& rect, const QImage& packed)
     if (d->placed != rect) {
         wl_subsurface_set_position(d->subsurface, rect.x(), rect.y());
         wp_viewport_set_destination(d->viewport, rect.width(), rect.height());
-        wl_region* opaque = wl_compositor_create_region(c.globals.compositor);
+        wl_region *opaque = wl_compositor_create_region(c.globals.compositor);
         wl_region_add(opaque, 0, 0, rect.width(), rect.height());
         wl_surface_set_opaque_region(d->surface, opaque);
         wl_region_destroy(opaque);
@@ -297,6 +302,7 @@ bool Surface::show(QWindow* parent, const QRect& rect, const QImage& packed)
     wl_surface_commit(d->surface);
     wl_display_flush(c.display);
     d->shown = true;
+    d->cacheKey = packed.cacheKey();
     return true;
 }
 }
