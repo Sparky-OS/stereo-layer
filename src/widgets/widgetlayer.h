@@ -22,6 +22,7 @@ public:
     void setTransform(qreal zoom, const QPointF &pan);
     void setPaintArea(bool enabled);
     bool isActive() const;
+    bool approximateColor() const;
     void paint(QPainter *painter);
 Q_SIGNALS:
     void activeChanged();

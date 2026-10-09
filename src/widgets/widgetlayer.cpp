@@ -132,6 +132,7 @@ void WidgetLayer::setTransform(qreal zoom, const QPointF &pan)
 }
 void WidgetLayer::setPaintArea(bool enabled) { d->paintArea = enabled; }
 bool WidgetLayer::isActive() const { return d->active; }
+bool WidgetLayer::approximateColor() const { return d->picture.approximateColor; }
 void WidgetLayer::paint(QPainter *painter)
 {
     if (!d->area)
