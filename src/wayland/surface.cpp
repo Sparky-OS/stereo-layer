@@ -277,14 +277,16 @@ bool Surface::show(QWindow *parent, const QRect &rect, const QImage &packed)
     painter.setCompositionMode(QPainter::CompositionMode_Source);
     painter.drawImage(0, 0, packed);
     painter.end();
-    if (d->placed != rect) {
-        wl_subsurface_set_position(d->subsurface, rect.x(), rect.y());
+    // The parent surface starts at Qt's own decoration, when it draws one.
+    const QRect placed = rect.translated(parent->frameMargins().left(), parent->frameMargins().top());
+    if (d->placed != placed) {
+        wl_subsurface_set_position(d->subsurface, placed.x(), placed.y());
         wp_viewport_set_destination(d->viewport, rect.width(), rect.height());
         wl_region *opaque = wl_compositor_create_region(c.globals.compositor);
         wl_region_add(opaque, 0, 0, rect.width(), rect.height());
         wl_surface_set_opaque_region(d->surface, opaque);
         wl_region_destroy(opaque);
-        d->placed = rect;
+        d->placed = placed;
         parent->requestUpdate();
     }
     if (!d->declared) {
