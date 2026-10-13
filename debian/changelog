@@ -1,3 +1,13 @@
+stereo-layer (1.1.0-1) unstable; urgency=medium
+
+  * Add Stereo::Video and stereo_layer_video_layout(): the players' shared
+    rule for video, with a frame taken for side by side by its shape alone
+    only at three times as wide as high or more.
+  * Build-Depends: kimageformat6-plugins, for the reader tests (MPO and JPS);
+    without it they failed in a clean build environment.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Tue, 13 Oct 2026 02:00:00 -0300
+
 stereo-layer (1.0.2-1) unstable; urgency=medium
 
   * Place the picture surface below Qt-drawn window decorations.

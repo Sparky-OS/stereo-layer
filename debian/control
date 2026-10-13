@@ -2,7 +2,7 @@ Source: stereo-layer
 Section: libs
 Priority: optional
 Maintainer: Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>
-Build-Depends: debhelper-compat (= 13), cmake, extra-cmake-modules, ninja-build, pkgconf, qt6-base-dev, qt6-base-private-dev, qt6-declarative-dev, qml6-module-qtquick, qt6-wayland-dev, libwayland-dev, wayland-protocols, libstereo-declare-dev, libkscreen-dev (>= 4:6.7.4-1+stereo3d4), libkscreen-bin (>= 4:6.7.4-1+stereo3d4)
+Build-Depends: debhelper-compat (= 13), cmake, extra-cmake-modules, ninja-build, pkgconf, qt6-base-dev, qt6-base-private-dev, qt6-declarative-dev, qml6-module-qtquick, qt6-wayland-dev, libwayland-dev, wayland-protocols, libstereo-declare-dev, libkscreen-dev (>= 4:6.7.4-1+stereo3d4), libkscreen-bin (>= 4:6.7.4-1+stereo3d4), kimageformat6-plugins (>= 6.30.0-1+stereo3d2) <!nocheck>
 Standards-Version: 4.7.3
 Rules-Requires-Root: no
 Homepage: https://sparkylinux.org
