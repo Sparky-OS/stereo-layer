@@ -20,7 +20,10 @@ The item's window needs an alpha buffer before native creation. The item prepare
 
 The integer properties use the public C++ enum values: layout 0 automatic, 1 side by side, 2 top and bottom, 3 multiview, 4 rows, 5 columns; order 0 left first, 1 right first; anaglyph 0 automatic, 1 red/cyan, 2 green/magenta, 3 amber/blue; view 0 stereo, 1 left only, 2 right only, 3 original 2D. Checkerboard input is reserved and unsupported. Format descriptions are separate from display choices such as Swap Eyes and original 2D.
 
-## Anaglyph colour
+## Video
+
+Players share one rule through `Stereo::Video::layout(displaySize, mark, options)` (header `video.h`): the stream's own mark first (Matroska's StereoMode, RFC 9559; the frame packing SEI of H.264 and H.265, Table D-8; the st3d box), in the words of the `Stereo3DLayout` text, then the user's choice, then the frame's shape. A frame without a mark is side by side by its shape alone only when it is at least three times as wide as high (`Video::SideBySideShape`): two pictures next to each other, as full side by side 16:9 (3.56:1) is, never one picture, as a 2.39:1 scope film is. Below that, and for top and bottom, the shape decides nothing and the user's choice covers the rest. `displaySize` is the frame as shown, with its sample aspect ratio applied. Programs without Qt, or that load the library at run time, call `stereo_layer_video_layout(width, height, mark, &layout, &order, &source)`, which returns the same enum values as integers. Still pictures keep `Picture`'s own rule.
+
 
 Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed. Present `Picture::colorDisclaimer()` when offering conversion; Quick exposes `colorDisclaimer` and `approximateColor` for the interface to show the note.
 

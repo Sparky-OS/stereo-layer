@@ -20,13 +20,14 @@ pkg_check_modules(STEREO_DECLARE REQUIRED IMPORTED_TARGET stereo-declare)
 pkg_check_modules(WAYLAND REQUIRED IMPORTED_TARGET wayland-client)
 pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
 add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/anaglyph.cpp src/picture/panorama.cpp src/picture/render.cpp
+    src/video/video.cpp src/video/video.h
     src/output/screenmode.cpp src/output/screenmode.h
     src/wayland/surface.cpp src/wayland/surface_p.h
     src/widgets/widgetlayer.cpp src/widgets/widgetlayer.h)
 add_library(Stereo::Layer ALIAS StereoLayer)
 ecm_generate_export_header(StereoLayer BASE_NAME STEREO_LAYER VERSION ${PROJECT_VERSION} EXPORT_FILE_NAME stereo_layer_export.h)
 set_target_properties(StereoLayer PROPERTIES OUTPUT_NAME stereo-layer VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Layer)
-target_include_directories(StereoLayer PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/picture> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/widgets> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/output> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/quick> $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-layer>)
+target_include_directories(StereoLayer PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/picture> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/video> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/widgets> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/output> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/quick> $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-layer>)
 target_link_libraries(StereoLayer PUBLIC Qt6::Gui Qt6::Quick PRIVATE Qt6::Widgets Qt6::GuiPrivate KF6::Screen PkgConfig::STEREO_DECLARE PkgConfig::WAYLAND)
 target_include_directories(StereoLayer PRIVATE src/wayland)
 qt6_generate_wayland_protocol_client_sources(StereoLayer FILES ${WAYLAND_PROTOCOLS_DIR}/stable/viewporter/viewporter.xml)
@@ -37,7 +38,7 @@ set_target_properties(StereoLayerplugin PROPERTIES PREFIX "${CMAKE_SHARED_LIBRAR
 install(TARGETS StereoLayerplugin DESTINATION ${KDE_INSTALL_QMLDIR}/org/sparky/stereo)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/qml/org/sparky/stereo/qmldir ${CMAKE_CURRENT_BINARY_DIR}/qml/org/sparky/stereo/StereoLayer.qmltypes DESTINATION ${KDE_INSTALL_QMLDIR}/org/sparky/stereo)
 install(TARGETS StereoLayer EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
-install(FILES src/picture/picture.h src/picture/render.h src/widgets/widgetlayer.h src/output/screenmode.h src/quick/pictureitem.h ${CMAKE_CURRENT_BINARY_DIR}/stereo_layer_export.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-layer)
+install(FILES src/picture/picture.h src/picture/render.h src/video/video.h src/widgets/widgetlayer.h src/output/screenmode.h src/quick/pictureitem.h ${CMAKE_CURRENT_BINARY_DIR}/stereo_layer_export.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-layer)
 install(EXPORT StereoLayerTargets NAMESPACE Stereo:: DESTINATION ${KDE_INSTALL_CMAKEPACKAGEDIR}/StereoLayer)
 configure_package_config_file(cmake/StereoLayerConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/StereoLayerConfig.cmake INSTALL_DESTINATION ${KDE_INSTALL_CMAKEPACKAGEDIR}/StereoLayer)
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/StereoLayerConfigVersion.cmake VERSION ${PROJECT_VERSION} COMPATIBILITY SameMajorVersion)
