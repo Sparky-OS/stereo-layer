@@ -29,6 +29,8 @@ private Q_SLOTS:
     void loadPair_data();
     void loadPair();
     void loadPairPng();
+    void svgStereo_data();
+    void svgStereo();
 };
 static QImage packed()
 {
@@ -370,6 +372,47 @@ void PictureTest::loadPairPng()
     QVERIFY(image.save(dir.filePath(QStringLiteral("shape.png"))));
     QCOMPARE(Picture::loadPair(dir.filePath(QStringLiteral("shape.png")), QSize(256, 256), {}).source, Picture::Source::Shape);
     QVERIFY(Picture().sideBySide().isNull());
+}
+void PictureTest::svgStereo_data()
+{
+    QTest::addColumn<QString>("root");
+    QTest::addColumn<bool>("pair");
+    QTest::addColumn<bool>("rightFirst");
+    const QString svg = QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' xmlns:svgstereo='https://github.com/Sparky-OS/svgstereo' ");
+    QTest::newRow("left first") << svg + QStringLiteral("svgstereo:layout='sideBySideLeftFirst'") << true << false;
+    QTest::newRow("right first") << svg + QStringLiteral("svgstereo:layout='sideBySideRightFirst'") << true << true;
+    QTest::newRow("mono") << svg + QStringLiteral("svgstereo:layout='mono'") << false << false;
+    QTest::newRow("unmarked 2:1 drawing") << svg << false << false;
+    QTest::newRow("another namespace") << QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' xmlns:s='https://example.org/other' s:layout='sideBySideLeftFirst'")
+                                       << false << false;
+}
+void PictureTest::svgStereo()
+{
+    QFETCH(QString, root);
+    QFETCH(bool, pair);
+    QFETCH(bool, rightFirst);
+    if (!QImageReader::supportedImageFormats().contains("svg")) {
+        QSKIP("Qt's SVG image plugin is not installed");
+    }
+    const QString document = root
+        + QStringLiteral(" width='200' height='100' viewBox='0 0 200 100'><rect width='100' height='100' fill='#ff0000'/>"
+                         "<rect x='100' width='100' height='100' fill='#0000ff'/></svg>");
+    QTemporaryDir dir;
+    QFile file(dir.filePath(QStringLiteral("pair.svg")));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(document.toUtf8());
+    file.close();
+    const auto loaded = Picture::loadPair(file.fileName(), QSize(256, 256), {});
+    QCOMPARE(loaded.isStereo(), pair);
+    const auto full = Picture::load(file.fileName(), {}, OutputMode::Stereo);
+    QCOMPARE(full.isStereo(), pair);
+    if (!pair) {
+        return;
+    }
+    QCOMPARE(loaded.source, Picture::Source::FileMark);
+    QCOMPARE(loaded.left.size(), QSize(128, 128));
+    QCOMPARE(loaded.left.pixelColor(64, 64), rightFirst ? QColor(Qt::blue) : QColor(Qt::red));
+    QCOMPARE(loaded.right.pixelColor(64, 64), rightFirst ? QColor(Qt::red) : QColor(Qt::blue));
 }
 
 QTEST_MAIN(PictureTest)

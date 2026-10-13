@@ -9,6 +9,7 @@
 #include <QFileInfo>
 #include <QImageReader>
 #include <QPainter>
+#include <QXmlStreamReader>
 #include <QtEndian>
 #include <algorithm>
 
@@ -94,6 +95,25 @@ bool hasStereoMpfIndex(const QByteArray &data)
     return false;
 }
 
+// The SVGStereo mark: an attribute of the root svg element in a namespace of its own, layout="sideBySideLeftFirst" and the
+// other Stereo3DLayout values, with the viewBox holding both views. SVG renderers ignore attributes from other namespaces
+// (SVG 1.1 Second Edition, 23.1 "Foreign namespaces and private data"), so a marked file draws as before everywhere else.
+constexpr QLatin1StringView svgStereoNamespace("https://github.com/Sparky-OS/svgstereo");
+
+QString svgStereoLayout(const QByteArray &header)
+{
+    QXmlStreamReader xml(header);
+    while (!xml.atEnd()) {
+        if (xml.readNext() == QXmlStreamReader::StartElement) {
+            if (xml.name() != QLatin1String("svg") || xml.namespaceUri() != QLatin1String("http://www.w3.org/2000/svg")) {
+                return {};
+            }
+            return xml.attributes().value(svgStereoNamespace, QLatin1String("layout")).toString();
+        }
+    }
+    return {};
+}
+
 struct Decision {
     Picture::Layout packing = Picture::Layout::None;
     Picture::EyeOrder order = Picture::EyeOrder::LeftFirst;
@@ -105,9 +125,11 @@ struct Decision {
 };
 
 // What the file's marks, its format and the user's choice say, before any pixel is read.
-Decision decide(const QString &metadata, const QByteArray &format, const QByteArray &header, bool second, const Picture::Options &options)
+Decision decide(const QString &fileMetadata, const QByteArray &format, const QByteArray &header, bool second, const Picture::Options &options)
 {
     Decision result;
+    const bool drawing = format == "svg" || format == "svgz";
+    const QString metadata = fileMetadata.isEmpty() && format == "svg" ? svgStereoLayout(header) : fileMetadata;
     result.order = metadata.endsWith(QLatin1String("RightFirst")) || metadata == QLatin1String("anaglyphRedRight") ? Picture::EyeOrder::RightFirst
                                                                                                                   : Picture::EyeOrder::LeftFirst;
     const bool fallback = format == "jps" && (metadata.isEmpty() || (metadata == QLatin1String("sideBySideRightFirst") && !hasJpsDescriptor(header)));
@@ -146,7 +168,8 @@ Decision decide(const QString &metadata, const QByteArray &format, const QByteAr
         result.packing = Picture::Layout::SideBySide;
         result.order = Picture::EyeOrder::RightFirst;
         result.source = Picture::Source::Format;
-    } else {
+    } else if (!drawing) {
+        // A drawing is one picture unless it says otherwise: neither its colours nor its shape make it a pair.
         result.pixels = true;
         result.panorama = hasEquirectangularPanoramaMark(header);
     }

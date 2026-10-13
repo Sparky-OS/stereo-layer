@@ -6,6 +6,17 @@ The library consumes `Stereo3DLayout` from the edition's Qt and KImageFormats re
 
 A picture's stereo surface contains full side-by-side views, left first. The window's controls stay on its ordinary surface. Widget and Quick adapters share the Wayland backend and renderer. A connection owns declaration state for all its surfaces; releasing one does not release another.
 
+## Stereo SVG files
+
+SVG has no stereo mark of its own, so the policy reads a proposed one, SVGStereo: an attribute `layout` in the namespace `https://github.com/Sparky-OS/svgstereo` on the root `svg` element, with the `Stereo3DLayout` values (`sideBySideLeftFirst`, `sideBySideRightFirst`, `topBottomLeftFirst`, `mono` and the rest), the viewBox holding both views:
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:svgstereo="https://github.com/Sparky-OS/svgstereo"
+     svgstereo:layout="sideBySideLeftFirst" viewBox="0 0 200 100">
+```
+
+SVG renderers ignore attributes from other namespaces (SVG 1.1 Second Edition, section 23.1, "Foreign namespaces and private data"), so a marked file draws as before everywhere else. An SVG without the mark is a drawing, one picture: neither its colours nor its shape make it a pair. The namespace and the attribute name are a proposal until they are published.
+
 ## Widget clients
 
 Find `StereoLayer` with CMake and link `Stereo::Layer`. Call `Stereo::WidgetLayer::prepareWindow(topLevel)` before the native window is created. Create a `WidgetLayer` on the dedicated picture widget and call `setSource(path, options)`. The layer follows its rectangle, visibility, screen, zoom and pan. The source-loading path follows the screen's active output mode.
