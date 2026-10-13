@@ -131,7 +131,7 @@ Decision decide(const QString &fileMetadata, const QByteArray &format, const QBy
     const bool drawing = format == "svg" || format == "svgz";
     const QString metadata = fileMetadata.isEmpty() && format == "svg" ? svgStereoLayout(header) : fileMetadata;
     result.order = metadata.endsWith(QLatin1String("RightFirst")) || metadata == QLatin1String("anaglyphRedRight") ? Picture::EyeOrder::RightFirst
-                                                                                                                  : Picture::EyeOrder::LeftFirst;
+                                                                                                                   : Picture::EyeOrder::LeftFirst;
     const bool fallback = format == "jps" && (metadata.isEmpty() || (metadata == QLatin1String("sideBySideRightFirst") && !hasJpsDescriptor(header)));
     if (format == "mpo" && metadata.isEmpty() && !hasStereoMpfIndex(header)) {
         result.source = Picture::Source::FileMark;
@@ -371,7 +371,8 @@ QImage Picture::sideBySide() const
         return {};
     }
     const bool alpha = left.hasAlphaChannel() || right.hasAlphaChannel();
-    QImage image(left.width() + right.width(), qMax(left.height(), right.height()), alpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32);
+    QImage image(
+        left.width() + right.width(), qMax(left.height(), right.height()), alpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32);
     image.fill(Qt::transparent);
     QPainter painter(&image);
     painter.setCompositionMode(QPainter::CompositionMode_Source);

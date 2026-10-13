@@ -7,8 +7,7 @@ namespace Stereo
 {
 bool Video::sideBySideByShape(QSize displaySize)
 {
-    return displaySize.width() > 0 && displaySize.height() > 0
-        && qint64(displaySize.width()) >= qint64(displaySize.height()) * SideBySideShape;
+    return displaySize.width() > 0 && displaySize.height() > 0 && qint64(displaySize.width()) >= qint64(displaySize.height()) * SideBySideShape;
 }
 
 Video::Layout Video::layout(QSize displaySize, const QString &mark, const Picture::Options &options)

@@ -383,7 +383,8 @@ void PictureTest::svgStereo_data()
     QTest::newRow("right first") << svg + QStringLiteral("svgstereo:layout='sideBySideRightFirst'") << true << true;
     QTest::newRow("mono") << svg + QStringLiteral("svgstereo:layout='mono'") << false << false;
     QTest::newRow("unmarked 2:1 drawing") << svg << false << false;
-    QTest::newRow("another namespace") << QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' xmlns:s='https://example.org/other' s:layout='sideBySideLeftFirst'")
+    QTest::newRow("another namespace") << QStringLiteral(
+        "<svg xmlns='http://www.w3.org/2000/svg' xmlns:s='https://example.org/other' s:layout='sideBySideLeftFirst'")
                                        << false << false;
 }
 void PictureTest::svgStereo()
