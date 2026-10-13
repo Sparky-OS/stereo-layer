@@ -21,6 +21,8 @@ private Q_SLOTS:
     void detector();
     void geometry();
     void panorama();
+    void shape_data();
+    void shape();
     void readerIntegration_data();
     void readerIntegration();
 };
@@ -214,6 +216,32 @@ void PictureTest::panorama()
     const auto marked = Picture::fromImages(packed(), {}, QStringLiteral("sideBySideLeftFirst"), "jpg", header, {}, OutputMode::Stereo);
     QVERIFY(marked.isStereo());
     QCOMPARE(marked.source, Picture::Source::FileMark);
+}
+void PictureTest::shape_data()
+{
+    QTest::addColumn<QSize>("size");
+    QTest::addColumn<bool>("pair");
+    QTest::newRow("two squares") << QSize(200, 100) << true;
+    QTest::newRow("two 4:3") << QSize(800, 300) << true;
+    QTest::newRow("two 16:9") << QSize(3840, 1080) << true;
+    QTest::newRow("3.6:1") << QSize(360, 100) << true;
+    QTest::newRow("just under 2:1") << QSize(198, 100) << false;
+    QTest::newRow("panorama 4:1") << QSize(400, 100) << false;
+    QTest::newRow("tall 1:2") << QSize(100, 200) << false;
+    QTest::newRow("phone screenshot") << QSize(1080, 2340) << false;
+}
+void PictureTest::shape()
+{
+    QFETCH(QSize, size);
+    QFETCH(bool, pair);
+    QImage image(size, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    const auto picture = Picture::fromImages(image, {}, {}, "png", {}, {}, OutputMode::Stereo);
+    QCOMPARE(picture.isStereo(), pair);
+    QCOMPARE(picture.source, pair ? Picture::Source::Shape : Picture::Source::None);
+    if (pair) {
+        QCOMPARE(picture.layout, Picture::Layout::SideBySide);
+    }
 }
 void PictureTest::readerIntegration_data()
 {

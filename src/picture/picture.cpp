@@ -93,6 +93,73 @@ bool hasStereoMpfIndex(const QByteArray &data)
     return false;
 }
 
+struct Decision {
+    Picture::Layout packing = Picture::Layout::None;
+    Picture::EyeOrder order = Picture::EyeOrder::LeftFirst;
+    Picture::Source source = Picture::Source::None;
+    Picture::AnaglyphColorPair anaglyph = Picture::AnaglyphColorPair::None;
+    // Only the pixels can tell: anaglyph detection first, then the shape unless a panorama mark vetoes it.
+    bool pixels = false;
+    bool panorama = false;
+};
+
+// What the file's marks, its format and the user's choice say, before any pixel is read.
+Decision decide(const QString &metadata, const QByteArray &format, const QByteArray &header, bool second, const Picture::Options &options)
+{
+    Decision result;
+    result.order = metadata.endsWith(QLatin1String("RightFirst")) || metadata == QLatin1String("anaglyphRedRight") ? Picture::EyeOrder::RightFirst
+                                                                                                                  : Picture::EyeOrder::LeftFirst;
+    const bool fallback = format == "jps" && (metadata.isEmpty() || (metadata == QLatin1String("sideBySideRightFirst") && !hasJpsDescriptor(header)));
+    if (format == "mpo" && metadata.isEmpty() && !hasStereoMpfIndex(header)) {
+        result.source = Picture::Source::FileMark;
+        return result;
+    }
+    if (!metadata.isEmpty() && !fallback) {
+        result.source = Picture::Source::FileMark;
+        if (metadata.startsWith(QLatin1String("sideBySide")))
+            result.packing = Picture::Layout::SideBySide;
+        else if (metadata.startsWith(QLatin1String("topBottom")))
+            result.packing = Picture::Layout::TopAndBottom;
+        else if (metadata.startsWith(QLatin1String("multiView")))
+            result.packing = Picture::Layout::MultiView;
+        else if (metadata.startsWith(QLatin1String("rowInterleaved")))
+            result.packing = Picture::Layout::Rows;
+        else if (metadata.startsWith(QLatin1String("columnInterleaved")))
+            result.packing = Picture::Layout::Columns;
+        else if (metadata.startsWith(QLatin1String("checkerboard")))
+            result.packing = Picture::Layout::Checkerboard;
+        else if (metadata.startsWith(QLatin1String("anaglyphRed")))
+            result.anaglyph = Picture::AnaglyphColorPair::RedCyan;
+        return result;
+    }
+    if (options.inputLayout != Picture::Layout::None || options.anaglyph != Picture::AnaglyphColorPair::None) {
+        result.packing = options.inputLayout;
+        result.order = options.inputOrder;
+        result.anaglyph = options.anaglyph;
+        result.source = Picture::Source::User;
+    } else if (second) {
+        result.packing = Picture::Layout::MultiView;
+        result.order = Picture::EyeOrder::LeftFirst;
+        result.source = Picture::Source::Format;
+    } else if (fallback) {
+        result.packing = Picture::Layout::SideBySide;
+        result.order = Picture::EyeOrder::RightFirst;
+        result.source = Picture::Source::Format;
+    } else {
+        result.pixels = true;
+        result.panorama = hasEquirectangularPanoramaMark(header);
+    }
+    return result;
+}
+
+// A stereo photograph is two pictures next to each other: from two squares (2:1) to two 16:9 pictures (32:9, 3.56:1),
+// with a little margin. A wider picture is a panorama, and a tall one a portrait or a phone screenshot: the shape alone
+// never says top and bottom.
+bool pairByShape(const QSize &size)
+{
+    return size.height() > 0 && qint64(size.width()) >= qint64(size.height()) * 2 && qint64(size.width()) * 5 <= qint64(size.height()) * 18;
+}
+
 Picture unpackPng(const QImage &image, Picture::EyeOrder order)
 {
     const int padding = 15 - ((image.width() - 1) % 16);
@@ -140,68 +207,29 @@ Picture Picture::fromImages(const QImage &image, const QImage &second, const QSt
     if (image.isNull() || options.view == View::Mono) {
         return result;
     }
-    Layout packing = Layout::None;
-    EyeOrder order = metadata.endsWith(QLatin1String("RightFirst")) || metadata == QLatin1String("anaglyphRedRight") ? EyeOrder::RightFirst
-                                                                                                                     : EyeOrder::LeftFirst;
-    Source source = Source::None;
-    const bool fallback = format == "jps" && (metadata.isEmpty() || (metadata == QLatin1String("sideBySideRightFirst") && !hasJpsDescriptor(header)));
-    if (format == "mpo" && metadata.isEmpty() && !hasStereoMpfIndex(header)) {
-        result.source = Source::FileMark;
+    Decision decision = decide(metadata, format, header, !second.isNull(), options);
+    if (decision.pixels) {
+        decision.anaglyph = detectAnaglyph(image);
+        if (decision.anaglyph != AnaglyphColorPair::None) {
+            decision.source = Source::Detection;
+        } else if (!decision.panorama && pairByShape(image.size())) {
+            decision.packing = Layout::SideBySide;
+            decision.source = Source::Shape;
+        }
+    }
+    if (decision.packing == Layout::None && decision.anaglyph == AnaglyphColorPair::None) {
+        result.source = decision.source;
         return result;
     }
-    if (!metadata.isEmpty() && !fallback) {
-        source = Source::FileMark;
-        if (metadata == QLatin1String("mono")) {
-            result.source = Source::FileMark;
-            return result;
-        }
-        if (metadata.startsWith(QLatin1String("sideBySide")))
-            packing = Layout::SideBySide;
-        else if (metadata.startsWith(QLatin1String("topBottom")))
-            packing = Layout::TopAndBottom;
-        else if (metadata.startsWith(QLatin1String("multiView")))
-            packing = Layout::MultiView;
-        else if (metadata.startsWith(QLatin1String("rowInterleaved")))
-            packing = Layout::Rows;
-        else if (metadata.startsWith(QLatin1String("columnInterleaved")))
-            packing = Layout::Columns;
-        else if (metadata.startsWith(QLatin1String("checkerboard")))
-            packing = Layout::Checkerboard;
-        else if (metadata.startsWith(QLatin1String("anaglyphRed")))
-            result.anaglyph = AnaglyphColorPair::RedCyan;
-        else
-            return result;
-    } else if (options.inputLayout != Layout::None || options.anaglyph != AnaglyphColorPair::None) {
-        packing = options.inputLayout;
-        order = options.inputOrder;
-        result.anaglyph = options.anaglyph;
-        source = Source::User;
-    } else if (!second.isNull()) {
-        packing = Layout::MultiView;
-        order = EyeOrder::LeftFirst;
-        source = Source::Format;
-    } else if (fallback) {
-        packing = Layout::SideBySide;
-        order = EyeOrder::RightFirst;
-        source = Source::Format;
-    } else {
-        result.anaglyph = detectAnaglyph(image);
-        if (result.anaglyph != AnaglyphColorPair::None) {
-            source = Source::Detection;
-        } else if (!hasEquirectangularPanoramaMark(header)) {
-            if (qint64(image.width()) >= qint64(image.height()) * 2)
-                packing = Layout::SideBySide;
-            else if (qint64(image.height()) >= qint64(image.width()) * 2)
-                packing = Layout::TopAndBottom;
-            if (packing != Layout::None)
-                source = Source::Shape;
-        }
-    }
-    const auto anaglyph = result.anaglyph;
+    const Layout packing = decision.packing;
+    const EyeOrder order = decision.order;
+    const Source source = decision.source;
+    const auto anaglyph = decision.anaglyph;
     if (anaglyph != AnaglyphColorPair::None) {
         // The original anaglyph is already encoded for glasses on this output.
         if (output != OutputMode::Stereo) {
             result.source = source;
+            result.anaglyph = anaglyph;
             return result;
         }
         result = fromAnaglyph(image, anaglyph);
