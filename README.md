@@ -12,6 +12,10 @@ Find `StereoLayer` with CMake and link `Stereo::Layer`. Call `Stereo::WidgetLaye
 
 For viewers that already decode images, `Picture::fromImages` accepts raw frames, reader metadata, format and a bounded header. Pass the output mode from a `ScreenMode` watching this window's screen. `setPicture` presents that result. Set `setPaintArea(false)` when the adapter owns painting; call `paint` from that paint path to clear the hole or draw the ordinary image. Graphics-view adapters must also stop filling or brushing their viewport while the layer is active.
 
+## Thumbnails
+
+Programs that show pictures small call `Picture::loadPair(path, bound, options)`: the same policy as `load()` on an output that is not stereo, with each image decoded to fit within the bound where the reader can, and the views scaled so that both side by side fit it. A file whose marks, format and shape cannot make a pair is not decoded and gives an empty picture, so a thumbnailer keeps its own path for ordinary pictures. `Picture::sideBySide()` returns both views side by side, left first, with `Stereo3DLayout` set to `sideBySideLeftFirst` in the image's text: the form a thumbnail of a stereo file takes.
+
 ## Quick clients
 
 Import `org.sparky.stereo 1.0` and use `StereoPicture`. Its properties are `source`, `swapEyes`, `inputLayout`, `inputOrder`, `anaglyph`, `view`, `zoom` and `pan`. Each item follows its own window's screen and active output mode. Local and qrc URLs are supported, with relative QML URLs resolved in their context.

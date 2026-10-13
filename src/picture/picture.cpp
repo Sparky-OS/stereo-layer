@@ -8,6 +8,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImageReader>
+#include <QPainter>
 #include <QtEndian>
 #include <algorithm>
 
@@ -199,6 +200,54 @@ Picture Picture::load(const QString &path, const Options &options, OutputMode ou
     return fromImages(image, second, metadata, format, header, options, output);
 }
 
+Picture Picture::loadPair(const QString &path, const QSize &bound, const Options &options)
+{
+    QFile file(path);
+    if (bound.isEmpty() || options.view == View::Mono || !file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    const QByteArray header = file.peek(1024 * 1024);
+    const QByteArray extension = QFileInfo(path).suffix().toLatin1().toLower();
+    QImageReader reader(&file, extension == "jps" || extension == "mpo" ? extension : QByteArray());
+    QString metadata = reader.text(QStringLiteral("Stereo3DLayout"));
+    const QByteArray format = extension == "jps" || extension == "mpo" || extension == "pns" ? extension : reader.format();
+    const bool multiView = reader.imageCount() >= 2 && (format == "mpo" || metadata.startsWith(QLatin1String("multiView")));
+    const QSize size = reader.size();
+    const Decision decision = decide(metadata, format, header, multiView, options);
+    if (decision.pixels ? decision.panorama || (size.isValid() && !pairByShape(size)) : decision.packing == Layout::None) {
+        return {};
+    }
+    // A packed picture holds two views in either direction, so each image is decoded to fit twice the bound.
+    const QSize limit = bound * 2;
+    const auto read = [&reader, &limit](const QSize &size) {
+        if (size.isValid() && reader.supportsOption(QImageIOHandler::ScaledSize)
+            && (size.width() > limit.width() || size.height() > limit.height() || reader.format() == "svg")) {
+            QSize scaled = size.scaled(limit, Qt::KeepAspectRatio);
+            scaled = QSize(qMax(2, scaled.width() & ~1), qMax(2, scaled.height() & ~1));
+            reader.setScaledSize(scaled);
+        }
+        return reader.read();
+    };
+    const QImage image = read(size);
+    if (metadata.isEmpty()) {
+        metadata = image.text(QStringLiteral("Stereo3DLayout"));
+    }
+    QImage second;
+    if (multiView && reader.jumpToImage(1)) {
+        second = read(reader.size());
+    }
+    Picture result = fromImages(image, second, metadata, format, header, options, OutputMode::Unknown);
+    if (!result.isStereo()) {
+        return {};
+    }
+    const QSize eye = result.left.size().scaled(QSize(bound.width() / 2, bound.height()), Qt::KeepAspectRatio);
+    if (result.left.width() > eye.width() || result.left.height() > eye.height() || result.right.size() != result.left.size()) {
+        result.left = result.left.scaled(eye, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        result.right = result.right.scaled(eye, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    }
+    return result;
+}
+
 Picture Picture::fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
     const Options &options, OutputMode output)
 {
@@ -292,6 +341,23 @@ Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder or
 }
 
 bool Picture::isStereo() const { return layout != Layout::None && !left.isNull() && !right.isNull(); }
+
+QImage Picture::sideBySide() const
+{
+    if (!isStereo()) {
+        return {};
+    }
+    const bool alpha = left.hasAlphaChannel() || right.hasAlphaChannel();
+    QImage image(left.width() + right.width(), qMax(left.height(), right.height()), alpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32);
+    image.fill(Qt::transparent);
+    QPainter painter(&image);
+    painter.setCompositionMode(QPainter::CompositionMode_Source);
+    painter.drawImage(0, 0, left);
+    painter.drawImage(left.width(), 0, right);
+    painter.end();
+    image.setText(QStringLiteral("Stereo3DLayout"), QStringLiteral("sideBySideLeftFirst"));
+    return image;
+}
 
 Picture Picture::swapped() const
 {

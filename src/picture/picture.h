@@ -27,6 +27,10 @@ public:
     };
 
     static Picture load(const QString &path, const Options &options, OutputMode output);
+    // For pictures shown small, such as thumbnails: the policy of load() on an output that is not stereo, each image
+    // decoded to fit within bound where the reader can, and the views scaled so that the pair side by side fits bound.
+    // A file that cannot be a pair (no mark, no stereo format, no stereo shape) is not decoded: the result is empty.
+    static Picture loadPair(const QString &path, const QSize &bound, const Options &options);
     static Picture fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
         const Options &options, OutputMode output);
     static Picture fromPackedImage(const QImage &image, Layout layout, EyeOrder order);
@@ -35,6 +39,9 @@ public:
     static QString colorDisclaimer();
 
     bool isStereo() const;
+    // Both views side by side, left first, each at its own size, marked "sideBySideLeftFirst" in the image's
+    // Stereo3DLayout text; a null image when this is not a pair.
+    QImage sideBySide() const;
     Picture swapped() const;
     QImage original;
     QImage left;

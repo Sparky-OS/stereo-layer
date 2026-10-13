@@ -5,6 +5,7 @@
 #include <QBuffer>
 #include <QFile>
 #include <QImageReader>
+#include <QPainter>
 #include <QTemporaryDir>
 #include <QTest>
 using namespace Stereo;
@@ -25,6 +26,9 @@ private Q_SLOTS:
     void shape();
     void readerIntegration_data();
     void readerIntegration();
+    void loadPair_data();
+    void loadPair();
+    void loadPairPng();
 };
 static QImage packed()
 {
@@ -277,6 +281,95 @@ void PictureTest::readerIntegration()
     const QImage expectedSecond = multiView ? second : first.copy(first.width() / 2, 0, first.width() / 2, first.height());
     QCOMPARE(picture.left, rightFirst ? expectedSecond : expectedFirst);
     QCOMPARE(picture.right, rightFirst ? expectedFirst : expectedSecond);
+}
+void PictureTest::loadPair_data()
+{
+    QTest::addColumn<QString>("file");
+    QTest::addColumn<bool>("rightFirst");
+    QTest::newRow("jps marked right first") << QStringLiteral("test_jps_2_0.jpg") << true;
+    QTest::newRow("jps marked left first") << QStringLiteral("test_jps_2_1.jpg") << false;
+    QTest::newRow("jps unmarked") << QStringLiteral("test_jps_unmarked.jps") << true;
+    QTest::newRow("mpo") << QStringLiteral("test_mpo_1_0.mpo") << false;
+    QTest::newRow("mpo right first") << QStringLiteral("test_mpo_1_1.mpo") << true;
+}
+void PictureTest::loadPair()
+{
+    QFETCH(QString, file);
+    QFETCH(bool, rightFirst);
+    const QString path = QFINDTESTDATA(QStringLiteral("readers/") + file);
+    const auto full = Picture::load(path, {}, OutputMode::Unknown);
+    QVERIFY(full.isStereo());
+    const QSize bound(8, 8);
+    const auto pair = Picture::loadPair(path, bound, {});
+    QVERIFY(pair.isStereo());
+    QCOMPARE(pair.eyeOrder == Picture::EyeOrder::RightFirst, rightFirst);
+    QCOMPARE(pair.left.size(), pair.right.size());
+    QCOMPARE(pair.left.size(), full.left.size().scaled(QSize(bound.width() / 2, bound.height()), Qt::KeepAspectRatio));
+    const QImage sideBySide = pair.sideBySide();
+    QCOMPARE(sideBySide.size(), QSize(pair.left.width() * 2, pair.left.height()));
+    QVERIFY(sideBySide.width() <= bound.width() && sideBySide.height() <= bound.height());
+    QCOMPARE(sideBySide.text(QStringLiteral("Stereo3DLayout")), QStringLiteral("sideBySideLeftFirst"));
+    QCOMPARE(sideBySide.copy(0, 0, pair.left.width(), pair.left.height()), pair.left.convertToFormat(sideBySide.format()));
+    QCOMPARE(sideBySide.copy(pair.left.width(), 0, pair.right.width(), pair.right.height()), pair.right.convertToFormat(sideBySide.format()));
+    // The views keep their colours through the scaling: compare each with the full-size view scaled the same way.
+    const QImage expected = full.left.scaled(pair.left.size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    const QColor a = expected.pixelColor(expected.width() / 2, expected.height() / 2);
+    const QColor b = pair.left.pixelColor(pair.left.width() / 2, pair.left.height() / 2);
+    QVERIFY(qAbs(a.red() - b.red()) < 48 && qAbs(a.blue() - b.blue()) < 48);
+}
+static QByteArray pngChunk(const QByteArray &type, const QByteArray &data)
+{
+    QByteArray chunk;
+    const quint32 length = data.size();
+    chunk.append(char(length >> 24)).append(char(length >> 16)).append(char(length >> 8)).append(char(length));
+    const QByteArray body = type + data;
+    chunk.append(body);
+    quint32 crc = 0xffffffff;
+    for (const char c : body) {
+        crc ^= quint8(c);
+        for (int k = 0; k < 8; ++k)
+            crc = crc & 1 ? 0xedb88320 ^ (crc >> 1) : crc >> 1;
+    }
+    crc ^= 0xffffffff;
+    chunk.append(char(crc >> 24)).append(char(crc >> 16)).append(char(crc >> 8)).append(char(crc));
+    return chunk;
+}
+void PictureTest::loadPairPng()
+{
+    // A small pair with the registered sTER chunk (PNG extensions 1.4.0, 3.6), mode 1: the left view on the left. The
+    // views are 598 wide, so the right one starts on a multiple of 8 (600) after 2 padding columns.
+    QImage image(1198, 400, QImage::Format_RGB32);
+    image.fill(Qt::black);
+    QPainter painter(&image);
+    painter.fillRect(0, 0, 598, 400, Qt::red);
+    painter.fillRect(600, 0, 598, 400, Qt::blue);
+    painter.end();
+    QByteArray png;
+    QBuffer buffer(&png);
+    buffer.open(QIODevice::WriteOnly);
+    QVERIFY(image.save(&buffer, "PNG"));
+    png.insert(8 + 25, pngChunk("sTER", QByteArray(1, '\x01')));
+    QTemporaryDir dir;
+    for (const QString &name : { QStringLiteral("pair.png"), QStringLiteral("pair.pns") }) {
+        QFile file(dir.filePath(name));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(png);
+        file.close();
+        const auto pair = Picture::loadPair(file.fileName(), QSize(256, 256), {});
+        QVERIFY2(pair.isStereo(), qPrintable(name));
+        QCOMPARE(pair.source, Picture::Source::FileMark);
+        QCOMPARE(pair.left.size(), QSize(598, 400).scaled(QSize(128, 256), Qt::KeepAspectRatio));
+        QCOMPARE(pair.left.pixelColor(64, 40), QColor(Qt::red));
+        QCOMPARE(pair.right.pixelColor(64, 40), QColor(Qt::blue));
+    }
+    // The same pixels without the chunk are a picture 3:1 wide, a pair by its shape; at 4:1 they are a panorama.
+    QImage wide(1600, 400, QImage::Format_RGB32);
+    wide.fill(Qt::gray);
+    QVERIFY(wide.save(dir.filePath(QStringLiteral("panorama.png"))));
+    QVERIFY(!Picture::loadPair(dir.filePath(QStringLiteral("panorama.png")), QSize(256, 256), {}).isStereo());
+    QVERIFY(image.save(dir.filePath(QStringLiteral("shape.png"))));
+    QCOMPARE(Picture::loadPair(dir.filePath(QStringLiteral("shape.png")), QSize(256, 256), {}).source, Picture::Source::Shape);
+    QVERIFY(Picture().sideBySide().isNull());
 }
 
 QTEST_MAIN(PictureTest)
