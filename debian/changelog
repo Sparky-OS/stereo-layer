@@ -1,3 +1,18 @@
+stereo-layer (1.2.0-1) unstable; urgency=medium
+
+  * Take a photograph for a pair by its shape only from 2:1 to 3.6:1, and
+    never for top and bottom: panoramas and phone screenshots stay one
+    picture.
+  * Add Picture::loadPair() and Picture::sideBySide() for thumbnailers: the
+    policy before any pixel is read, views decoded small, both side by side.
+  * Read the proposed SVGStereo mark on an SVG's root element; an unmarked
+    drawing is one picture.
+  * A tooltip or a popup prepared for a stereo layer keeps the panel its
+    style draws (rounded corners, a shadow).
+  * Build-Depends: qt6-svg-plugins, for the SVG tests.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Tue, 13 Oct 2026 18:00:00 -0300
+
 stereo-layer (1.1.0-1) unstable; urgency=medium
 
   * Add Stereo::Video and stereo_layer_video_layout(): the players' shared
