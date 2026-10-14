@@ -15,7 +15,7 @@ SVG has no stereo mark of its own, so the policy reads a proposed one, SVGStereo
      svgstereo:layout="sideBySideLeftFirst" viewBox="0 0 200 100">
 ```
 
-SVG renderers ignore attributes from other namespaces (SVG 1.1 Second Edition, section 23.1, "Foreign namespaces and private data"), so a marked file draws as before everywhere else. An SVG without the mark is a drawing, one picture: neither its colours nor its shape make it a pair. The namespace and the attribute name are a proposal until they are published.
+SVG renderers ignore attributes from other namespaces (SVG 1.1 Second Edition, section 23.1, "Foreign namespaces and private data"), so a marked file draws as before everywhere else. A compressed SVG (`.svgz`, a gzip stream, RFC 1952; SVG 1.1 Second Edition, section 1.2) carries the mark the same way and is read the same way. An SVG without the mark is a drawing, one picture: neither its colours nor its shape make it a pair. The namespace and the attribute name are a proposal until they are published.
 
 ## Widget clients
 

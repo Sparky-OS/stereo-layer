@@ -12,6 +12,7 @@
 #include <QXmlStreamReader>
 #include <QtEndian>
 #include <algorithm>
+#include <zlib.h>
 
 namespace Stereo
 {
@@ -100,6 +101,24 @@ bool hasStereoMpfIndex(const QByteArray &data)
 // (SVG 1.1 Second Edition, 23.1 "Foreign namespaces and private data"), so a marked file draws as before everywhere else.
 constexpr QLatin1StringView svgStereoNamespace("https://github.com/Sparky-OS/svgstereo");
 
+// The start of a gzip-compressed SVG (RFC 1952), inflated as far as the bytes at hand and the limit allow: the root element
+// is near the start of the document.
+QByteArray gunzipHeader(const QByteArray &data, qsizetype limit)
+{
+    z_stream stream = {};
+    if (inflateInit2(&stream, 16 + MAX_WBITS) != Z_OK)
+        return {};
+    QByteArray result(limit, Qt::Uninitialized);
+    stream.next_in = reinterpret_cast<Bytef *>(const_cast<char *>(data.constData()));
+    stream.avail_in = uInt(data.size());
+    stream.next_out = reinterpret_cast<Bytef *>(result.data());
+    stream.avail_out = uInt(limit);
+    const int status = inflate(&stream, Z_SYNC_FLUSH);
+    result.truncate(status == Z_OK || status == Z_STREAM_END || status == Z_BUF_ERROR ? qsizetype(stream.total_out) : 0);
+    inflateEnd(&stream);
+    return result;
+}
+
 QString svgStereoLayout(const QByteArray &header)
 {
     QXmlStreamReader xml(header);
@@ -129,7 +148,11 @@ Decision decide(const QString &fileMetadata, const QByteArray &format, const QBy
 {
     Decision result;
     const bool drawing = format == "svg" || format == "svgz";
-    const QString metadata = fileMetadata.isEmpty() && format == "svg" ? svgStereoLayout(header) : fileMetadata;
+    QString metadata = fileMetadata;
+    if (metadata.isEmpty() && format == "svg")
+        metadata = svgStereoLayout(header);
+    else if (metadata.isEmpty() && format == "svgz")
+        metadata = svgStereoLayout(gunzipHeader(header, 1024 * 1024));
     result.order = metadata.endsWith(QLatin1String("RightFirst")) || metadata == QLatin1String("anaglyphRedRight") ? Picture::EyeOrder::RightFirst
                                                                                                                    : Picture::EyeOrder::LeftFirst;
     const bool fallback = format == "jps" && (metadata.isEmpty() || (metadata == QLatin1String("sideBySideRightFirst") && !hasJpsDescriptor(header)));
@@ -244,7 +267,7 @@ Picture Picture::loadPair(const QString &path, const QSize &bound, const Options
     const QSize limit = bound * 2;
     const auto read = [&reader, &limit](const QSize &size) {
         if (size.isValid() && reader.supportsOption(QImageIOHandler::ScaledSize)
-            && (size.width() > limit.width() || size.height() > limit.height() || reader.format() == "svg")) {
+            && (size.width() > limit.width() || size.height() > limit.height() || reader.format() == "svg" || reader.format() == "svgz")) {
             QSize scaled = size.scaled(limit, Qt::KeepAspectRatio);
             scaled = QSize(qMax(2, scaled.width() & ~1), qMax(2, scaled.height() & ~1));
             reader.setScaledSize(scaled);

@@ -8,6 +8,7 @@
 #include <QPainter>
 #include <QTemporaryDir>
 #include <QTest>
+#include <zlib.h>
 using namespace Stereo;
 class PictureTest : public QObject
 {
@@ -378,30 +379,50 @@ void PictureTest::svgStereo_data()
     QTest::addColumn<QString>("root");
     QTest::addColumn<bool>("pair");
     QTest::addColumn<bool>("rightFirst");
+    QTest::addColumn<bool>("compressed");
     const QString svg = QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' xmlns:svgstereo='https://github.com/Sparky-OS/svgstereo' ");
-    QTest::newRow("left first") << svg + QStringLiteral("svgstereo:layout='sideBySideLeftFirst'") << true << false;
-    QTest::newRow("right first") << svg + QStringLiteral("svgstereo:layout='sideBySideRightFirst'") << true << true;
-    QTest::newRow("mono") << svg + QStringLiteral("svgstereo:layout='mono'") << false << false;
-    QTest::newRow("unmarked 2:1 drawing") << svg << false << false;
-    QTest::newRow("another namespace") << QStringLiteral(
-        "<svg xmlns='http://www.w3.org/2000/svg' xmlns:s='https://example.org/other' s:layout='sideBySideLeftFirst'")
-                                       << false << false;
+    for (const bool compressed : { false, true }) {
+        const char *suffix = compressed ? ", gzip" : "";
+        QTest::addRow("left first%s", suffix) << svg + QStringLiteral("svgstereo:layout='sideBySideLeftFirst'") << true << false << compressed;
+        QTest::addRow("right first%s", suffix) << svg + QStringLiteral("svgstereo:layout='sideBySideRightFirst'") << true << true << compressed;
+        QTest::addRow("mono%s", suffix) << svg + QStringLiteral("svgstereo:layout='mono'") << false << false << compressed;
+        QTest::addRow("unmarked 2:1 drawing%s", suffix) << svg << false << false << compressed;
+        QTest::addRow("another namespace%s", suffix)
+            << QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' xmlns:s='https://example.org/other' s:layout='sideBySideLeftFirst'") << false
+            << false << compressed;
+    }
 }
 void PictureTest::svgStereo()
 {
     QFETCH(QString, root);
     QFETCH(bool, pair);
     QFETCH(bool, rightFirst);
-    if (!QImageReader::supportedImageFormats().contains("svg")) {
+    QFETCH(bool, compressed);
+    if (!QImageReader::supportedImageFormats().contains(compressed ? "svgz" : "svg")) {
         QSKIP("Qt's SVG image plugin is not installed");
     }
     const QString document = root
         + QStringLiteral(" width='200' height='100' viewBox='0 0 200 100'><rect width='100' height='100' fill='#ff0000'/>"
                          "<rect x='100' width='100' height='100' fill='#0000ff'/></svg>");
+    QByteArray bytes = document.toUtf8();
+    if (compressed) {
+        // A gzip stream (RFC 1952), as an .svgz file holds it
+        z_stream stream = {};
+        QCOMPARE(deflateInit2(&stream, Z_BEST_COMPRESSION, Z_DEFLATED, 16 + MAX_WBITS, 8, Z_DEFAULT_STRATEGY), Z_OK);
+        QByteArray gzip(deflateBound(&stream, bytes.size()), Qt::Uninitialized);
+        stream.next_in = reinterpret_cast<Bytef *>(bytes.data());
+        stream.avail_in = uInt(bytes.size());
+        stream.next_out = reinterpret_cast<Bytef *>(gzip.data());
+        stream.avail_out = uInt(gzip.size());
+        QCOMPARE(deflate(&stream, Z_FINISH), Z_STREAM_END);
+        gzip.truncate(stream.total_out);
+        deflateEnd(&stream);
+        bytes = gzip;
+    }
     QTemporaryDir dir;
-    QFile file(dir.filePath(QStringLiteral("pair.svg")));
+    QFile file(dir.filePath(compressed ? QStringLiteral("pair.svgz") : QStringLiteral("pair.svg")));
     QVERIFY(file.open(QIODevice::WriteOnly));
-    file.write(document.toUtf8());
+    file.write(bytes);
     file.close();
     const auto loaded = Picture::loadPair(file.fileName(), QSize(256, 256), {});
     QCOMPARE(loaded.isStereo(), pair);
