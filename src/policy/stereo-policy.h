@@ -81,8 +81,8 @@ STEREO_POLICY_EXPORT int stereo_policy_video_layout(
 
 /*
  * Whether the views of a frame of this packing are full, each at its own shape and shown as it is, or half, squeezed
- * along the packing and stretched back to the frame. Side by side is full at a display aspect of 2.5 or more and top
- * and bottom at 1.2 or less, the gap between one picture (1.25 to 2.39) and two (the edition's mpv); interleaved,
+ * along the packing and stretched back to the frame. Side by side is full when wider than a single picture can be and
+ * top and bottom when narrower (STEREO_POLICY_SINGLE_PICTURE_*); interleaved,
  * checkerboard and quincunx views are always half; multiview, frame-sequential and block-laced views are whole frames,
  * full. Returns 1 for full, 0 for half, -1 for a bad argument or no packing.
  */
@@ -97,9 +97,8 @@ STEREO_POLICY_EXPORT int stereo_policy_video_full_views(int width, int height, i
  * elements' default (the pixel size after cropping) and says nothing. upsampled_aspect_ratio is the H.265 frame packing SEI's flag (D.3.16): 1 for half
  * views, 0 for full ones, -1 (STEREO_POLICY_UPSAMPLED_UNKNOWN) for H.264, which has none, or when it is not at hand.
  * Layouts other than side by side and top and bottom are decided as in stereo_policy_video_full_views(). When nothing
- * says, stereo_policy_video_views_by_shape() decides, with the frame as stored: the sample aspect ratio is meant for a
- * decoder that does not read the SEI message (H.264 D.2.26 NOTE 2) and FFmpeg folds a Matroska plane size into it, so
- * it does not tell the shape of a view. It is kept in the signature for a later refinement. decided_by, which may be null, receives
+ * says, stereo_policy_video_views_by_shape() decides, with the frame as shown (the sample aspect ratio applied): a
+ * marked frame of a single picture's shape carries half views, one twice as wide or as tall carries full views. decided_by, which may be null, receives
  * STEREO_POLICY_VIEWS_BY_MARK, _BY_SHAPE or _BY_LAYOUT. Returns 1 for full views, 0 for half, -1 for a bad argument or
  * no packing.
  */
@@ -123,9 +122,23 @@ STEREO_POLICY_EXPORT int stereo_policy_video_views(int coded_width, int coded_he
 STEREO_POLICY_EXPORT int stereo_policy_matroska_plane(int coded_width, int coded_height, int sar_num, int sar_den, int layout, int *plane_width, int *plane_height);
 
 /*
- * The only place the shape decides full or half, for a stream whose marks are silent: side by side is full at a display
- * aspect of 2.5 or more and top and bottom at 1.2 or less, the gap between one picture (1.25 to 2.39) and two. The same
- * as stereo_policy_video_full_views(), which stays for programs of version 1.4.
+ * The shapes of an ordinary single picture, from 5:4 to 12:5 (1.25 to 2.4 wide: 4:3, 16:10, 16:9, 1.85 and the 2.39
+ * scope film are inside it). A frame that a stream marks as side by side or top and bottom and whose shape is inside the
+ * range holds one picture's worth of shape, so its views are half, squeezed to fit; a side by side frame wider than the
+ * range, or a top and bottom frame narrower than it, is two pictures and its views are full. The mark says the packing,
+ * not the resolution of the views, and this is the only place the shape speaks for it: an explicit Matroska plane
+ * size or the H.265 upsampled_aspect_ratio_flag decides first (stereo_policy_video_views()). Unmarked video is another
+ * rule (stereo_policy_video_side_by_side_by_shape()).
+ */
+#define STEREO_POLICY_SINGLE_PICTURE_WIDEST_NUM 12
+#define STEREO_POLICY_SINGLE_PICTURE_WIDEST_DEN 5
+#define STEREO_POLICY_SINGLE_PICTURE_NARROWEST_NUM 5
+#define STEREO_POLICY_SINGLE_PICTURE_NARROWEST_DEN 4
+
+/*
+ * A marked frame of a single picture's shape carries half views, a frame of two pictures' shape full ones: side by side
+ * is full when wider than the widest single picture, top and bottom when narrower than the narrowest. The same as
+ * stereo_policy_video_full_views(), which stays for programs of version 1.4.
  */
 STEREO_POLICY_EXPORT int stereo_policy_video_views_by_shape(int width, int height, int layout);
 

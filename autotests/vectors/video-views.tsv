@@ -6,16 +6,23 @@
 # (0 layout, 1 mark, 2 shape).
 full side by side, nothing marked	1	3840	1080	1	1	0	0	-1	1	2
 half side by side, nothing marked	1	1920	1080	1	1	0	0	-1	0	2
-two 4:3 views side by side, nothing marked	1	2880	1080	1	1	0	0	-1	1	2
-one 21:9 view in a half pair, nothing marked	1	2560	1080	1	1	0	0	-1	0	2
+two 4:3 views side by side	1	2880	1080	1	1	0	0	-1	1	2
+one 21:9 picture, 2.37, half	1	2560	1080	1	1	0	0	-1	0	2
+scope 2.39 single picture, half	1	2390	1000	1	1	0	0	-1	0	2
+two scope pictures, full	1	4780	1000	1	1	0	0	-1	1	2
+4:3 single picture, half	1	1440	1080	1	1	0	0	-1	0	2
+two 1.85 pictures, full	1	3700	1000	1	1	0	0	-1	1	2
+two 4:3 pictures on top of each other, full	2	1440	2160	1	1	0	0	-1	1	2
+two 1.85 pictures on top of each other, full	2	1850	2000	1	1	0	0	-1	1	2
+16:9 top and bottom, half	2	1920	1080	1	1	0	0	-1	0	2
 full side by side, one plane shown (DisplayWidth 1920)	1	3840	1080	1	2	1920	1080	-1	1	1
 full side by side, one plane shown, square samples	1	3840	1080	1	1	1920	1080	-1	1	1
-full side by side, a sample ratio of 1:2 and no plane (the stored shape decides)	1	3840	1080	1	2	0	0	-1	1	2
+full side by side, a sample ratio of 1:2 and no plane: shown as 16:9, one picture, half	1	3840	1080	1	2	0	0	-1	0	2
 half side by side, plane is the default	1	1920	1080	1	1	1920	1080	-1	0	2
-half side by side with a doubled sample ratio, plane is the default (Matroska through FFmpeg)	1	1920	1080	2	1	1920	1080	-1	0	2
+half side by side, plane is the default, doubled sample ratio (Matroska through FFmpeg, known to read as full)	1	1920	1080	2	1	1920	1080	-1	1	2
 half side by side, plane has the shape of the frame	1	1920	1080	1	1	1280	720	-1	0	1
 full side by side, plane is the default (3840x1080)	1	3840	1080	1	1	3840	1080	-1	1	2
-half side by side with a doubled sample ratio (x264 VUI), nothing marked	1	1920	1080	2	1	0	0	-1	0	2
+half side by side with a doubled sample ratio (x264 VUI), nothing else marked: shown 32:9, full	1	1920	1080	2	1	0	0	-1	1	2
 H.265 flag 1, up-converted samples: half	1	3840	1080	1	1	0	0	1	0	1
 H.265 flag 0, samples as stored: full	1	1920	1080	1	1	0	0	0	1	1
 the plane comes before the flag	1	3840	1080	1	1	1920	1080	1	1	1

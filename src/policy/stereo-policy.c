@@ -113,9 +113,11 @@ int stereo_policy_video_views_by_shape(int width, int height, int layout)
         return -1;
     switch (layout) {
     case STEREO_POLICY_LAYOUT_SIDE_BY_SIDE:
-        return (long long)width * 2 >= (long long)height * 5;
+        /* wider than a single picture can be: two pictures next to each other */
+        return (long long)width * STEREO_POLICY_SINGLE_PICTURE_WIDEST_DEN > (long long)height * STEREO_POLICY_SINGLE_PICTURE_WIDEST_NUM;
     case STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM:
-        return (long long)width * 5 <= (long long)height * 6;
+        /* narrower than a single picture can be: two pictures on top of each other */
+        return (long long)width * STEREO_POLICY_SINGLE_PICTURE_NARROWEST_DEN < (long long)height * STEREO_POLICY_SINGLE_PICTURE_NARROWEST_NUM;
     case STEREO_POLICY_LAYOUT_ROWS:
     case STEREO_POLICY_LAYOUT_COLUMNS:
     case STEREO_POLICY_LAYOUT_CHECKERBOARD:
@@ -202,11 +204,11 @@ int stereo_policy_video_views(int coded_width, int coded_height, int sar_num, in
         return upsampled_aspect_ratio == 0;
     }
 
-    /* The marks are silent: the shape of the frame decides, in one place. The stored shape is used, not the one with the
-     * sample aspect ratio applied: that ratio is meant for a decoder that does not read the SEI message (H.264 D.2.26
-     * NOTE 2), and FFmpeg folds a Matroska plane size into it. */
+    /* The marks are silent: a frame marked side by side or top and bottom whose size, with the sample aspect ratio
+     * applied, is that of a single picture carries half views; one twice as wide or twice as tall carries full views. */
     set(decided_by, STEREO_POLICY_VIEWS_BY_SHAPE);
-    return stereo_policy_video_views_by_shape(coded_width, coded_height, layout);
+    const long long shown_width = ((long long)coded_width * sar_num + sar_den / 2) / sar_den;
+    return stereo_policy_video_views_by_shape(shown_width > 0x7fffffff ? 0x7fffffff : (int)shown_width, coded_height, layout);
 }
 
 int stereo_policy_file_swap_eyes(const char *path)

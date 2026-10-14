@@ -39,7 +39,7 @@ public:
     // The shape rule alone: true for a frame at least SideBySideShape times as wide as high.
     static bool sideBySideByShape(QSize displaySize);
     // Whether each view of a frame of this packing is full, shown at its own shape, or half, stretched back to the
-    // frame: side by side is full at a display aspect of 2.5 or more, top and bottom at 1.2 or less; interleaved,
+    // frame: side by side is full when wider than a single picture can be (12:5), top and bottom when narrower (5:4); interleaved,
     // checkerboard and quincunx views are half; multiview, frame-sequential and block-laced ones full (stereo-policy.h).
     static bool fullViews(QSize displaySize, Picture::Layout layout);
 
