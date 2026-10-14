@@ -88,6 +88,7 @@ struct Buffer {
     uchar *data = nullptr;
     size_t size = 0;
     QSize pixels;
+    bool alpha = false;
     bool busy = false;
 };
 
@@ -106,7 +107,7 @@ void destroyBuffer(Buffer &buffer)
     buffer = {};
 }
 
-bool createBuffer(Buffer &buffer, wl_shm *shm, wl_event_queue *queue, const QSize &pixels)
+bool createBuffer(Buffer &buffer, wl_shm *shm, wl_event_queue *queue, const QSize &pixels, bool alpha)
 {
     if (pixels.isEmpty() || pixels.width() > 16384 || pixels.height() > 16384 || qint64(pixels.width()) * pixels.height() > 128 * 1024 * 1024) {
         return false;
@@ -127,13 +128,16 @@ bool createBuffer(Buffer &buffer, wl_shm *shm, wl_event_queue *queue, const QSiz
     }
     wl_shm_pool *pool = wl_shm_create_pool(shm, fd, int(size));
     close(fd);
-    wl_buffer *wlBuffer = wl_shm_pool_create_buffer(pool, 0, pixels.width(), pixels.height(), stride, WL_SHM_FORMAT_XRGB8888);
+    // Premultiplied alpha where the picture has some (wl_shm, ARGB8888), so that what is clear in it shows what is behind
+    wl_buffer *wlBuffer
+        = wl_shm_pool_create_buffer(pool, 0, pixels.width(), pixels.height(), stride, alpha ? WL_SHM_FORMAT_ARGB8888 : WL_SHM_FORMAT_XRGB8888);
     wl_shm_pool_destroy(pool);
     wl_proxy_set_queue(reinterpret_cast<wl_proxy *>(wlBuffer), queue);
     buffer.buffer = wlBuffer;
     buffer.data = static_cast<uchar *>(data);
     buffer.size = size;
     buffer.pixels = pixels;
+    buffer.alpha = alpha;
     wl_buffer_add_listener(wlBuffer, &bufferListener, &buffer);
     return true;
 }
@@ -195,6 +199,7 @@ struct Surface::Private {
     bool declared = false;
     bool shown = false;
     QRect placed;
+    bool alpha = false;
 };
 Surface::Surface()
     : d(std::make_unique<Private>())
@@ -259,34 +264,38 @@ bool Surface::show(QWindow *parent, const QRect &rect, const QImage &packed)
     }
     auto &c = *d->connection;
     wl_display_dispatch_queue_pending(c.display, c.queue);
+    const bool alpha = packed.hasAlphaChannel();
     Buffer *buffer = nullptr;
     for (auto &candidate : d->buffers) {
         if (candidate.busy)
             continue;
-        if (candidate.buffer && candidate.pixels != packed.size())
+        if (candidate.buffer && (candidate.pixels != packed.size() || candidate.alpha != alpha))
             destroyBuffer(candidate);
-        if (!candidate.buffer && !createBuffer(candidate, c.globals.shm, c.queue, packed.size()))
+        if (!candidate.buffer && !createBuffer(candidate, c.globals.shm, c.queue, packed.size(), alpha))
             continue;
         buffer = &candidate;
         break;
     }
     if (!buffer)
         return d->shown;
-    QImage target(buffer->data, packed.width(), packed.height(), packed.width() * 4, QImage::Format_RGB32);
+    QImage target(
+        buffer->data, packed.width(), packed.height(), packed.width() * 4, alpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32);
     QPainter painter(&target);
     painter.setCompositionMode(QPainter::CompositionMode_Source);
     painter.drawImage(0, 0, packed);
     painter.end();
     // The parent surface starts at Qt's own decoration, when it draws one.
     const QRect placed = rect.translated(parent->frameMargins().left(), parent->frameMargins().top());
-    if (d->placed != placed) {
+    if (d->placed != placed || d->alpha != alpha) {
         wl_subsurface_set_position(d->subsurface, placed.x(), placed.y());
         wp_viewport_set_destination(d->viewport, rect.width(), rect.height());
         wl_region *opaque = wl_compositor_create_region(c.globals.compositor);
-        wl_region_add(opaque, 0, 0, rect.width(), rect.height());
+        if (!alpha)
+            wl_region_add(opaque, 0, 0, rect.width(), rect.height());
         wl_surface_set_opaque_region(d->surface, opaque);
         wl_region_destroy(opaque);
         d->placed = placed;
+        d->alpha = alpha;
         parent->requestUpdate();
     }
     if (!d->declared) {

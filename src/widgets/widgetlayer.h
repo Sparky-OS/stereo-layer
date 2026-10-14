@@ -21,6 +21,9 @@ public:
     void setSource(const QString &path, const Picture::Options &options = {});
     void setTransform(qreal zoom, const QPointF &pan);
     void setPaintArea(bool enabled);
+    // Keep the clear parts of the picture clear, showing what is behind the window there, instead of black. For an
+    // adapter that gives each eye a whole view of its area, clear outside its stereo pictures; off by default.
+    void setKeepTransparency(bool keep);
     bool isActive() const;
     bool approximateColor() const;
     void paint(QPainter *painter);

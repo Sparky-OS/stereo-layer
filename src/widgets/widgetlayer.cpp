@@ -54,6 +54,7 @@ struct WidgetLayer::Private {
     QPointF pan;
     bool active = false;
     bool paintArea = true;
+    bool keepTransparency = false;
     QImage packed;
     QSize pixels;
     bool dirty = true;
@@ -134,6 +135,12 @@ void WidgetLayer::setTransform(qreal zoom, const QPointF &pan)
         d->area->update();
 }
 void WidgetLayer::setPaintArea(bool enabled) { d->paintArea = enabled; }
+void WidgetLayer::setKeepTransparency(bool keep)
+{
+    d->keepTransparency = keep;
+    d->dirty = true;
+    update();
+}
 bool WidgetLayer::isActive() const { return d->active; }
 bool WidgetLayer::approximateColor() const { return d->picture.approximateColor; }
 void WidgetLayer::paint(QPainter *painter)
@@ -179,6 +186,17 @@ void WidgetLayer::update()
         const QSize pixels(qRound(d->area->width() * ratio), qRound(d->area->height() * ratio));
         if (d->dirty || pixels != d->pixels) {
             d->packed = renderEyes(d->picture, pixels, d->zoom, d->pan * ratio);
+            if (d->keepTransparency && d->zoom == 1 && d->pan.isNull() && (d->picture.left.hasAlphaChannel() || d->picture.right.hasAlphaChannel())) {
+                // Each eye as it is, clear parts included, at the area's size
+                QImage packed(pixels.width() * 2, pixels.height(), QImage::Format_ARGB32_Premultiplied);
+                packed.fill(Qt::transparent);
+                QPainter painter(&packed);
+                painter.setRenderHint(QPainter::SmoothPixmapTransform);
+                painter.setCompositionMode(QPainter::CompositionMode_Source);
+                painter.drawImage(QRect(QPoint(), pixels), d->picture.left);
+                painter.drawImage(QRect(QPoint(pixels.width(), 0), pixels), d->picture.right);
+                d->packed = packed;
+            }
             d->pixels = pixels;
             d->dirty = false;
         }
