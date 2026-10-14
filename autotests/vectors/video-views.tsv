@@ -10,11 +10,12 @@ two 4:3 views side by side, nothing marked	1	2880	1080	1	1	0	0	-1	1	2
 one 21:9 view in a half pair, nothing marked	1	2560	1080	1	1	0	0	-1	0	2
 full side by side, one plane shown (DisplayWidth 1920)	1	3840	1080	1	2	1920	1080	-1	1	1
 full side by side, one plane shown, square samples	1	3840	1080	1	1	1920	1080	-1	1	1
-full side by side, the sample ratio halves it and no plane (the shape cannot tell)	1	3840	1080	1	2	0	0	-1	0	2
+full side by side, a sample ratio of 1:2 and no plane (the stored shape decides)	1	3840	1080	1	2	0	0	-1	1	2
 half side by side, plane is the default	1	1920	1080	1	1	1920	1080	-1	0	2
+half side by side with a doubled sample ratio, plane is the default (Matroska through FFmpeg)	1	1920	1080	2	1	1920	1080	-1	0	2
 half side by side, plane has the shape of the frame	1	1920	1080	1	1	1280	720	-1	0	1
 full side by side, plane is the default (3840x1080)	1	3840	1080	1	1	3840	1080	-1	1	2
-side by side with doubled sample ratio, nothing marked	1	1920	1080	2	1	0	0	-1	1	2
+half side by side with a doubled sample ratio (x264 VUI), nothing marked	1	1920	1080	2	1	0	0	-1	0	2
 H.265 flag 1, up-converted samples: half	1	3840	1080	1	1	0	0	1	0	1
 H.265 flag 0, samples as stored: full	1	1920	1080	1	1	0	0	0	1	1
 the plane comes before the flag	1	3840	1080	1	1	1920	1080	1	1	1
