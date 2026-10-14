@@ -1,3 +1,21 @@
+stereo-layer (1.4.1-1) unstable; urgency=medium
+
+  * A still picture with no mark is a side-by-side pair only when its pixels
+    say so: stereo_policy_picture_pair_by_content() (libstereo-policy) and
+    Picture::pairByContent() compare the two halves block by block, after a
+    small horizontal shift and next to no vertical one. The shape rule only
+    gates the pixel test, so phone photos (20:9), two-monitor screenshots and
+    banners are no longer pairs. Marks, the user's choice and anaglyph
+    detection are unchanged. A call point for the file-name tag reader is
+    marked in the decision.
+  * StereoPicture (Quick): on a screen that shows one eye the item draws the
+    pair's left view and declares nothing, as documented; only a stereo or
+    anaglyph output takes the pair. A pair with no surface of its own yet is
+    drawn as its left view, not whole.
+  * libstereo-layer1 depends on the libstereo-policy1 of the same build.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Wed, 14 Oct 2026 22:50:00 -0300
+
 stereo-layer (1.4.0-1) unstable; urgency=medium
 
   * libstereo-policy1, libstereo-policy-dev: the stereo policy without Qt
