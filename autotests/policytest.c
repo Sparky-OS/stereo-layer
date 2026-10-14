@@ -167,6 +167,76 @@ static void matroskaPlane(void)
         && stereo_policy_video_views(1920, 1080, 1, 2, w, h, -1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, NULL) == 1);
 }
 
+static void nameTags(void)
+{
+    char line[512];
+    int rows = 0;
+    FILE *file = fopen(VECTORS_DIR "/name-tags.tsv", "r");
+    CHECK(file != NULL);
+    while (file && fgets(line, sizeof(line), file)) {
+        if (line[0] == '#' || line[0] == '\n')
+            continue;
+        char *name = strtok(line, "\t");
+        int v[5];
+        int i = 0;
+        for (char *field = strtok(NULL, "\t\n"); field && i < 5; field = strtok(NULL, "\t\n"))
+            v[i++] = atoi(field);
+        CHECK(name != NULL && i == 5);
+        int layout, order, views, three_d;
+        const int found = stereo_policy_name_tag(name, &layout, &order, &views, &three_d);
+        if (found != v[4] || layout != v[0] || order != v[1] || views != v[2] || three_d != v[3])
+            fprintf(stderr, "name '%s': got %d/%d/%d/%d/%d\n", name, layout, order, views, three_d, found);
+        CHECK(found == v[4] && layout == v[0] && order == v[1] && views == v[2] && three_d == v[3]);
+        rows++;
+    }
+    if (file)
+        fclose(file);
+    CHECK(rows >= 18);
+    CHECK(stereo_policy_name_tag(NULL, NULL, NULL, NULL, NULL) == -1);
+}
+
+static void namedLayout(void)
+{
+    int layout, order, source, views;
+    /* a tag with a packing, nothing else says */
+    CHECK(stereo_policy_video_layout_named(1920, 1080, NULL, "Name.3D.HSBS.mkv", 0, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE && source == STEREO_POLICY_SOURCE_NAME && views == 0);
+    CHECK(stereo_policy_video_layout_named(3840, 1080, NULL, "Name.FSBS.mkv", 0, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE && source == STEREO_POLICY_SOURCE_NAME && views == 1);
+    CHECK(stereo_policy_video_layout_named(1920, 1080, NULL, "Name.HOU.mkv", 0, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM && views == 0);
+    /* a bare packing word leaves the views to the size rule */
+    CHECK(stereo_policy_video_layout_named(1920, 1080, NULL, "Name.SBS.mkv", 0, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE && views == -1
+        && stereo_policy_video_views(1920, 1080, 1, 1, 0, 0, -1, layout, NULL) == 0);
+    CHECK(stereo_policy_video_layout_named(3840, 1080, NULL, "Name.SBS.mkv", 0, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(source == STEREO_POLICY_SOURCE_NAME && stereo_policy_video_views(3840, 1080, 1, 1, 0, 0, -1, layout, NULL) == 1);
+    /* a bare 3D: the shape, else the halves, else 2D */
+    CHECK(stereo_policy_video_layout_named(3840, 1080, NULL, "Name [3D].mp4", 0, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE && source == STEREO_POLICY_SOURCE_SHAPE);
+    CHECK(stereo_policy_video_layout_named(1920, 1080, NULL, "Name [3D].mp4", STEREO_POLICY_HALVES_SIDE_BY_SIDE, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE && source == STEREO_POLICY_SOURCE_NAME);
+    CHECK(stereo_policy_video_layout_named(1920, 1080, NULL, "Name [3D].mp4", STEREO_POLICY_HALVES_TOP_AND_BOTTOM, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM && source == STEREO_POLICY_SOURCE_NAME);
+    CHECK(stereo_policy_video_layout_named(1920, 1080, NULL, "3D printing tutorial.mp4", STEREO_POLICY_HALVES_UNKNOWN, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_NONE && source == STEREO_POLICY_SOURCE_NONE);
+    /* a tag never overrides a mark or the user's choice */
+    CHECK(stereo_policy_video_layout_named(1920, 1080, "topBottomLeftFirst", "Name.HSBS.mkv", 0, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM && source == STEREO_POLICY_SOURCE_FILE_MARK && views == -1);
+    CHECK(stereo_policy_video_layout_named(1920, 1080, "mono", "Name.HSBS.mkv", 0, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_NONE && source == STEREO_POLICY_SOURCE_FILE_MARK);
+    CHECK(stereo_policy_video_layout_named(1920, 1080, NULL, "Name.HSBS.mkv", 0, STEREO_POLICY_USER_FORCE_2D, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_NONE && source == STEREO_POLICY_SOURCE_USER);
+    /* the eye order of the tag, and the user's swap over it */
+    CHECK(stereo_policy_video_layout_named(1920, 1080, NULL, "Name.HSBS.RL.mkv", 0, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(order == STEREO_POLICY_RIGHT_FIRST);
+    CHECK(stereo_policy_video_layout_named(1920, 1080, NULL, "Name.HSBS.RL.mkv", 0, 0, 0, 1, &layout, &order, &source, &views) == 0);
+    CHECK(order == STEREO_POLICY_LEFT_FIRST);
+    /* no tag, no change */
+    CHECK(stereo_policy_video_layout_named(3840, 1080, NULL, "Holiday.mp4", 0, 0, 0, 0, &layout, &order, &source, &views) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE && source == STEREO_POLICY_SOURCE_SHAPE);
+}
+
 static void fullViews(void)
 {
     /* side by side: full when wider than the widest single picture (12:5) */
@@ -249,6 +319,8 @@ int main(void)
     fullViews();
     videoViewsTable();
     matroskaPlane();
+    nameTags();
+    namedLayout();
     shapes();
     if (failures)
         fprintf(stderr, "%d check(s) failed\n", failures);

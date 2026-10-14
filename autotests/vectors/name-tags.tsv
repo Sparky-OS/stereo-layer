@@ -1,0 +1,23 @@
+# The 3D tag of a file name (stereo_policy_name_tag). Columns, tab separated: file name, layout (0 none, 1 side by side,
+# 2 top and bottom), order (0 left first, 1 right first), views (-1 not said, 0 half, 1 full), three_d (1 when the name
+# says 3D), result (1 tag found, 0 none).
+Name.3D.HSBS.mkv	1	0	0	1	1
+Name.FSBS.mkv	1	0	1	1	1
+Name.HOU.mkv	2	0	0	1	1
+Name [3D].mp4	0	0	-1	1	1
+Name.SBS.mkv	1	0	-1	1	1
+Name.TAB.mkv	2	0	-1	1	1
+Name.Half-SBS.mkv	1	0	0	1	1
+Name H-SBS.mkv	1	0	0	1	1
+Name.H.OU.mkv	2	0	0	1	1
+Name_Full-OU.mkv	2	0	1	1	1
+Name.F-TAB.mkv	2	0	1	1	1
+Name.sbs.RL.mkv	1	1	-1	1	1
+Name-LR.mkv	1	0	-1	1	1
+Name (3D) (HTAB).mkv	2	0	0	1	1
+3D printing tutorial.mp4	0	0	-1	1	1
+3DMark run.mp4	0	0	-1	0	0
+Blender3D intro.mp4	0	0	-1	0	0
+My.Holiday.mp4	0	0	-1	0	0
+Absolutely.SBSX.mp4	0	0	-1	0	0
+Name.HSBS.TAB.mkv	1	0	0	1	1

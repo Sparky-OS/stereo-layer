@@ -56,6 +56,7 @@ enum stereo_policy_source {
     STEREO_POLICY_SOURCE_FORMAT = 3,
     STEREO_POLICY_SOURCE_DETECTION = 4,
     STEREO_POLICY_SOURCE_SHAPE = 5,
+    STEREO_POLICY_SOURCE_NAME = 6,
 };
 
 /*
@@ -120,6 +121,41 @@ STEREO_POLICY_EXPORT int stereo_policy_video_views(int coded_width, int coded_he
  * Returns 0, or -1 for a bad argument or a layout other than side by side and top and bottom.
  */
 STEREO_POLICY_EXPORT int stereo_policy_matroska_plane(int coded_width, int coded_height, int sar_num, int sar_den, int layout, int *plane_width, int *plane_height);
+
+/*
+ * The 3D tag of a file name. The name is cut into words at . _ - space [ ] ( ) and a word counts only whole and in any
+ * case, so "3DMark" and "Blender3D" say nothing. The vocabulary, where each word comes from:
+ *   3D                          the plain tag of 3D releases ("Name.3D.mkv", "Name [3D].mp4"): says only that the video is 3D
+ *   SBS, TAB, TB, OU            side by side; top and bottom (TAB: top and bottom of the Blu-ray 3D scene, TB, OU:
+ *                               over and under): the packing, left eye first
+ *   HSBS, H-SBS, HALF-SBS, HTAB, H-TAB, HALF-TAB, HOU, H-OU, HALF-OU, HTB   the same with half views
+ *   FSBS, F-SBS, FULL-SBS, FTAB, FULL-TAB, FOU, FULL-OU, FTB                the same with full views
+ *   LR, RL                      the left eye first or the right eye first (the Bino 1.x and 3dtv.at names); alone they mean side by side
+ * A packing word with half or full says both; a bare one leaves the views to stereo_policy_video_views() (an ordinary
+ * single picture's size is half, twice that is full). A tag never overrides a stream's mark.
+ * layout receives SIDE_BY_SIDE, TOP_AND_BOTTOM or NONE, order LEFT_FIRST or RIGHT_FIRST, views 1 for full, 0 for half and
+ * -1 when the name does not say, three_d 1 when the name says the video is 3D (a bare "3D" or any packing word). Any
+ * output pointer may be null. Returns 1 when the name carries a tag, 0 when not, -1 for a bad argument.
+ */
+STEREO_POLICY_EXPORT int stereo_policy_name_tag(const char *file_name, int *layout, int *order, int *views, int *three_d);
+
+/*
+ * What a frame whose name says only "3D" can still tell: the caller's own comparison of the halves of the picture (a
+ * side by side pair has two similar halves left and right, a top and bottom pair above and below). STEREO_POLICY_HALVES_*.
+ */
+#define STEREO_POLICY_HALVES_UNKNOWN 0
+#define STEREO_POLICY_HALVES_SIDE_BY_SIDE 1
+#define STEREO_POLICY_HALVES_TOP_AND_BOTTOM 2
+
+/*
+ * stereo_policy_video_layout() with the file name's tag after the stream's mark: the user's explicit choice, then the
+ * stream's mark, then the name (source STEREO_POLICY_SOURCE_NAME; views receives 1, 0 or -1 as for the tag, -1 when the
+ * layout did not come from the name), then the shape. A name that only says "3D" gives side by side when the shape rule
+ * does (three times as wide as high), else what halves says; if nothing decides, the video stays 2D and the user's menu
+ * covers it. file_name may be null. Returns 0, or -1 for a bad argument.
+ */
+STEREO_POLICY_EXPORT int stereo_policy_video_layout_named(int width, int height, const char *mark, const char *file_name, int halves, int user_layout,
+    int user_order, int swap_eyes, int *layout, int *order, int *source, int *views);
 
 /*
  * The shapes of an ordinary single picture, from 5:4 to 12:5 (1.25 to 2.4 wide: 4:3, 16:10, 16:9, 1.85 and the 2.39

@@ -36,6 +36,19 @@ bool Video::fullViews(QSize displaySize, Picture::Layout layout)
     return stereo_policy_video_full_views(displaySize.width(), displaySize.height(), int(layout)) == 1;
 }
 
+Video::NameTag Video::nameTag(const QString &fileName)
+{
+    NameTag result;
+    int layout = 0, order = 0, views = -1, threeD = 0;
+    const QByteArray name = fileName.toUtf8();
+    stereo_policy_name_tag(name.constData(), &layout, &order, &views, &threeD);
+    result.layout = Picture::Layout(layout);
+    result.eyeOrder = Picture::EyeOrder(order);
+    result.views = views;
+    result.threeD = threeD == 1;
+    return result;
+}
+
 Video::Views Video::views(QSize codedSize, QSize sampleAspectRatio, QSize planeSize, int upsampledAspectRatio, Picture::Layout layout)
 {
     Views result;

@@ -43,6 +43,16 @@ public:
     // checkerboard and quincunx views are half; multiview, frame-sequential and block-laced ones full (stereo-policy.h).
     static bool fullViews(QSize displaySize, Picture::Layout layout);
 
+    // The 3D tag of a file name (stereo-policy.h, stereo_policy_name_tag()): whole words only, so "3DMark" says nothing.
+    // views: 1 full, 0 half, -1 the name does not say (stereo_policy_video_views() then decides by size).
+    struct NameTag {
+        Picture::Layout layout = Picture::Layout::None;
+        Picture::EyeOrder eyeOrder = Picture::EyeOrder::LeftFirst;
+        int views = -1;
+        bool threeD = false;
+    };
+    static NameTag nameTag(const QString &fileName);
+
     // What decided whether the views are full or half
     enum class ViewsSource { Layout, Mark, Shape };
     struct Views {
