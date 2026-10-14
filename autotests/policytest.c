@@ -161,24 +161,25 @@ static void matroskaPlane(void)
     CHECK(stereo_policy_matroska_plane(3840, 1080, 1, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, &w, &h) == 0
         && stereo_policy_video_views(3840, 1080, 1, 1, w, h, -1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, NULL) == 1);
     CHECK(stereo_policy_matroska_plane(1920, 1080, 2, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, &w, &h) == 0
-        && stereo_policy_video_views(1920, 1080, 2, 1, w, h, -1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, NULL) == 0);
+        && stereo_policy_video_views(1920, 1080, 2, 1, w, h, -1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, NULL) == 1);
+    /* known limit: a plane as large as the frame is the elements' default, says nothing, and the shape shown (32:9) decides */
     CHECK(stereo_policy_matroska_plane(1920, 2160, 1, 1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, &w, &h) == 0
         && stereo_policy_video_views(1920, 2160, 1, 1, w, h, -1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, NULL) == 1);
     CHECK(stereo_policy_matroska_plane(1920, 1080, 1, 2, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, &w, &h) == 0
-        && stereo_policy_video_views(1920, 1080, 1, 2, w, h, -1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, NULL) == 0);
+        && stereo_policy_video_views(1920, 1080, 1, 2, w, h, -1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, NULL) == 1);
 }
 
 static void fullViews(void)
 {
-    /* side by side: full at 2.5 or more */
+    /* side by side: full when wider than the widest single picture (12:5) */
     CHECK(stereo_policy_video_full_views(3840, 1080, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 1);
-    CHECK(stereo_policy_video_full_views(2500, 1000, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 1);
-    CHECK(stereo_policy_video_full_views(2499, 1000, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 0);
+    CHECK(stereo_policy_video_full_views(2401, 1000, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 1);
+    CHECK(stereo_policy_video_full_views(2400, 1000, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 0);
     CHECK(stereo_policy_video_full_views(1920, 1080, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 0);
-    /* top and bottom: full at 1.2 or less */
+    /* top and bottom: full when narrower than the narrowest single picture (5:4) */
     CHECK(stereo_policy_video_full_views(1920, 2160, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 1);
-    CHECK(stereo_policy_video_full_views(1200, 1000, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 1);
-    CHECK(stereo_policy_video_full_views(1201, 1000, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 0);
+    CHECK(stereo_policy_video_full_views(1249, 1000, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 1);
+    CHECK(stereo_policy_video_full_views(1250, 1000, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 0);
     CHECK(stereo_policy_video_full_views(1920, 1080, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 0);
     /* interleaved, checkerboard and quincunx: half; whole frames: full */
     CHECK(stereo_policy_video_full_views(3840, 1080, STEREO_POLICY_LAYOUT_ROWS) == 0);
@@ -190,6 +191,17 @@ static void fullViews(void)
     CHECK(stereo_policy_video_full_views(1920, 1080, STEREO_POLICY_LAYOUT_BLOCK_LACED) == 1);
     CHECK(stereo_policy_video_full_views(1920, 1080, STEREO_POLICY_LAYOUT_NONE) == -1);
     CHECK(stereo_policy_video_full_views(0, 1080, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == -1);
+    /* single pictures marked side by side or top and bottom carry half views, their doubled forms full ones */
+    static const struct {
+        int width, height;
+    } pictures[] = { { 4, 3 }, { 16, 10 }, { 16, 9 }, { 185, 100 }, { 239, 100 }, { 5, 4 }, { 12, 5 } };
+    for (unsigned i = 0; i < sizeof(pictures) / sizeof(pictures[0]); ++i) {
+        const int w = pictures[i].width * 100, h = pictures[i].height * 100;
+        CHECK(stereo_policy_video_full_views(w, h, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 0);
+        CHECK(stereo_policy_video_full_views(w, h, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 0);
+        CHECK(stereo_policy_video_full_views(2 * w, h, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 1);
+        CHECK(stereo_policy_video_full_views(w, 2 * h, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 1);
+    }
 }
 
 static void shapes(void)
