@@ -15,6 +15,14 @@
 #include <cmath>
 namespace Stereo
 {
+namespace
+{
+// Only a screen that shows two eyes takes the pair; any other shows the left view alone, as the file's flat picture.
+bool showsTwoEyes(OutputMode mode)
+{
+    return mode == OutputMode::Stereo || mode == OutputMode::Anaglyph;
+}
+}
 struct PictureItem::Private {
     QUrl source;
     Picture::Options options;
@@ -160,6 +168,7 @@ QString PictureItem::colorDisclaimer() const { return Picture::colorDisclaimer()
 void PictureItem::updatePolish()
 {
     bool active = false;
+    const bool twoEyes = showsTwoEyes(d->output.mode());
     const QRectF mapped = mapRectToScene(boundingRect());
     // Native subsurfaces cannot follow scene-graph rotation, opacity or clipping.
     bool aligned = qFuzzyIsNull(rotation()) && qFuzzyCompare(scale(), qreal(1)) && qFuzzyCompare(opacity(), qreal(1)) && !clip();
@@ -167,7 +176,7 @@ void PictureItem::updatePolish()
         aligned &= qFuzzyIsNull(ancestor->rotation()) && qFuzzyCompare(ancestor->scale(), qreal(1)) && qFuzzyCompare(ancestor->opacity(), qreal(1))
             && !ancestor->clip();
     }
-    if (window() && window()->isVisible() && isVisible() && aligned && d->picture.isStereo() && window()->format().alphaBufferSize() > 0) {
+    if (window() && window()->isVisible() && isVisible() && aligned && twoEyes && d->picture.isStereo() && window()->format().alphaBufferSize() > 0) {
         const qreal ratio = window()->devicePixelRatio();
         const QSize pixels(qRound(mapped.width() * ratio), qRound(mapped.height() * ratio));
         if (d->dirty || d->pixels != pixels) {
@@ -195,8 +204,10 @@ QSGNode *PictureItem::updatePaintNode(QSGNode *node, UpdatePaintNodeData *)
         hole->material()->setFlag(QSGMaterial::Blending, false);
         return hole;
     }
+    // Drawn flat (a screen with one eye, or no surface of its own yet), a pair shows its left view, as the file's flat picture.
+    const QImage &flat = d->picture.isStereo() ? d->picture.left : d->picture.original;
     auto *texture = window()->createTextureFromImage(
-        renderMono(d->picture.original, QSize(qMax(1, qRound(width())), qMax(1, qRound(height()))), d->zoom, d->pan));
+        renderMono(flat, QSize(qMax(1, qRound(width())), qMax(1, qRound(height()))), d->zoom, d->pan));
     if (!texture)
         return nullptr;
     auto *image = new QSGSimpleTextureNode;

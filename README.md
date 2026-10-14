@@ -35,7 +35,9 @@ Programs that show pictures small call `Picture::loadPair(path, bound, options)`
 
 ## Quick clients
 
-Import `org.sparky.stereo 1.0` and use `StereoPicture`. Its properties are `source`, `swapEyes`, `inputLayout`, `inputOrder`, `anaglyph`, `view`, `zoom` and `pan`. Each item follows its own window's screen and active output mode. Local and qrc URLs are supported, with relative QML URLs resolved in their context.
+Import `org.sparky.stereo 1.0` and use `StereoPicture`. Its properties are `source`, `swapEyes`, `inputLayout`, `inputOrder`, `anaglyph`, `view`, `zoom` and `pan`. Each item follows its own window's screen and active output mode. Local and qrc URLs are supported, with relative QML URLs resolved in their context. On a screen that shows one eye (a 2D output) a pair is drawn as its left view and declares nothing; only a stereo or anaglyph output takes the pair.
+
+The item needs a window of the windowing system to itself. A `QQuickWidget` has none, so a program that embeds QML in a widget window runs it in a `QQuickView` inside `QWidget::createWindowContainer()` (Calamares does so for its slideshow when the branding sets `slideshowWindow`).
 
 The item's window needs an alpha buffer before native creation. The item prepares a window it joins before creation; a client creating its window earlier must call `PictureItem::prepareWindow` first. Unsupported rotation, ancestor scaling, opacity and clipping use the ordinary image rather than letting a subsurface escape the item's visible area. Put the stereo item in an untransformed, unclipped area, with normal Quick overlays above it.
 
