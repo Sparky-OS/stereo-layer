@@ -35,6 +35,17 @@ bool Video::fullViews(QSize displaySize, Picture::Layout layout)
 {
     return stereo_policy_video_full_views(displaySize.width(), displaySize.height(), int(layout)) == 1;
 }
+
+Video::Views Video::views(QSize codedSize, QSize sampleAspectRatio, QSize planeSize, int upsampledAspectRatio, Picture::Layout layout)
+{
+    Views result;
+    int decidedBy = 0;
+    const int full = stereo_policy_video_views(codedSize.width(), codedSize.height(), sampleAspectRatio.width(), sampleAspectRatio.height(), planeSize.width(),
+        planeSize.height(), upsampledAspectRatio, int(layout), &decidedBy);
+    result.full = full == 1;
+    result.source = decidedBy == STEREO_POLICY_VIEWS_BY_MARK ? ViewsSource::Mark : decidedBy == STEREO_POLICY_VIEWS_BY_SHAPE ? ViewsSource::Shape : ViewsSource::Layout;
+    return result;
+}
 }
 
 int stereo_layer_video_layout(int width, int height, const char *mark, int *layout, int *order, int *source)

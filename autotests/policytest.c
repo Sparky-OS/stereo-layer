@@ -117,6 +117,35 @@ static void videoLayout(void)
     CHECK(stereo_policy_video_layout(1920, 1080, NULL, -2, 0, 0, &layout, &order, &source) == -1);
 }
 
+static void videoViewsTable(void)
+{
+    char line[512];
+    int rows = 0;
+    FILE *file = fopen(VECTORS_DIR "/video-views.tsv", "r");
+    CHECK(file != NULL);
+    while (file && fgets(line, sizeof(line), file)) {
+        if (line[0] == '#' || line[0] == '\n')
+            continue;
+        char *name = strtok(line, "\t");
+        int v[10];
+        int i = 0;
+        for (char *field = strtok(NULL, "\t\n"); field && i < 10; field = strtok(NULL, "\t\n"))
+            v[i++] = atoi(field);
+        CHECK(name != NULL && i == 10);
+        int by = -1;
+        const int full = stereo_policy_video_views(v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[0], &by);
+        if (full != v[8] || (full >= 0 && by != v[9]))
+            fprintf(stderr, "vector '%s': got %d decided by %d, expected %d decided by %d\n", name, full, by, v[8], v[9]);
+        CHECK(full == v[8]);
+        if (full >= 0)
+            CHECK(by == v[9]);
+        rows++;
+    }
+    if (file)
+        fclose(file);
+    CHECK(rows >= 20);
+}
+
 static void fullViews(void)
 {
     /* side by side: full at 2.5 or more */
@@ -253,6 +282,7 @@ int main(void)
     fileCorrection();
     videoLayout();
     fullViews();
+    videoViewsTable();
     shapes();
     contents();
     if (failures)

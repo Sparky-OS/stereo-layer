@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
 #include "video.h"
+#include <QFile>
 #include <QTest>
 using namespace Stereo;
 class VideoTest : public QObject
@@ -15,6 +16,8 @@ private Q_SLOTS:
     void plainC();
     void swapOverMark();
     void fullViews();
+    void viewsTable_data();
+    void viewsTable();
 };
 void VideoTest::shape_data()
 {
@@ -163,5 +166,32 @@ void VideoTest::fullViews()
     QCOMPARE(stereo_layer_video_full_views(1920, 1080, int(Picture::Layout::SideBySide)), 0);
     QCOMPARE(stereo_layer_video_full_views(1920, 1080, int(Picture::Layout::None)), -1);
 }
+void VideoTest::viewsTable_data()
+{
+    // the vectors every implementation reads: the C test, this one, and the Java mirror in Universal Media Server
+    QTest::addColumn<QList<int>>("values");
+    QFile file(QStringLiteral(VECTORS_DIR "/video-views.tsv"));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    while (!file.atEnd()) {
+        const QString line = QString::fromUtf8(file.readLine()).trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+            continue;
+        const QStringList fields = line.split(QLatin1Char('\t'));
+        QCOMPARE(fields.size(), 11);
+        QList<int> values;
+        for (int i = 1; i < fields.size(); ++i)
+            values << fields.at(i).toInt();
+        QTest::newRow(qPrintable(fields.at(0))) << values;
+    }
+}
+void VideoTest::viewsTable()
+{
+    QFETCH(QList<int>, values);
+    const auto views = Video::views(QSize(values[1], values[2]), QSize(values[3], values[4]), QSize(values[5], values[6]), values[7], Picture::Layout(values[0]));
+    QCOMPARE(views.full, values[8] == 1);
+    const int source = values[9];
+    QCOMPARE(int(views.source), source);
+}
+
 QTEST_MAIN(VideoTest)
 #include "videotest.moc"

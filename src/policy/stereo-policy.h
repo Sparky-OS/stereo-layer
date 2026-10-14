@@ -90,6 +90,35 @@ STEREO_POLICY_EXPORT int stereo_policy_video_layout(
  */
 STEREO_POLICY_EXPORT int stereo_policy_video_full_views(int width, int height, int layout);
 
+/*
+ * Whether the views of a packed frame are full or half, from what the stream says, and only then from the shape.
+ * coded_width and coded_height are the frame as stored, after any crop; sar_num and sar_den its sample aspect ratio (0 or less for
+ * 1:1). plane_width and plane_height are Matroska's DisplayWidth and DisplayHeight when the track carries them (0 when
+ * not): one plane's size (RFC 9559 section 18.10; elements 5.1.4.1.28.12 and .13), so a side by side frame whose half has the shape of
+ * the plane holds full views, and one whose whole has it holds half views; a plane as large as the frame is the
+ * elements' default (the pixel size after cropping) and says nothing. upsampled_aspect_ratio is the H.265 frame packing SEI's flag (D.3.16): 1 for half
+ * views, 0 for full ones, -1 (STEREO_POLICY_UPSAMPLED_UNKNOWN) for H.264, which has none, or when it is not at hand.
+ * Layouts other than side by side and top and bottom are decided as in stereo_policy_video_full_views(). When nothing
+ * says, stereo_policy_video_views_by_shape() decides, with the frame as shown. decided_by, which may be null, receives
+ * STEREO_POLICY_VIEWS_BY_MARK, _BY_SHAPE or _BY_LAYOUT. Returns 1 for full views, 0 for half, -1 for a bad argument or
+ * no packing.
+ */
+#define STEREO_POLICY_UPSAMPLED_UNKNOWN (-1)
+enum stereo_policy_views_source {
+    STEREO_POLICY_VIEWS_BY_LAYOUT = 0,
+    STEREO_POLICY_VIEWS_BY_MARK = 1,
+    STEREO_POLICY_VIEWS_BY_SHAPE = 2,
+};
+STEREO_POLICY_EXPORT int stereo_policy_video_views(int coded_width, int coded_height, int sar_num, int sar_den, int plane_width, int plane_height,
+    int upsampled_aspect_ratio, int layout, int *decided_by);
+
+/*
+ * The only place the shape decides full or half, for a stream whose marks are silent: side by side is full at a display
+ * aspect of 2.5 or more and top and bottom at 1.2 or less, the gap between one picture (1.25 to 2.39) and two. The same
+ * as stereo_policy_video_full_views(), which stays for programs of version 1.4.
+ */
+STEREO_POLICY_EXPORT int stereo_policy_video_views_by_shape(int width, int height, int layout);
+
 /* The shape rule of video alone: 1 for a frame at least three times as wide as high, else 0. */
 STEREO_POLICY_EXPORT int stereo_policy_video_side_by_side_by_shape(int width, int height);
 
