@@ -39,6 +39,10 @@ public:
     static Picture fromPackedImage(const QImage &image, Layout layout, EyeOrder order);
     static Picture fromAnaglyph(const QImage &image, AnaglyphColorPair pair);
     static AnaglyphColorPair detectAnaglyph(const QImage &image);
+    // Whether the two halves of an unmarked picture are views of one scene, by its pixels, on a reduced copy
+    // (stereo_policy_picture_pair_by_content()). Shape only says a picture may be a pair: an unmarked picture is one
+    // unless this says it is.
+    static bool pairByContent(const QImage &image);
     static QString colorDisclaimer();
     // The user's correction stored with a file whose mark has its eyes the wrong way round (stereo-policy.h,
     // stereo_policy_file_swap_eyes()). load() and loadPair() apply it over the file's mark, on top of

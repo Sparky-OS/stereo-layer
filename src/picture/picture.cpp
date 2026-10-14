@@ -188,6 +188,9 @@ Decision decide(const QString &fileMetadata, const QByteArray &format, const QBy
         result.source = Picture::Source::Format;
     } else if (!drawing) {
         // A drawing is one picture unless it says otherwise: neither its colours nor its shape make it a pair.
+        // The order of a still: the user's choice, the file's marks, then (a call point of its own, the file-name tag
+        // reader of libstereo-policy goes here), then the pixels: a shape that may be a pair, and halves that are
+        // views of one scene (fromImages()).
         result.pixels = true;
         result.panorama = hasEquirectangularPanoramaMark(header);
     }
@@ -196,7 +199,8 @@ Decision decide(const QString &fileMetadata, const QByteArray &format, const QBy
 
 // A stereo photograph is two pictures next to each other: from two squares (2:1) to two 16:9 pictures (32:9, 3.56:1),
 // with a little margin. A wider picture is a panorama, and a tall one a portrait or a phone screenshot: the shape alone
-// never says top and bottom.
+// never says top and bottom, and never says pair at all: it only says whether the pixels are worth comparing
+// (Picture::pairByContent()).
 bool pairByShape(const QSize &size) { return stereo_policy_picture_pair_by_shape(size.width(), size.height()) == 1; }
 
 Picture unpackPng(const QImage &image, Picture::EyeOrder order)
@@ -212,6 +216,15 @@ Picture unpackPng(const QImage &image, Picture::EyeOrder order)
     result.layout = Picture::Layout::SideBySide;
     return order == Picture::EyeOrder::RightFirst ? result.swapped() : result;
 }
+}
+
+bool Picture::pairByContent(const QImage &image)
+{
+    if (image.isNull())
+        return false;
+    // The function reduces a larger picture itself; a copy of a few hundred pixels keeps a thumbnailer fast.
+    const QImage small = (image.width() > 384 ? image.scaledToWidth(384, Qt::SmoothTransformation) : image).convertToFormat(QImage::Format_RGB888);
+    return stereo_policy_picture_pair_by_content(small.constBits(), small.width(), small.height(), small.bytesPerLine()) == 1;
 }
 
 bool Picture::userSwapEyes(const QString &path) { return stereo_policy_file_swap_eyes(QFile::encodeName(path).constData()) == 1; }
@@ -316,7 +329,7 @@ Picture Picture::fromImages(const QImage &image, const QImage &second, const QSt
         decision.anaglyph = detectAnaglyph(image);
         if (decision.anaglyph != AnaglyphColorPair::None) {
             decision.source = Source::Detection;
-        } else if (!decision.panorama && pairByShape(image.size())) {
+        } else if (!decision.panorama && pairByShape(image.size()) && pairByContent(image)) {
             decision.packing = Layout::SideBySide;
             decision.source = Source::Shape;
         }

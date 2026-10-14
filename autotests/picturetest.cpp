@@ -9,6 +9,7 @@
 #include <QPainter>
 #include <QTemporaryDir>
 #include <QTest>
+#include <cmath>
 #include <zlib.h>
 using namespace Stereo;
 class PictureTest : public QObject
@@ -26,6 +27,7 @@ private Q_SLOTS:
     void panorama();
     void shape_data();
     void shape();
+    void shapeAloneIsNotEnough();
     void readerIntegration_data();
     void readerIntegration();
     void loadPair_data();
@@ -41,6 +43,45 @@ private Q_SLOTS:
     void swapOverMark();
     void storedCorrection();
 };
+// A scene of smooth texture, sums of waves, one set per seed (the same as policytest.c).
+static double scene(double x, double y, int seed)
+{
+    return 128 + 50 * std::sin(x * (0.21 + 0.013 * seed) + y * 0.13) + 35 * std::sin(x * 0.047 - y * (0.31 + 0.007 * seed))
+        + 25 * std::sin(x * 0.11 * (seed + 1) + y * 0.19) + 20 * std::sin(x * 0.37 + y * 0.29 * (seed + 2));
+}
+// What a picture of this size may hold: two views of one scene side by side (the right one a little to the side, more
+// at the bottom), two unrelated scenes (two monitors), one scene across the whole width (a panorama or a phone
+// photo), or nothing but one grey.
+enum class Content { Pair, Unrelated, OneScene, Flat };
+static QImage picture(const QSize &size, Content content)
+{
+    QImage image(size, QImage::Format_RGB32);
+    const int half = size.width() / 2;
+    const double k = 192.0 / half;
+    for (int y = 0; y < size.height(); ++y) {
+        QRgb *row = reinterpret_cast<QRgb *>(image.scanLine(y));
+        for (int x = 0; x < size.width(); ++x) {
+            double v = 128;
+            const bool right = x >= half;
+            switch (content) {
+            case Content::Pair:
+                v = right ? scene((x - half) * k + 6 * (1 + double(y) / size.height()), y * k, 0) : scene(x * k, y * k, 0);
+                break;
+            case Content::Unrelated:
+                v = right ? scene((x - half) * k, y * k, 3) : scene(x * k, y * k, 0);
+                break;
+            case Content::OneScene:
+                v = scene(x * k, y * k, 0);
+                break;
+            case Content::Flat:
+                break;
+            }
+            const int c = qBound(0, int(v), 255);
+            row[x] = qRgb(c, c * 9 / 10, c * 8 / 10);
+        }
+    }
+    return image;
+}
 static QImage packed()
 {
     QImage image(16, 8, QImage::Format_RGB32);
@@ -68,9 +109,11 @@ void PictureTest::marksAndChoices()
         QCOMPARE(picture.isStereo(), layout != QLatin1String("mono"));
     }
     options = {};
-    const auto ratio = Picture::fromImages(image, {}, {}, "png", {}, options, OutputMode::Stereo);
+    // Shape alone is not a pair: flat red and blue halves are in the shape range, and say nothing
+    QVERIFY(!Picture::fromImages(image, {}, {}, "png", {}, options, OutputMode::Stereo).isStereo());
+    const auto ratio = Picture::fromImages(picture(QSize(300, 100), Content::Pair), {}, {}, "png", {}, options, OutputMode::Stereo);
     QCOMPARE(ratio.source, Picture::Source::Shape);
-    QCOMPARE(ratio.right.pixelColor(0, 0), QColor(Qt::blue));
+    QCOMPARE(ratio.layout, Picture::Layout::SideBySide);
     const auto mono = Picture::fromImages(image, {}, QStringLiteral("mono"), "jpg", {}, options, OutputMode::Stereo);
     QVERIFY(!mono.isStereo());
 }
@@ -137,6 +180,7 @@ void PictureTest::outputPolicy()
 void PictureTest::viewControls()
 {
     Picture::Options options;
+    options.inputLayout = Picture::Layout::SideBySide; // flat halves are one picture to the shape rule: the user says it is a pair
     options.swapEyes = true;
     options.view = Picture::View::LeftOnly;
     const auto left = Picture::fromImages(packed(), {}, {}, "png", {}, options, OutputMode::Stereo);
@@ -236,6 +280,7 @@ void PictureTest::shape_data()
 {
     QTest::addColumn<QSize>("size");
     QTest::addColumn<bool>("pair");
+    // two views of one scene, at every shape the rule takes, and at the shapes it does not
     QTest::newRow("two squares") << QSize(200, 100) << true;
     QTest::newRow("two 4:3") << QSize(800, 300) << true;
     QTest::newRow("two 16:9") << QSize(3840, 1080) << true;
@@ -249,14 +294,37 @@ void PictureTest::shape()
 {
     QFETCH(QSize, size);
     QFETCH(bool, pair);
-    QImage image(size, QImage::Format_RGB32);
-    image.fill(Qt::gray);
-    const auto picture = Picture::fromImages(image, {}, {}, "png", {}, {}, OutputMode::Stereo);
+    const auto picture = Picture::fromImages(::picture(size, Content::Pair), {}, {}, "png", {}, {}, OutputMode::Stereo);
     QCOMPARE(picture.isStereo(), pair);
     QCOMPARE(picture.source, pair ? Picture::Source::Shape : Picture::Source::None);
     if (pair) {
         QCOMPARE(picture.layout, Picture::Layout::SideBySide);
     }
+}
+// The shape of a pair is not the proof of one (a phone photo is 20:9, two monitors 2:1 to 3.3:1): an unmarked picture is
+// a pair only when its halves are views of one scene. A mark or the user's choice is not asked for pixels.
+void PictureTest::shapeAloneIsNotEnough()
+{
+    const QList<QSize> sizes { QSize(4640 / 4, 2088 / 4), QSize(1484, 720), QSize(400, 200), QSize(2400 / 2, 1000 / 2), QSize(2710, 1000), QSize(3200, 900) };
+    for (const QSize &size : sizes) {
+        for (const Content content : { Content::OneScene, Content::Unrelated, Content::Flat }) {
+            const QImage image = ::picture(size, content);
+            const auto picture = Picture::fromImages(image, {}, {}, "jpg", {}, {}, OutputMode::Stereo);
+            QVERIFY2(!picture.isStereo(), qPrintable(QStringLiteral("%1x%2 content %3").arg(size.width()).arg(size.height()).arg(int(content))));
+            QCOMPARE(picture.source, Picture::Source::None);
+            QVERIFY(!picture.original.isNull());
+            // the user's choice and the file's marks still make it a pair
+            Picture::Options options;
+            options.inputLayout = Picture::Layout::SideBySide;
+            QVERIFY2(Picture::fromImages(image, {}, {}, "jpg", {}, options, OutputMode::Stereo).isStereo(), qPrintable(QStringLiteral("%1x%2 content %3").arg(size.width()).arg(size.height()).arg(int(content))));
+            const auto marked = Picture::fromImages(image, {}, QStringLiteral("sideBySideLeftFirst"), "jpg", {}, {}, OutputMode::Stereo);
+            QVERIFY(marked.isStereo());
+            QCOMPARE(marked.source, Picture::Source::FileMark);
+        }
+        QVERIFY2(Picture::fromImages(::picture(size, Content::Pair), {}, {}, "jpg", {}, {}, OutputMode::Stereo).isStereo() == Picture::pairByContent(::picture(size, Content::Pair)),
+            "the twin and the decision agree");
+    }
+    QVERIFY(!Picture::pairByContent(QImage()));
 }
 void PictureTest::readerIntegration_data()
 {
@@ -373,12 +441,15 @@ void PictureTest::loadPairPng()
         QCOMPARE(pair.left.pixelColor(64, 40), QColor(Qt::red));
         QCOMPARE(pair.right.pixelColor(64, 40), QColor(Qt::blue));
     }
-    // The same pixels without the chunk are a picture 3:1 wide, a pair by its shape; at 4:1 they are a panorama.
+    // The same pixels without the chunk are one picture (flat red and blue halves are not views of one scene) at 3:1; a
+    // scene of two views at that shape is a pair, and at 4:1 a panorama.
     QImage wide(1600, 400, QImage::Format_RGB32);
     wide.fill(Qt::gray);
     QVERIFY(wide.save(dir.filePath(QStringLiteral("panorama.png"))));
     QVERIFY(!Picture::loadPair(dir.filePath(QStringLiteral("panorama.png")), QSize(256, 256), {}).isStereo());
-    QVERIFY(image.save(dir.filePath(QStringLiteral("shape.png"))));
+    QVERIFY(image.save(dir.filePath(QStringLiteral("flat.png"))));
+    QVERIFY(!Picture::loadPair(dir.filePath(QStringLiteral("flat.png")), QSize(256, 256), {}).isStereo());
+    QVERIFY(::picture(QSize(900, 300), Content::Pair).save(dir.filePath(QStringLiteral("shape.png"))));
     QCOMPARE(Picture::loadPair(dir.filePath(QStringLiteral("shape.png")), QSize(256, 256), {}).source, Picture::Source::Shape);
     QVERIFY(Picture().sideBySide().isNull());
 }
