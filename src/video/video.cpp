@@ -10,13 +10,18 @@ bool Video::sideBySideByShape(QSize displaySize) { return stereo_policy_video_si
 
 Video::Layout Video::layout(QSize displaySize, const QString &mark, const Picture::Options &options)
 {
+    return layout(displaySize, mark, options, false);
+}
+
+Video::Layout Video::layout(QSize displaySize, const QString &mark, const Picture::Options &options, bool forceMono)
+{
     Layout result;
     int layout = 0;
     int order = 0;
     int source = 0;
     const QByteArray value = mark.toUtf8();
     // a frame without a size has no shape to go by, but its mark and the user's choice still count
-    if (stereo_policy_video_layout(qMax(1, displaySize.width()), qMax(1, displaySize.height()), value.constData(), int(options.inputLayout),
+    if (stereo_policy_video_layout(qMax(1, displaySize.width()), qMax(1, displaySize.height()), value.constData(), forceMono ? STEREO_POLICY_USER_FORCE_2D : int(options.inputLayout),
             int(options.inputOrder), options.swapEyes, &layout, &order, &source)
         == 0) {
         result.layout = Picture::Layout(layout);

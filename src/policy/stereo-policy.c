@@ -76,13 +76,20 @@ int stereo_policy_picture_pair_by_shape(int width, int height)
 int stereo_policy_video_layout(
     int width, int height, const char *mark, int user_layout, int user_order, int swap_eyes, int *layout, int *order, int *source)
 {
-    if (width <= 0 || height <= 0 || !layout || !order || !source || user_layout < STEREO_POLICY_LAYOUT_NONE
+    if (width <= 0 || height <= 0 || !layout || !order || !source || user_layout < STEREO_POLICY_USER_FORCE_2D
         || user_layout > STEREO_POLICY_LAYOUT_BLOCK_LACED)
         return -1;
     *layout = STEREO_POLICY_LAYOUT_NONE;
     *order = STEREO_POLICY_LEFT_FIRST;
     *source = STEREO_POLICY_SOURCE_NONE;
-    if (mark && mark[0]) {
+    if (user_layout == STEREO_POLICY_USER_FORCE_2D) {
+        /* the user says the video is not 3D, whatever the stream says */
+        *source = STEREO_POLICY_SOURCE_USER;
+    } else if (user_layout != STEREO_POLICY_LAYOUT_NONE) {
+        *layout = user_layout;
+        *order = user_order == STEREO_POLICY_RIGHT_FIRST ? STEREO_POLICY_RIGHT_FIRST : STEREO_POLICY_LEFT_FIRST;
+        *source = STEREO_POLICY_SOURCE_USER;
+    } else if (mark && mark[0]) {
         int anaglyph = STEREO_POLICY_ANAGLYPH_NONE;
         stereo_policy_read_mark(mark, layout, order, &anaglyph);
         if (anaglyph != STEREO_POLICY_ANAGLYPH_NONE) {
@@ -91,10 +98,6 @@ int stereo_policy_video_layout(
             *order = STEREO_POLICY_LEFT_FIRST;
         }
         *source = STEREO_POLICY_SOURCE_FILE_MARK;
-    } else if (user_layout != STEREO_POLICY_LAYOUT_NONE) {
-        *layout = user_layout;
-        *order = user_order == STEREO_POLICY_RIGHT_FIRST ? STEREO_POLICY_RIGHT_FIRST : STEREO_POLICY_LEFT_FIRST;
-        *source = STEREO_POLICY_SOURCE_USER;
     } else if (stereo_policy_video_side_by_side_by_shape(width, height)) {
         *layout = STEREO_POLICY_LAYOUT_SIDE_BY_SIDE;
         *source = STEREO_POLICY_SOURCE_SHAPE;

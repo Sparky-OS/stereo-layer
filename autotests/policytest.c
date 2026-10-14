@@ -72,8 +72,15 @@ static void marks(void)
 static void videoLayout(void)
 {
     int layout, order, source;
-    /* the mark first, whatever the shape and the user's choice */
+    /* the user's explicit choice first, a packing or not 3D, over a mark that is wrong */
     CHECK(stereo_policy_video_layout(1920, 1080, "sideBySideRightFirst", STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, 0, 0, &layout, &order, &source) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM && order == STEREO_POLICY_LEFT_FIRST && source == STEREO_POLICY_SOURCE_USER);
+    CHECK(stereo_policy_video_layout(3840, 1080, "sideBySideLeftFirst", STEREO_POLICY_USER_FORCE_2D, 0, 0, &layout, &order, &source) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_NONE && source == STEREO_POLICY_SOURCE_USER);
+    CHECK(stereo_policy_video_layout(3840, 1080, NULL, STEREO_POLICY_USER_FORCE_2D, 0, 1, &layout, &order, &source) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_NONE && order == STEREO_POLICY_LEFT_FIRST && source == STEREO_POLICY_SOURCE_USER);
+    /* then the stream's own mark, whatever the shape */
+    CHECK(stereo_policy_video_layout(1920, 1080, "sideBySideRightFirst", 0, 0, 0, &layout, &order, &source) == 0);
     CHECK(layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE && order == STEREO_POLICY_RIGHT_FIRST && source == STEREO_POLICY_SOURCE_FILE_MARK);
     CHECK(stereo_policy_video_layout(3840, 1080, "mono", 0, 0, 0, &layout, &order, &source) == 0);
     CHECK(layout == STEREO_POLICY_LAYOUT_NONE && source == STEREO_POLICY_SOURCE_FILE_MARK);
@@ -81,7 +88,7 @@ static void videoLayout(void)
     CHECK(layout == STEREO_POLICY_LAYOUT_NONE && source == STEREO_POLICY_SOURCE_FILE_MARK);
     CHECK(stereo_policy_video_layout(1920, 1080, "frameSequentialLeftFirst", 0, 0, 0, &layout, &order, &source) == 0);
     CHECK(layout == STEREO_POLICY_LAYOUT_FRAME_SEQUENTIAL && source == STEREO_POLICY_SOURCE_FILE_MARK);
-    /* then the user's choice */
+    /* the user's choice covers what the shape no longer guesses */
     CHECK(stereo_policy_video_layout(1920, 800, NULL, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_POLICY_RIGHT_FIRST, 0, &layout, &order, &source)
         == 0);
     CHECK(layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM && order == STEREO_POLICY_RIGHT_FIRST && source == STEREO_POLICY_SOURCE_USER);
@@ -107,6 +114,7 @@ static void videoLayout(void)
     CHECK(stereo_policy_video_layout(0, 1080, NULL, 0, 0, 0, &layout, &order, &source) == -1);
     CHECK(stereo_policy_video_layout(1920, 1080, NULL, 0, 0, 0, NULL, &order, &source) == -1);
     CHECK(stereo_policy_video_layout(1920, 1080, NULL, 42, 0, 0, &layout, &order, &source) == -1);
+    CHECK(stereo_policy_video_layout(1920, 1080, NULL, -2, 0, 0, &layout, &order, &source) == -1);
 }
 
 static void fullViews(void)

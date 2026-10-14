@@ -10,10 +10,9 @@
 namespace Stereo
 {
 /*
- * The policy for video, shared by the players: the stream's own mark first (Matroska's StereoMode, RFC 9559
- * section 5.1.4.1.28.3; the frame packing SEI of H.264 and H.265, Table D-8, which H.264 V15 (08/2024) numbers D-8 and V16
- * (06/2026) D-9; the st3d box), then the user's choice,
- * then the frame's shape. A frame without a mark is side by side by its shape alone only when it is at least three
+ * The policy for video, shared by the players: the user's explicit choice first (a packing, or not 3D), then the stream's
+ * own mark (Matroska's StereoMode, RFC 9559 section 5.1.4.1.28.3; the frame packing SEI of H.264 and H.265, Table D-8, which H.264 V15 (08/2024) numbers D-8 and V16 (06/2026) D-9;
+ * the st3d box), then the frame's shape. A frame without a mark is side by side by its shape alone only when it is at least three
  * times as wide as high: two pictures next to each other (full side by side 16:9 is 3.56:1), never a single one
  * (a scope film is 2.39:1, the widest film formats stay under 3:1). Below that, and for top and bottom, the shape
  * decides nothing and the user's choice covers the rest. A still picture follows Picture's own rule instead.
@@ -34,6 +33,9 @@ public:
     // the Stereo3DLayout text ("mono", "sideBySideLeftFirst", "topBottomRightFirst", ...); empty when it has none.
     // options.swapEyes, the user's correction, reverses the order of whatever packing was decided.
     static Layout layout(QSize displaySize, const QString &mark, const Picture::Options &options = {});
+    // The same, when the user may also say that the video is not 3D (forceMono): that choice comes before the mark, as a
+    // chosen packing does (Options::inputLayout).
+    static Layout layout(QSize displaySize, const QString &mark, const Picture::Options &options, bool forceMono);
     // The shape rule alone: true for a frame at least SideBySideShape times as wide as high.
     static bool sideBySideByShape(QSize displaySize);
     // Whether each view of a frame of this packing is full, shown at its own shape, or half, stretched back to the
