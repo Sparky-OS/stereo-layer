@@ -42,6 +42,18 @@ public:
     // frame: side by side is full at a display aspect of 2.5 or more, top and bottom at 1.2 or less; interleaved,
     // checkerboard and quincunx views are half; multiview, frame-sequential and block-laced ones full (stereo-policy.h).
     static bool fullViews(QSize displaySize, Picture::Layout layout);
+
+    // What decided whether the views are full or half
+    enum class ViewsSource { Layout, Mark, Shape };
+    struct Views {
+        bool full = false;
+        ViewsSource source = ViewsSource::Layout;
+    };
+    // Full or half views from what the stream says before the shape (stereo-policy.h, stereo_policy_video_views()).
+    // codedSize is the frame as stored, after any crop; sampleAspectRatio is width over height of one sample (a null size
+    // for 1:1); planeSize is Matroska's DisplayWidth and DisplayHeight when the track has them (RFC 9559 section 18.10),
+    // else a null size; upsampledAspectRatio is the H.265 frame packing SEI's upsampled_aspect_ratio_flag (D.3.16), or -1.
+    static Views views(QSize codedSize, QSize sampleAspectRatio, QSize planeSize, int upsampledAspectRatio, Picture::Layout layout);
 };
 }
 

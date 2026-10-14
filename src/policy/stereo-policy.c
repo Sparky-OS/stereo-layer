@@ -107,7 +107,7 @@ int stereo_policy_video_layout(
     return 0;
 }
 
-int stereo_policy_video_full_views(int width, int height, int layout)
+int stereo_policy_video_views_by_shape(int width, int height, int layout)
 {
     if (width <= 0 || height <= 0)
         return -1;
@@ -128,6 +128,63 @@ int stereo_policy_video_full_views(int width, int height, int layout)
     default:
         return -1;
     }
+}
+
+int stereo_policy_video_full_views(int width, int height, int layout) { return stereo_policy_video_views_by_shape(width, height, layout); }
+
+/* a and b are the same shape, within one percent: a_w / a_h == b_w / b_h */
+static int same_shape(long long a_w, long long a_h, long long b_w, long long b_h)
+{
+    const long long left = a_w * b_h;
+    const long long right = b_w * a_h;
+    const long long difference = left > right ? left - right : right - left;
+    return difference * 100 <= right;
+}
+
+int stereo_policy_video_views(int coded_width, int coded_height, int sar_num, int sar_den, int plane_width, int plane_height,
+    int upsampled_aspect_ratio, int layout, int *decided_by)
+{
+    if (coded_width <= 0 || coded_height <= 0)
+        return -1;
+    if (sar_num <= 0 || sar_den <= 0) {
+        sar_num = 1;
+        sar_den = 1;
+    }
+    set(decided_by, STEREO_POLICY_VIEWS_BY_LAYOUT);
+    const int packed = layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE || layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM;
+    if (!packed)
+        return stereo_policy_video_views_by_shape(coded_width, coded_height, layout);
+    const int side_by_side = layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE;
+
+    /* The container's mark: a Matroska plane size (DisplayWidth and DisplayHeight, RFC 9559 section 18.10, elements
+     * 5.1.4.1.28.12 and .13) is the size of one plane, so it says how much of the frame one view is. A plane as large as the frame is
+     * the elements' default (the pixel size) and says nothing. */
+    if (plane_width > 0 && plane_height > 0 && !(plane_width == coded_width && plane_height == coded_height)) {
+        const long long view_width = side_by_side ? coded_width / 2 : coded_width;
+        const long long view_height = side_by_side ? coded_height : coded_height / 2;
+        if (same_shape(view_width, view_height, plane_width, plane_height)) {
+            set(decided_by, STEREO_POLICY_VIEWS_BY_MARK);
+            return 1;
+        }
+        if (same_shape(coded_width, coded_height, plane_width, plane_height)) {
+            set(decided_by, STEREO_POLICY_VIEWS_BY_MARK);
+            return 0;
+        }
+    }
+
+    /* The H.265 frame packing SEI (D.3.16): upsampled_aspect_ratio_flag 1 says the sample aspect ratio is that of the
+     * samples after the views are up-converted to the frame, so each view is shown at the frame's shape: half views;
+     * 0 says it is that of the samples as stored, so each view is shown as stored: full views. H.264 (D.2.26) has no
+     * such flag: its NOTE 2 only says the SAR is meant for a decoder that does not interpret the SEI message. */
+    if (upsampled_aspect_ratio == 1 || upsampled_aspect_ratio == 0) {
+        set(decided_by, STEREO_POLICY_VIEWS_BY_MARK);
+        return upsampled_aspect_ratio == 0;
+    }
+
+    /* The marks are silent: the shape of the frame as shown decides, in one place. */
+    set(decided_by, STEREO_POLICY_VIEWS_BY_SHAPE);
+    const long long shown_width = ((long long)coded_width * sar_num + sar_den / 2) / sar_den;
+    return stereo_policy_video_views_by_shape(shown_width > 0x7fffffff ? 0x7fffffff : (int)shown_width, coded_height, layout);
 }
 
 int stereo_policy_file_swap_eyes(const char *path)
