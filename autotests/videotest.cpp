@@ -13,6 +13,8 @@ private Q_SLOTS:
     void wholeMarkSet_data();
     void wholeMarkSet();
     void plainC();
+    void swapOverMark();
+    void fullViews();
 };
 void VideoTest::shape_data()
 {
@@ -125,6 +127,34 @@ void VideoTest::plainC()
     QCOMPARE(source, int(Picture::Source::FileMark));
     QCOMPARE(stereo_layer_video_layout(0, 800, nullptr, &layout, &order, &source), -1);
     QCOMPARE(stereo_layer_video_layout(1920, 800, nullptr, nullptr, &order, &source), -1);
+}
+void VideoTest::swapOverMark()
+{
+    // A file marked right first, corrected by the user, shows the left view in the left eye; without the correction,
+    // the mark rules again
+    const auto marked = Video::layout(QSize(1920, 1080), QStringLiteral("sideBySideRightFirst"));
+    QCOMPARE(marked.eyeOrder, Picture::EyeOrder::RightFirst);
+    Picture::Options options;
+    options.swapEyes = true;
+    const auto corrected = Video::layout(QSize(1920, 1080), QStringLiteral("sideBySideRightFirst"), options);
+    QCOMPARE(corrected.layout, Picture::Layout::SideBySide);
+    QCOMPARE(corrected.eyeOrder, Picture::EyeOrder::LeftFirst);
+    QCOMPARE(corrected.source, Picture::Source::FileMark);
+    // nothing to reverse in one picture
+    const auto mono = Video::layout(QSize(3840, 1080), QStringLiteral("mono"), options);
+    QCOMPARE(mono.layout, Picture::Layout::None);
+    QCOMPARE(mono.eyeOrder, Picture::EyeOrder::LeftFirst);
+}
+void VideoTest::fullViews()
+{
+    QVERIFY(Video::fullViews(QSize(3840, 1080), Picture::Layout::SideBySide));
+    QVERIFY(!Video::fullViews(QSize(1920, 1080), Picture::Layout::SideBySide));
+    QVERIFY(Video::fullViews(QSize(1920, 2160), Picture::Layout::TopAndBottom));
+    QVERIFY(!Video::fullViews(QSize(1920, 1080), Picture::Layout::TopAndBottom));
+    QVERIFY(!Video::fullViews(QSize(1920, 1080), Picture::Layout::Rows));
+    QCOMPARE(stereo_layer_video_full_views(3840, 1080, int(Picture::Layout::SideBySide)), 1);
+    QCOMPARE(stereo_layer_video_full_views(1920, 1080, int(Picture::Layout::SideBySide)), 0);
+    QCOMPARE(stereo_layer_video_full_views(1920, 1080, int(Picture::Layout::None)), -1);
 }
 QTEST_MAIN(VideoTest)
 #include "videotest.moc"

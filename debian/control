@@ -17,13 +17,33 @@ Description: Shared stereo picture policy and Qt presentation
  Anaglyph originals remain unchanged on anaglyph outputs. Reconstructed
  colours on true stereo outputs are approximate; files are never changed.
  .
- Sparky Stereo OS, an edition of SparkyLinux, created by Paweł "pavroo"
- Pijanowski and Daniel Ramos (Capitain Jack).
+ Sparky Stereo OS, Daniel Ramos's edition of SparkyLinux (by Paweł "pavroo"
+ Pijanowski).
 
 Package: libstereo-layer-dev
 Section: libdevel
 Architecture: any
-Depends: libstereo-layer1 (= ${binary:Version}), ${misc:Depends}, qt6-base-dev, qt6-declarative-dev
+Depends: libstereo-layer1 (= ${binary:Version}), libstereo-policy-dev (= ${binary:Version}), ${misc:Depends}, qt6-base-dev, qt6-declarative-dev
 Description: Development files for the shared stereo picture layer
  Headers and CMake targets for stereo picture policy, Qt widget presentation
  and the org.sparky.stereo QML item.
+
+Package: libstereo-policy1
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Shared stereo policy for programs without Qt
+ How a stereo mark reads (the Stereo3DLayout words of RFC 9559 StereoMode and
+ H.264/H.265 Table D-8), which packing a video frame holds, whether its views
+ are full or half, and the user's correction, as a small C library a browser
+ or a player can load. libstereo-layer builds on it, so every program
+ decides alike.
+ .
+ Sparky Stereo OS, Daniel Ramos's edition of SparkyLinux (by Paweł "pavroo"
+ Pijanowski).
+
+Package: libstereo-policy-dev
+Section: libdevel
+Architecture: any
+Depends: libstereo-policy1 (= ${binary:Version}), ${misc:Depends}
+Description: Development files for the shared stereo policy without Qt
+ The C header stereo-policy.h and the pkg-config file stereo-policy.pc.

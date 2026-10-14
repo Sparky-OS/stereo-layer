@@ -1,4 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
+add_executable(policytest policytest.c)
+target_link_libraries(policytest PRIVATE StereoPolicy)
+add_test(NAME policytest COMMAND policytest)
 add_executable(picturetest picturetest.cpp)
 target_link_libraries(picturetest PRIVATE StereoLayer Qt6::Test ZLIB::ZLIB)
 add_test(NAME picturetest COMMAND picturetest)

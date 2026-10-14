@@ -1,0 +1,3 @@
+usr/include/stereo-policy/*
+usr/lib/*/libstereo-policy.so
+usr/lib/*/pkgconfig/stereo-policy.pc

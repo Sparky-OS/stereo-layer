@@ -37,6 +37,7 @@ private Q_SLOTS:
     void wholeMarkSet();
     void upconversion_data();
     void upconversion();
+    void swapOverMark();
 };
 static QImage packed()
 {
@@ -586,6 +587,25 @@ void PictureTest::upconversion()
             QCOMPARE(picture.right.pixelColor(x, y), right(x, y));
         }
     }
+}
+
+void PictureTest::swapOverMark()
+{
+    // Marked right first: the first half is the right view. The user's correction puts it in the left eye; removing
+    // the correction returns to the mark; a 2D output keeps the picture as it is either way.
+    const QImage image = packed(); // red first half, blue second half
+    const auto marked = Picture::fromImages(image, {}, QStringLiteral("sideBySideRightFirst"), "png", {}, {}, OutputMode::Stereo);
+    QCOMPARE(marked.left.pixelColor(0, 0), QColor(Qt::blue));
+    Picture::Options corrected;
+    corrected.swapEyes = true;
+    const auto swapped = Picture::fromImages(image, {}, QStringLiteral("sideBySideRightFirst"), "png", {}, corrected, OutputMode::Stereo);
+    QCOMPARE(swapped.source, Picture::Source::FileMark);
+    QCOMPARE(swapped.left.pixelColor(0, 0), QColor(Qt::red));
+    QCOMPARE(swapped.right.pixelColor(0, 0), QColor(Qt::blue));
+    const auto again = Picture::fromImages(image, {}, QStringLiteral("sideBySideRightFirst"), "png", {}, {}, OutputMode::Stereo);
+    QCOMPARE(again.left.pixelColor(0, 0), QColor(Qt::blue));
+    const auto flat = Picture::fromImages(image, {}, QStringLiteral("sideBySideRightFirst"), "png", {}, corrected, OutputMode::Mono);
+    QCOMPARE(flat.original, image);
 }
 
 QTEST_MAIN(PictureTest)

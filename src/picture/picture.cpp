@@ -4,6 +4,7 @@
 #include "picture.h"
 #include "mark_p.h"
 #include "panorama_p.h"
+#include "stereo-policy.h"
 
 #include <QByteArrayView>
 #include <QFile>
@@ -196,10 +197,7 @@ Decision decide(const QString &fileMetadata, const QByteArray &format, const QBy
 // A stereo photograph is two pictures next to each other: from two squares (2:1) to two 16:9 pictures (32:9, 3.56:1),
 // with a little margin. A wider picture is a panorama, and a tall one a portrait or a phone screenshot: the shape alone
 // never says top and bottom.
-bool pairByShape(const QSize &size)
-{
-    return size.height() > 0 && qint64(size.width()) >= qint64(size.height()) * 2 && qint64(size.width()) * 5 <= qint64(size.height()) * 18;
-}
+bool pairByShape(const QSize &size) { return stereo_policy_picture_pair_by_shape(size.width(), size.height()) == 1; }
 
 Picture unpackPng(const QImage &image, Picture::EyeOrder order)
 {

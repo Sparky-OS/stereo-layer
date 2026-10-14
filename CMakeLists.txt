@@ -20,6 +20,17 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(STEREO_DECLARE REQUIRED IMPORTED_TARGET stereo-declare)
 pkg_check_modules(WAYLAND REQUIRED IMPORTED_TARGET wayland-client)
 pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
+# The policy without Qt, for any program; the Qt layer builds on it
+add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-policy.h)
+add_library(Stereo::Policy ALIAS StereoPolicy)
+set_target_properties(StereoPolicy PROPERTIES OUTPUT_NAME stereo-policy VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Policy
+    C_STANDARD 11 C_VISIBILITY_PRESET hidden)
+target_include_directories(StereoPolicy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/policy> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-policy>)
+install(TARGETS StereoPolicy EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+install(FILES src/policy/stereo-policy.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-policy)
+configure_file(src/policy/stereo-policy.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
+
 add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/mark.cpp src/picture/anaglyph.cpp src/picture/panorama.cpp src/picture/render.cpp
     src/video/video.cpp src/video/video.h
     src/output/screenmode.cpp src/output/screenmode.h
@@ -29,7 +40,7 @@ add_library(Stereo::Layer ALIAS StereoLayer)
 ecm_generate_export_header(StereoLayer BASE_NAME STEREO_LAYER VERSION ${PROJECT_VERSION} EXPORT_FILE_NAME stereo_layer_export.h)
 set_target_properties(StereoLayer PROPERTIES OUTPUT_NAME stereo-layer VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Layer)
 target_include_directories(StereoLayer PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/picture> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/video> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/widgets> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/output> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/quick> $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-layer>)
-target_link_libraries(StereoLayer PUBLIC Qt6::Gui Qt6::Quick PRIVATE Qt6::Widgets Qt6::GuiPrivate KF6::Screen ZLIB::ZLIB PkgConfig::STEREO_DECLARE PkgConfig::WAYLAND)
+target_link_libraries(StereoLayer PUBLIC Qt6::Gui Qt6::Quick PRIVATE StereoPolicy Qt6::Widgets Qt6::GuiPrivate KF6::Screen ZLIB::ZLIB PkgConfig::STEREO_DECLARE PkgConfig::WAYLAND)
 target_include_directories(StereoLayer PRIVATE src/wayland)
 qt6_generate_wayland_protocol_client_sources(StereoLayer FILES ${WAYLAND_PROTOCOLS_DIR}/stable/viewporter/viewporter.xml)
 qt_add_qml_module(StereoLayer URI org.sparky.stereo VERSION 1.0

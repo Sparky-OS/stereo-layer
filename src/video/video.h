@@ -31,12 +31,20 @@ public:
 
     // displaySize is the frame as shown (the sample aspect ratio applied). mark is the stream's own, in the words of
     // the Stereo3DLayout text ("mono", "sideBySideLeftFirst", "topBottomRightFirst", ...); empty when it has none.
+    // options.swapEyes, the user's correction, reverses the order of whatever packing was decided.
     static Layout layout(QSize displaySize, const QString &mark, const Picture::Options &options = {});
     // The shape rule alone: true for a frame at least SideBySideShape times as wide as high.
     static bool sideBySideByShape(QSize displaySize);
+    // Whether each view of a frame of this packing is full, shown at its own shape, or half, stretched back to the
+    // frame: side by side is full at a display aspect of 2.5 or more, top and bottom at 1.2 or less; interleaved,
+    // checkerboard and quincunx views are half; multiview, frame-sequential and block-laced ones full (stereo-policy.h).
+    static bool fullViews(QSize displaySize, Picture::Layout layout);
 };
 }
 
 // The same policy for programs without Qt, or that load the library at run time: layout, order and source receive the
 // integer values of Picture::Layout, Picture::EyeOrder and Picture::Source. Returns 0, or -1 for a bad argument.
 extern "C" STEREO_LAYER_EXPORT int stereo_layer_video_layout(int width, int height, const char *mark, int *layout, int *order, int *source);
+// Video::fullViews() in the same way: 1 for full views, 0 for half, -1 for a bad argument or no packing. Programs without
+// Qt find the whole policy, the user's choice and correction included, in libstereo-policy (stereo-policy.h).
+extern "C" STEREO_LAYER_EXPORT int stereo_layer_video_full_views(int width, int height, int layout);

@@ -17,6 +17,10 @@ SVG has no stereo mark of its own, so the policy reads a proposed one, SVGStereo
 
 SVG renderers ignore attributes from other namespaces (SVG 1.1 Second Edition, section 23.1, "Foreign namespaces and private data"), so a marked file draws as before everywhere else. A compressed SVG (`.svgz`, a gzip stream, RFC 1952; SVG 1.1 Second Edition, section 1.2) carries the mark the same way and is read the same way. An SVG without the mark is a drawing, one picture: neither its colours nor its shape make it a pair. The namespace and the attribute name are a proposal until they are published.
 
+## Programs without Qt
+
+`libstereo-policy` (header `stereo-policy.h`, pkg-config `stereo-policy`) is the same policy as a small C library, for a browser or a player: `stereo_policy_read_mark()` reads a Stereo3DLayout value exactly; `stereo_policy_video_layout()` gives a video frame's packing from the stream's mark, then the user's choice, then the shape (three times as wide as high), and applies the user's swap-eyes correction over whatever decided; `stereo_policy_video_full_views()` says whether the views are full or half (side by side is full at a display aspect of 2.5 or more, top and bottom at 1.2 or less; interleaved, checkerboard and quincunx views are half); the shape rules are there too. The values are those of the Qt API's enumerations. libstereo-layer builds on it, so every program decides alike; its own C entries `stereo_layer_video_layout()` and `stereo_layer_video_full_views()` stay.
+
 ## Widget clients
 
 Find `StereoLayer` with CMake and link `Stereo::Layer`. Call `Stereo::WidgetLayer::prepareWindow(topLevel)` before the native window is created; it gives the window an alpha buffer and keeps its opaque background, while a tooltip or a popup keeps the panel its style draws (rounded corners, a shadow). Create a `WidgetLayer` on the dedicated picture widget and call `setSource(path, options)`. The layer follows its rectangle, visibility, screen, zoom and pan. The source-loading path follows the screen's active output mode.

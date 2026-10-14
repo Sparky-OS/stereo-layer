@@ -1,0 +1,9 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+libdir=@KDE_INSTALL_FULL_LIBDIR@
+includedir=@KDE_INSTALL_FULL_INCLUDEDIR@/stereo-policy
+
+Name: stereo-policy
+Description: The stereo policy of Sparky Stereo OS, without Qt: stereo marks, video packings, full or half views
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lstereo-policy
+Cflags: -I${includedir}

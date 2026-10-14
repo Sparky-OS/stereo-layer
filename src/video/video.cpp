@@ -2,49 +2,39 @@
 // SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
 
 #include "video.h"
-#include "mark_p.h"
+#include "stereo-policy.h"
 
 namespace Stereo
 {
-bool Video::sideBySideByShape(QSize displaySize)
-{
-    return displaySize.width() > 0 && displaySize.height() > 0 && qint64(displaySize.width()) >= qint64(displaySize.height()) * SideBySideShape;
-}
+bool Video::sideBySideByShape(QSize displaySize) { return stereo_policy_video_side_by_side_by_shape(displaySize.width(), displaySize.height()) == 1; }
 
 Video::Layout Video::layout(QSize displaySize, const QString &mark, const Picture::Options &options)
 {
     Layout result;
-    if (!mark.isEmpty()) {
-        result.source = Picture::Source::FileMark;
-        // "mono", an anaglyph (one picture holding both views in colours), or a mark outside the set: no packing
-        const Mark read = readMark(mark);
-        if (read.anaglyph == Picture::AnaglyphColorPair::None) {
-            result.layout = read.layout;
-            result.eyeOrder = read.order;
-        }
-        return result;
-    }
-    if (options.inputLayout != Picture::Layout::None) {
-        result.layout = options.inputLayout;
-        result.eyeOrder = options.inputOrder;
-        result.source = Picture::Source::User;
-        return result;
-    }
-    if (sideBySideByShape(displaySize)) {
-        result.layout = Picture::Layout::SideBySide;
-        result.source = Picture::Source::Shape;
+    int layout = 0;
+    int order = 0;
+    int source = 0;
+    const QByteArray value = mark.toUtf8();
+    // a frame without a size has no shape to go by, but its mark and the user's choice still count
+    if (stereo_policy_video_layout(qMax(1, displaySize.width()), qMax(1, displaySize.height()), value.constData(), int(options.inputLayout),
+            int(options.inputOrder), options.swapEyes, &layout, &order, &source)
+        == 0) {
+        result.layout = Picture::Layout(layout);
+        result.eyeOrder = Picture::EyeOrder(order);
+        result.source = Picture::Source(source);
     }
     return result;
+}
+
+bool Video::fullViews(QSize displaySize, Picture::Layout layout)
+{
+    return stereo_policy_video_full_views(displaySize.width(), displaySize.height(), int(layout)) == 1;
 }
 }
 
 int stereo_layer_video_layout(int width, int height, const char *mark, int *layout, int *order, int *source)
 {
-    if (width <= 0 || height <= 0 || !layout || !order || !source)
-        return -1;
-    const auto result = Stereo::Video::layout(QSize(width, height), QString::fromUtf8(mark ? mark : ""));
-    *layout = static_cast<int>(result.layout);
-    *order = static_cast<int>(result.eyeOrder);
-    *source = static_cast<int>(result.source);
-    return 0;
+    return stereo_policy_video_layout(width, height, mark, 0, 0, 0, layout, order, source);
 }
+
+int stereo_layer_video_full_views(int width, int height, int layout) { return stereo_policy_video_full_views(width, height, layout); }
