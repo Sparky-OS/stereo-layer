@@ -3,6 +3,7 @@
 #include "picture.h"
 #include "render.h"
 #include <QBuffer>
+#include <QDir>
 #include <QFile>
 #include <QImageReader>
 #include <QPainter>
@@ -38,6 +39,7 @@ private Q_SLOTS:
     void upconversion_data();
     void upconversion();
     void swapOverMark();
+    void storedCorrection();
 };
 static QImage packed()
 {
@@ -606,6 +608,41 @@ void PictureTest::swapOverMark()
     QCOMPARE(again.left.pixelColor(0, 0), QColor(Qt::blue));
     const auto flat = Picture::fromImages(image, {}, QStringLiteral("sideBySideRightFirst"), "png", {}, corrected, OutputMode::Mono);
     QCOMPARE(flat.original, image);
+}
+
+void PictureTest::storedCorrection()
+{
+    // The correction stored with a file applies over its mark in load() and loadPair(), and goes away with it
+    if (!QImageReader::supportedImageFormats().contains("svg")) {
+        QSKIP("Qt's SVG image plugin is not installed");
+    }
+    QTemporaryDir dir(QDir::currentPath() + QStringLiteral("/correction-XXXXXX"));
+    const QString path = dir.filePath(QStringLiteral("pair.svg"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("<svg xmlns='http://www.w3.org/2000/svg' xmlns:svgstereo='https://github.com/Sparky-OS/svgstereo' "
+               "svgstereo:layout='sideBySideLeftFirst' width='200' height='100' viewBox='0 0 200 100'>"
+               "<rect width='100' height='100' fill='#ff0000'/><rect x='100' width='100' height='100' fill='#0000ff'/></svg>");
+    file.close();
+    if (!Picture::canStoreUserSwapEyes(path)) {
+        QSKIP("This file system keeps no extended attributes");
+    }
+    QVERIFY(!Picture::userSwapEyes(path));
+    QCOMPARE(Picture::loadPair(path, QSize(256, 256), {}).left.pixelColor(64, 64), QColor(Qt::red));
+    QVERIFY(Picture::setUserSwapEyes(path, true));
+    QVERIFY(Picture::userSwapEyes(path));
+    const auto pair = Picture::loadPair(path, QSize(256, 256), {});
+    QCOMPARE(pair.source, Picture::Source::FileMark);
+    QCOMPARE(pair.left.pixelColor(64, 64), QColor(Qt::blue));
+    QCOMPARE(pair.right.pixelColor(64, 64), QColor(Qt::red));
+    QCOMPARE(Picture::load(path, {}, OutputMode::Stereo).left.pixelColor(64, 64), QColor(Qt::blue));
+    // the program's own swap on top of the stored one swaps back
+    Picture::Options swapped;
+    swapped.swapEyes = true;
+    QCOMPARE(Picture::load(path, swapped, OutputMode::Stereo).left.pixelColor(64, 64), QColor(Qt::red));
+    QVERIFY(Picture::setUserSwapEyes(path, false));
+    QVERIFY(!Picture::userSwapEyes(path));
+    QCOMPARE(Picture::loadPair(path, QSize(256, 256), {}).left.pixelColor(64, 64), QColor(Qt::red));
 }
 
 QTEST_MAIN(PictureTest)

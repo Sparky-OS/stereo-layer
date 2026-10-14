@@ -142,9 +142,37 @@ static void shapes(void)
     CHECK(stereo_policy_picture_pair_by_shape(1000, 2000) == 0);
 }
 
+static void fileCorrection(void)
+{
+    /* in the build folder, which keeps extended attributes on the edition's file systems; skipped where it does not */
+    const char *path = "policytest-correction.tmp";
+    FILE *file = fopen(path, "w");
+    CHECK(file != NULL);
+    if (!file)
+        return;
+    fputs("pair", file);
+    fclose(file);
+    const int before = stereo_policy_file_swap_eyes(path);
+    if (before < 0) {
+        printf("policytest: no extended attributes here, the file correction is not checked\n");
+        remove(path);
+        return;
+    }
+    CHECK(before == 0);
+    CHECK(stereo_policy_set_file_swap_eyes(path, 1) == 0);
+    CHECK(stereo_policy_file_swap_eyes(path) == 1);
+    CHECK(stereo_policy_set_file_swap_eyes(path, 0) == 0);
+    CHECK(stereo_policy_file_swap_eyes(path) == 0);
+    CHECK(stereo_policy_set_file_swap_eyes(path, 0) == 0); /* removing what is not there is no error */
+    remove(path);
+    CHECK(stereo_policy_file_swap_eyes(path) == -1);
+    CHECK(stereo_policy_file_swap_eyes(NULL) == -1);
+}
+
 int main(void)
 {
     marks();
+    fileCorrection();
     videoLayout();
     fullViews();
     shapes();

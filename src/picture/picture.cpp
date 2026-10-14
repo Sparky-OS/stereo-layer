@@ -214,8 +214,20 @@ Picture unpackPng(const QImage &image, Picture::EyeOrder order)
 }
 }
 
-Picture Picture::load(const QString &path, const Options &options, OutputMode output)
+bool Picture::userSwapEyes(const QString &path) { return stereo_policy_file_swap_eyes(QFile::encodeName(path).constData()) == 1; }
+
+bool Picture::setUserSwapEyes(const QString &path, bool swap)
 {
+    return stereo_policy_set_file_swap_eyes(QFile::encodeName(path).constData(), swap) == 0;
+}
+
+bool Picture::canStoreUserSwapEyes(const QString &path) { return stereo_policy_file_swap_eyes(QFile::encodeName(path).constData()) >= 0; }
+
+Picture Picture::load(const QString &path, const Options &fileOptions, OutputMode output)
+{
+    // the user's correction stored with the file, over its mark
+    Options options = fileOptions;
+    options.swapEyes = options.swapEyes != userSwapEyes(path);
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
         return {};
@@ -238,8 +250,10 @@ Picture Picture::load(const QString &path, const Options &options, OutputMode ou
     return fromImages(image, second, metadata, format, header, options, output);
 }
 
-Picture Picture::loadPair(const QString &path, const QSize &bound, const Options &options)
+Picture Picture::loadPair(const QString &path, const QSize &bound, const Options &fileOptions)
 {
+    Options options = fileOptions;
+    options.swapEyes = options.swapEyes != userSwapEyes(path);
     QFile file(path);
     if (bound.isEmpty() || options.view == View::Mono || !file.open(QIODevice::ReadOnly)) {
         return {};

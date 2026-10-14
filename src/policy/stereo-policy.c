@@ -3,8 +3,14 @@
 
 #include "stereo-policy.h"
 
+#include <errno.h>
 #include <stddef.h>
 #include <string.h>
+#ifdef __linux__
+#include <sys/xattr.h>
+#endif
+
+#define SWAP_EYES_ATTRIBUTE "user.stereo-policy.swap-eyes"
 
 static void set(int *target, int value)
 {
@@ -119,4 +125,39 @@ int stereo_policy_video_full_views(int width, int height, int layout)
     default:
         return -1;
     }
+}
+
+int stereo_policy_file_swap_eyes(const char *path)
+{
+    if (!path || !path[0])
+        return -1;
+#ifdef __linux__
+    char value[8];
+    const ssize_t length = getxattr(path, SWAP_EYES_ATTRIBUTE, value, sizeof(value) - 1);
+    if (length < 0)
+        return errno == ENODATA ? 0 : -1;
+    value[length] = 0;
+    return strcmp(value, "1") == 0;
+#else
+    return -1;
+#endif
+}
+
+int stereo_policy_set_file_swap_eyes(const char *path, int swap)
+{
+    if (!path || !path[0]) {
+        errno = EINVAL;
+        return -1;
+    }
+#ifdef __linux__
+    if (swap)
+        return setxattr(path, SWAP_EYES_ATTRIBUTE, "1", 1, 0);
+    if (removexattr(path, SWAP_EYES_ATTRIBUTE) < 0 && errno != ENODATA)
+        return -1;
+    return 0;
+#else
+    (void)swap;
+    errno = ENOTSUP;
+    return -1;
+#endif
 }

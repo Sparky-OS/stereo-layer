@@ -40,6 +40,12 @@ public:
     static Picture fromAnaglyph(const QImage &image, AnaglyphColorPair pair);
     static AnaglyphColorPair detectAnaglyph(const QImage &image);
     static QString colorDisclaimer();
+    // The user's correction stored with a file whose mark has its eyes the wrong way round (stereo-policy.h,
+    // stereo_policy_file_swap_eyes()). load() and loadPair() apply it over the file's mark, on top of
+    // Options::swapEyes. setUserSwapEyes() returns false where the file system keeps no extended attributes.
+    static bool userSwapEyes(const QString &path);
+    static bool setUserSwapEyes(const QString &path, bool swap);
+    static bool canStoreUserSwapEyes(const QString &path);
 
     bool isStereo() const;
     // Both views side by side, left first, each at its own size, marked "sideBySideLeftFirst" in the image's

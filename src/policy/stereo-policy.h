@@ -92,6 +92,17 @@ STEREO_POLICY_EXPORT int stereo_policy_video_side_by_side_by_shape(int width, in
  */
 STEREO_POLICY_EXPORT int stereo_policy_picture_pair_by_shape(int width, int height);
 
+/*
+ * The user's correction stored with a file, for a file whose mark has its eyes the wrong way round: the extended
+ * attribute user.stereo-policy.swap-eyes, "1", which copies and moves that keep extended attributes keep. Returns 1
+ * when the file carries it, 0 when it does not, -1 when the file system keeps no extended attributes, the file cannot
+ * be read or the argument is bad.
+ */
+STEREO_POLICY_EXPORT int stereo_policy_file_swap_eyes(const char *path);
+
+/* Stores the correction with the file (swap 1) or removes it (swap 0). Returns 0, or -1 with errno set. */
+STEREO_POLICY_EXPORT int stereo_policy_set_file_swap_eyes(const char *path, int swap);
+
 #ifdef __cplusplus
 }
 #endif
