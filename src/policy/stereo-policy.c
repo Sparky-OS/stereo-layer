@@ -107,6 +107,134 @@ int stereo_policy_video_layout(
     return 0;
 }
 
+#include <ctype.h>
+
+static int is_separator(char c) { return c == '.' || c == '_' || c == '-' || c == ' ' || c == '[' || c == ']' || c == '(' || c == ')'; }
+
+/* the word at name[start, end), compared in upper case with a word of the vocabulary */
+static int word_is(const char *name, size_t start, size_t end, const char *word)
+{
+    const size_t length = strlen(word);
+    if (end - start != length)
+        return 0;
+    for (size_t i = 0; i < length; ++i)
+        if (toupper((unsigned char)name[start + i]) != word[i])
+            return 0;
+    return 1;
+}
+
+static int packing_word(const char *name, size_t start, size_t end, int *layout, int *views)
+{
+    static const struct {
+        const char *word;
+        int layout;
+        int views;
+    } words[] = {
+        { "SBS", STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, -1 }, { "HSBS", STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, 0 }, { "FSBS", STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, 1 },
+        { "TAB", STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, -1 }, { "HTAB", STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, 0 }, { "FTAB", STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, 1 },
+        { "TB", STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, -1 }, { "HTB", STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, 0 }, { "FTB", STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, 1 },
+        { "OU", STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, -1 }, { "HOU", STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, 0 }, { "FOU", STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, 1 },
+    };
+    for (size_t i = 0; i < sizeof(words) / sizeof(words[0]); ++i) {
+        if (word_is(name, start, end, words[i].word)) {
+            *layout = words[i].layout;
+            *views = words[i].views;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int stereo_policy_name_tag(const char *file_name, int *out_layout, int *out_order, int *out_views, int *out_three_d)
+{
+    set(out_layout, STEREO_POLICY_LAYOUT_NONE);
+    set(out_order, STEREO_POLICY_LEFT_FIRST);
+    set(out_views, -1);
+    set(out_three_d, 0);
+    if (!file_name)
+        return -1;
+    int layout = STEREO_POLICY_LAYOUT_NONE, order = STEREO_POLICY_LEFT_FIRST, views = -1, three_d = 0, order_word = 0;
+    int previous = 0; /* 1 after a lone H or HALF, 2 after a lone F or FULL, in the word before */
+    const size_t length = strlen(file_name);
+    size_t i = 0;
+    while (i < length) {
+        while (i < length && is_separator(file_name[i]))
+            ++i;
+        const size_t start = i;
+        while (i < length && !is_separator(file_name[i]))
+            ++i;
+        const size_t end = i;
+        if (end == start)
+            break;
+        int word_layout, word_views;
+        if (packing_word(file_name, start, end, &word_layout, &word_views)) {
+            if (layout == STEREO_POLICY_LAYOUT_NONE) {
+                layout = word_layout;
+                views = word_views;
+                if (views < 0 && previous == 1)
+                    views = 0;
+                else if (views < 0 && previous == 2)
+                    views = 1;
+            }
+            three_d = 1;
+            previous = 0;
+        } else if (word_is(file_name, start, end, "3D")) {
+            three_d = 1;
+            previous = 0;
+        } else if (word_is(file_name, start, end, "LR") || word_is(file_name, start, end, "RL")) {
+            order = toupper((unsigned char)file_name[start]) == 'R' ? STEREO_POLICY_RIGHT_FIRST : STEREO_POLICY_LEFT_FIRST;
+            order_word = 1;
+            previous = 0;
+        } else if (word_is(file_name, start, end, "H") || word_is(file_name, start, end, "HALF")) {
+            previous = 1;
+        } else if (word_is(file_name, start, end, "F") || word_is(file_name, start, end, "FULL")) {
+            previous = 2;
+        } else {
+            previous = 0;
+        }
+    }
+    if (order_word && layout == STEREO_POLICY_LAYOUT_NONE) {
+        layout = STEREO_POLICY_LAYOUT_SIDE_BY_SIDE;
+        three_d = 1;
+    }
+    set(out_layout, layout);
+    set(out_order, order);
+    set(out_views, views);
+    set(out_three_d, three_d);
+    return three_d || order_word;
+}
+
+int stereo_policy_video_layout_named(int width, int height, const char *mark, const char *file_name, int halves, int user_layout, int user_order,
+    int swap_eyes, int *layout, int *order, int *source, int *views)
+{
+    set(views, -1);
+    if (stereo_policy_video_layout(width, height, mark, user_layout, user_order, swap_eyes, layout, order, source) != 0)
+        return -1;
+    if (*source != STEREO_POLICY_SOURCE_NONE && *source != STEREO_POLICY_SOURCE_SHAPE)
+        return 0; /* the user's choice or the stream's mark: a tag never overrides one */
+    int tag_layout, tag_order, tag_views, three_d;
+    if (stereo_policy_name_tag(file_name, &tag_layout, &tag_order, &tag_views, &three_d) != 1 || !three_d)
+        return 0;
+    if (tag_layout == STEREO_POLICY_LAYOUT_NONE) {
+        /* only "3D": the shape, else the halves, else nothing */
+        if (*source == STEREO_POLICY_SOURCE_SHAPE)
+            return 0; /* side by side by the shape rule, as without the tag */
+        if (halves == STEREO_POLICY_HALVES_SIDE_BY_SIDE)
+            tag_layout = STEREO_POLICY_LAYOUT_SIDE_BY_SIDE;
+        else if (halves == STEREO_POLICY_HALVES_TOP_AND_BOTTOM)
+            tag_layout = STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM;
+        else
+            return 0;
+    }
+    *layout = tag_layout;
+    *order = tag_order;
+    *source = STEREO_POLICY_SOURCE_NAME;
+    set(views, tag_views);
+    if (swap_eyes)
+        *order = *order == STEREO_POLICY_LEFT_FIRST ? STEREO_POLICY_RIGHT_FIRST : STEREO_POLICY_LEFT_FIRST;
+    return 0;
+}
+
 int stereo_policy_video_views_by_shape(int width, int height, int layout)
 {
     if (width <= 0 || height <= 0)

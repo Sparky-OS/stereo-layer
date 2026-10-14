@@ -18,6 +18,8 @@ private Q_SLOTS:
     void fullViews();
     void viewsTable_data();
     void viewsTable();
+    void nameTags_data();
+    void nameTags();
 };
 void VideoTest::shape_data()
 {
@@ -191,6 +193,34 @@ void VideoTest::viewsTable()
     QCOMPARE(views.full, values[8] == 1);
     const int source = values[9];
     QCOMPARE(int(views.source), source);
+}
+
+void VideoTest::nameTags_data()
+{
+    QTest::addColumn<QList<int>>("values");
+    QFile file(QStringLiteral(VECTORS_DIR "/name-tags.tsv"));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    while (!file.atEnd()) {
+        const QString line = QString::fromUtf8(file.readLine()).trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+            continue;
+        const QStringList fields = line.split(QLatin1Char('\t'));
+        QCOMPARE(fields.size(), 6);
+        QList<int> values;
+        for (int i = 1; i < fields.size(); ++i)
+            values << fields.at(i).toInt();
+        QTest::newRow(qPrintable(fields.at(0))) << values;
+    }
+}
+void VideoTest::nameTags()
+{
+    QFETCH(QList<int>, values);
+    const QString name = QString::fromLatin1(QTest::currentDataTag());
+    const auto tag = Video::nameTag(name);
+    QCOMPARE(int(tag.layout), values[0]);
+    QCOMPARE(int(tag.eyeOrder), values[1]);
+    QCOMPARE(tag.views, values[2]);
+    QCOMPARE(tag.threeD, values[3] == 1);
 }
 
 QTEST_MAIN(VideoTest)
