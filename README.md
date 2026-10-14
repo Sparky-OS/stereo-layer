@@ -69,6 +69,7 @@ The name is cut into words at `.`, `_`, `-`, space, `[`, `]`, `(` and `)`; a wor
 The vocabulary: `3D` (the plain tag of 3D releases: says only that the video is 3D); `SBS`, `TAB`, `TB`, `OU` (side by side; top and bottom, as in the Blu-ray 3D scene's TAB and the over and under OU); the same with half views (`HSBS`, `H-SBS`, `HALF-SBS`, `HTAB`, `HOU`, `HTB` and so on) or full views (`FSBS`, `FULL-SBS`, `FTAB`, `FOU`, `FTB` and so on); `LR` and `RL` for the eye order (the Bino 1.x and 3dtv.at names; alone they mean side by side).
 A word with half or full says both; a bare packing word leaves half or full to `stereo_policy_video_views()`, where a single picture's shape is half and twice that is full.
 A bare `3D` gives side by side when the shape rule says so, else what the caller's comparison of the picture's halves says, else the video stays 2D and the user's menu covers it.
+`Video::matroskaPlane()` (and `stereo_policy_matroska_plane()`) gives back the plane size that FFmpeg's Matroska demuxer folded into the sample aspect ratio, for `Video::views()`.
 `stereo_policy_video_layout_named()` puts the tag after the user's explicit choice and the stream's mark and before the shape: a tag never overrides a mark.
 Test vectors: `autotests/vectors/name-tags.tsv`.
 

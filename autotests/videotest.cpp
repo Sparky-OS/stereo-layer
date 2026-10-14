@@ -18,6 +18,7 @@ private Q_SLOTS:
     void fullViews();
     void viewsTable_data();
     void viewsTable();
+    void matroskaPlane();
     void nameTags_data();
     void nameTags();
 };
@@ -193,6 +194,18 @@ void VideoTest::viewsTable()
     QCOMPARE(views.full, values[8] == 1);
     const int source = values[9];
     QCOMPARE(int(views.source), source);
+}
+
+void VideoTest::matroskaPlane()
+{
+    // FFmpeg folds a plane of 1920x1080 shown for a 3840x1080 side by side track into a sample aspect ratio of 1:1, and for a
+    // 1920x1080 track into 2:1: the plane comes back, and the views are told from it
+    QCOMPARE(Video::matroskaPlane(QSize(3840, 1080), QSize(1, 1), Picture::Layout::SideBySide), QSize(1920, 1080));
+    QCOMPARE(Video::matroskaPlane(QSize(1920, 2160), QSize(1, 1), Picture::Layout::TopAndBottom), QSize(1920, 1080));
+    QCOMPARE(Video::matroskaPlane(QSize(1920, 1080), QSize(1, 1), Picture::Layout::Rows), QSize());
+    QCOMPARE(Video::matroskaPlane(QSize(1920, 1080), QSize(), Picture::Layout::SideBySide), QSize());
+    const QSize plane = Video::matroskaPlane(QSize(3840, 1080), QSize(1, 1), Picture::Layout::SideBySide);
+    QVERIFY(Video::views(QSize(3840, 1080), QSize(1, 1), plane, -1, Picture::Layout::SideBySide).full);
 }
 
 void VideoTest::nameTags_data()

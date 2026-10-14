@@ -49,6 +49,16 @@ Video::NameTag Video::nameTag(const QString &fileName)
     return result;
 }
 
+QSize Video::matroskaPlane(QSize codedSize, QSize sampleAspectRatio, Picture::Layout layout)
+{
+    int width = 0;
+    int height = 0;
+    if (stereo_policy_matroska_plane(codedSize.width(), codedSize.height(), sampleAspectRatio.width(), sampleAspectRatio.height(), int(layout), &width, &height) != 0) {
+        return {};
+    }
+    return {width, height};
+}
+
 Video::Views Video::views(QSize codedSize, QSize sampleAspectRatio, QSize planeSize, int upsampledAspectRatio, Picture::Layout layout)
 {
     Views result;

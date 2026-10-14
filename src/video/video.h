@@ -64,6 +64,11 @@ public:
     // for 1:1); planeSize is Matroska's DisplayWidth and DisplayHeight when the track has them (RFC 9559 section 18.10),
     // else a null size; upsampledAspectRatio is the H.265 frame packing SEI's upsampled_aspect_ratio_flag (D.3.16), or -1.
     static Views views(QSize codedSize, QSize sampleAspectRatio, QSize planeSize, int upsampledAspectRatio, Picture::Layout layout);
+    // The plane size (Matroska's DisplayWidth and DisplayHeight) of a side by side or top and bottom track, from the frame and the
+    // sample aspect ratio FFmpeg gives it: FFmpeg's Matroska demuxer folds the plane size into the sample aspect ratio, doubled along the
+    // stacked axis (stereo_policy_matroska_plane()). Pass the result as planeSize to views() for a stream that comes from Matroska through
+    // FFmpeg. A null size when there is none (a bad argument, or a layout other than side by side and top and bottom).
+    static QSize matroskaPlane(QSize codedSize, QSize sampleAspectRatio, Picture::Layout layout);
 };
 }
 
