@@ -160,6 +160,21 @@ STEREO_POLICY_EXPORT int stereo_policy_video_layout_named(int width, int height,
     int user_order, int swap_eyes, int *layout, int *order, int *source, int *views);
 
 /*
+ * The halves test, for a video whose name says only "3D" and a caller that can hand over one decoded frame: whether the
+ * picture is two similar halves left and right (side by side) or above and below (top and bottom). luma is the
+ * brightness plane (8 bits, stride bytes per row) of the frame as decoded. The halves of a stereo pair differ only by
+ * a small horizontal shift and the other view's small differences, so each pair of halves is compared sampled on a grid,
+ * allowing a shift of up to a thirtysecond of the width; the pair of halves that matches clearly better than the other
+ * (STEREO_POLICY_HALVES_MARGIN_PERCENT of the other's difference) and is close in itself
+ * (STEREO_POLICY_HALVES_CLOSE_PERCENT of the brightness range) is the packing. Returns STEREO_POLICY_HALVES_SIDE_BY_SIDE,
+ * _TOP_AND_BOTTOM or _UNKNOWN (a flat picture, an ordinary picture, a bad argument). A still picture's content test, in
+ * the photos lane's entry, may share this code later.
+ */
+#define STEREO_POLICY_HALVES_MARGIN_PERCENT 60
+#define STEREO_POLICY_HALVES_CLOSE_PERCENT 12
+STEREO_POLICY_EXPORT int stereo_policy_halves_test(const unsigned char *luma, int width, int height, int stride);
+
+/*
  * The shapes of an ordinary single picture, from 5:4 to 12:5 (1.25 to 2.4 wide: 4:3, 16:10, 16:9, 1.85 and the 2.39
  * scope film are inside it). A frame that a stream marks as side by side or top and bottom and whose shape is inside the
  * range holds one picture's worth of shape, so its views are half, squeezed to fit; a side by side frame wider than the

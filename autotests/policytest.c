@@ -239,6 +239,44 @@ static void namedLayout(void)
     CHECK(layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE && source == STEREO_POLICY_SOURCE_SHAPE);
 }
 
+/* A smooth pseudo-random texture of the scene at (x, y), the same for both views but shifted */
+static unsigned char halves_scene(int x, int y)
+{
+    unsigned v = (unsigned)(x / 6) * 2654435761u ^ (unsigned)(y / 6) * 40503u;
+    v ^= v >> 13;
+    v *= 0x5bd1e995u;
+    return (unsigned char)((v >> 8) & 0xff);
+}
+
+static void halvesTest(void)
+{
+    enum { W = 640, H = 360 };
+    static unsigned char image[H * W];
+    /* side by side: two 320x360 views of one scene, the right one seen 3 pixels to the side */
+    for (int y = 0; y < H; ++y)
+        for (int x = 0; x < W / 2; ++x) {
+            image[y * W + x] = halves_scene(x, y);
+            image[y * W + W / 2 + x] = halves_scene(x + 3, y);
+        }
+    CHECK(stereo_policy_halves_test(image, W, H, W) == STEREO_POLICY_HALVES_SIDE_BY_SIDE);
+    /* top and bottom */
+    for (int y = 0; y < H / 2; ++y)
+        for (int x = 0; x < W; ++x) {
+            image[y * W + x] = halves_scene(x, y);
+            image[(H / 2 + y) * W + x] = halves_scene(x + 3, y);
+        }
+    CHECK(stereo_policy_halves_test(image, W, H, W) == STEREO_POLICY_HALVES_TOP_AND_BOTTOM);
+    /* an ordinary picture, one scene */
+    for (int y = 0; y < H; ++y)
+        for (int x = 0; x < W; ++x)
+            image[y * W + x] = halves_scene(x, y);
+    CHECK(stereo_policy_halves_test(image, W, H, W) == STEREO_POLICY_HALVES_UNKNOWN);
+    /* a flat picture says nothing */
+    memset(image, 90, sizeof(image));
+    CHECK(stereo_policy_halves_test(image, W, H, W) == STEREO_POLICY_HALVES_UNKNOWN);
+    CHECK(stereo_policy_halves_test(NULL, W, H, W) == STEREO_POLICY_HALVES_UNKNOWN);
+}
+
 static void fullViews(void)
 {
     /* side by side: full when wider than the widest single picture (12:5) */
@@ -388,6 +426,7 @@ int main(void)
     fullViews();
     videoViewsTable();
     matroskaPlane();
+    halvesTest();
     nameTags();
     namedLayout();
     shapes();

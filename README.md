@@ -72,3 +72,6 @@ A bare `3D` gives side by side when the shape rule says so, else what the caller
 `stereo_policy_video_layout_named()` puts the tag after the user's explicit choice and the stream's mark and before the shape: a tag never overrides a mark.
 Test vectors: `autotests/vectors/name-tags.tsv`.
 
+`stereo_policy_halves_test()` is the call for a bare `3D` tag when a player can hand over one decoded frame (its brightness plane): it compares the halves left and right against above and below, allowing a small shift, and returns `STEREO_POLICY_HALVES_*` for `stereo_policy_video_layout_named()`; a flat or ordinary picture gives `UNKNOWN` and the video stays 2D.
+A Matroska half pair whose DisplayWidth equals its pixel width reads through FFmpeg's doubled sample ratio as full, and each view still shows at its true display shape, so the picture is right even when the label says full (vector in `autotests/vectors/video-views.tsv`).
+

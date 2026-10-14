@@ -235,6 +235,63 @@ int stereo_policy_video_layout_named(int width, int height, const char *mark, co
     return 0;
 }
 
+/* The mean absolute difference of two regions of a picture, on a grid, the second shifted by dx: a, b are the top left
+ * samples of the two regions, w and h their size. */
+static long long region_difference(const unsigned char *a, const unsigned char *b, int stride, int w, int h, int dx, int *count)
+{
+    const int step_x = w >= 128 ? w / 64 : 1;
+    const int step_y = h >= 128 ? h / 64 : 1;
+    long long sum = 0;
+    int n = 0;
+    for (int y = 0; y < h; y += step_y) {
+        for (int x = 0; x < w; x += step_x) {
+            const int bx = x + dx;
+            if (bx < 0 || bx >= w)
+                continue;
+            const int d = (int)a[(size_t)y * stride + x] - (int)b[(size_t)y * stride + bx];
+            sum += d < 0 ? -d : d;
+            ++n;
+        }
+    }
+    *count = n;
+    return sum;
+}
+
+/* the smallest mean difference (times 256, for precision) of two regions over the allowed shifts */
+static long long best_difference(const unsigned char *a, const unsigned char *b, int stride, int w, int h)
+{
+    const int range = w / 32;
+    const int step = range >= 8 ? range / 8 : 1;
+    long long best = -1;
+    for (int dx = -range; dx <= range; dx += step) {
+        int n;
+        const long long sum = region_difference(a, b, stride, w, h, dx, &n);
+        if (n < 64)
+            continue;
+        const long long mean = sum * 256 / n;
+        if (best < 0 || mean < best)
+            best = mean;
+    }
+    return best;
+}
+
+int stereo_policy_halves_test(const unsigned char *luma, int width, int height, int stride)
+{
+    if (!luma || width < 64 || height < 64 || stride < width)
+        return STEREO_POLICY_HALVES_UNKNOWN;
+    const int half_w = width / 2, half_h = height / 2;
+    const long long side = best_difference(luma, luma + half_w, stride, half_w, height);
+    const long long top = best_difference(luma, luma + (size_t)half_h * stride, stride, width, half_h);
+    if (side < 0 || top < 0)
+        return STEREO_POLICY_HALVES_UNKNOWN;
+    const long long close = 255LL * 256 * STEREO_POLICY_HALVES_CLOSE_PERCENT / 100;
+    long long better = side < top ? side : top;
+    long long other = side < top ? top : side;
+    if (better > close || better * 100 >= other * STEREO_POLICY_HALVES_MARGIN_PERCENT)
+        return STEREO_POLICY_HALVES_UNKNOWN;
+    return side < top ? STEREO_POLICY_HALVES_SIDE_BY_SIDE : STEREO_POLICY_HALVES_TOP_AND_BOTTOM;
+}
+
 int stereo_policy_video_views_by_shape(int width, int height, int layout)
 {
     if (width <= 0 || height <= 0)
