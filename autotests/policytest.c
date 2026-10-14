@@ -6,7 +6,9 @@
 
 #include "stereo-policy.h"
 
+#include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int failures = 0;
@@ -169,6 +171,73 @@ static void fileCorrection(void)
     CHECK(stereo_policy_file_swap_eyes(NULL) == -1);
 }
 
+
+/* A scene of smooth texture: sums of waves, one set per seed, no two seeds alike. */
+static double scene(double x, double y, int seed)
+{
+    return 128 + 50 * sin(x * (0.21 + 0.013 * seed) + y * 0.13) + 35 * sin(x * 0.047 - y * (0.31 + 0.007 * seed)) + 25 * sin(x * 0.11 * (seed + 1) + y * 0.19)
+        + 20 * sin(x * 0.37 + y * 0.29 * (seed + 2));
+}
+
+/* Both views side by side, w by h each: the right view is the left one seen from nearer or farther (shift pixels, more at
+ * the bottom), a row lower (down), with its own gain. unrelated puts another scene on the right, wide one scene across both. */
+static unsigned char *picture(int w, int h, double shift, int down, double gain, int unrelated, int wide, int copy)
+{
+    unsigned char *rgb = malloc((size_t)2 * w * h * 3);
+    const double k = 192.0 / w; /* the same scene at any size */
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < 2 * w; ++x) {
+            double v;
+            if (wide)
+                v = scene(x * k, y * k, 0);
+            else if (x < w || copy)
+                v = scene((x % w) * k, y * k, 0);
+            else if (unrelated)
+                v = scene((x - w) * k, y * k, 3);
+            else
+                v = gain * scene((x - w) * k + shift * (1 + (double)y / h), (y + down) * k, 0);
+            v = v < 0 ? 0 : v > 255 ? 255 : v;
+            unsigned char *p = rgb + ((size_t)y * 2 * w + x) * 3;
+            p[0] = (unsigned char)v;
+            p[1] = (unsigned char)(v * 0.9);
+            p[2] = (unsigned char)(v * 0.8);
+        }
+    }
+    return rgb;
+}
+
+static int byContent(int w, int h, double shift, int down, double gain, int unrelated, int wide, int copy)
+{
+    unsigned char *rgb = picture(w, h, shift, down, gain, unrelated, wide, copy);
+    const int result = stereo_policy_picture_pair_by_content(rgb, 2 * w, h, 2 * w * 3);
+    free(rgb);
+    return result;
+}
+
+static void contents(void)
+{
+    /* what two views of one scene are: shifted either way, a row off, another gain */
+    CHECK(byContent(192, 108, 6, 0, 1.0, 0, 0, 0) == 1);
+    CHECK(byContent(192, 108, -9, 0, 1.0, 0, 0, 0) == 1);
+    CHECK(byContent(192, 108, 4, 1, 1.0, 0, 0, 0) == 1);
+    CHECK(byContent(192, 108, 5, 0, 0.9, 0, 0, 0) == 1);
+    CHECK(byContent(960, 540, 6, 0, 1.0, 0, 0, 0) == 1); /* reduced here to 192 a view */
+    /* what they are not: another scene, one wide scene, a copy of one half (proves nothing), a flat picture, too small */
+    CHECK(byContent(192, 108, 0, 0, 1.0, 1, 0, 0) == 0);
+    CHECK(byContent(192, 108, 0, 0, 1.0, 0, 1, 0) == 0);
+    CHECK(byContent(192, 108, 0, 0, 1.0, 0, 0, 1) == 0);
+    CHECK(byContent(192, 108, 40, 0, 1.0, 0, 0, 0) == 0); /* beyond the search: a shift of a fifth of a view */
+    CHECK(byContent(192, 108, 6, 6, 1.0, 0, 0, 0) == 0); /* six rows off: not two views of one camera pair */
+    unsigned char *flat = calloc((size_t)384 * 108 * 3, 1);
+    memset(flat, 90, (size_t)384 * 108 * 3);
+    CHECK(stereo_policy_picture_pair_by_content(flat, 384, 108, 384 * 3) == 0);
+    CHECK(stereo_policy_picture_pair_by_content(flat, 40, 20, 40 * 3) == 0);
+    CHECK(stereo_policy_picture_pair_by_content(NULL, 384, 108, 384 * 3) == -1);
+    CHECK(stereo_policy_picture_pair_by_content(flat, 1, 108, 3) == -1);
+    CHECK(stereo_policy_picture_pair_by_content(flat, 384, 108, 100) == -1);
+    free(flat);
+}
+
 int main(void)
 {
     marks();
@@ -176,6 +245,7 @@ int main(void)
     videoLayout();
     fullViews();
     shapes();
+    contents();
     if (failures)
         fprintf(stderr, "%d check(s) failed\n", failures);
     else

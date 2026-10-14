@@ -93,6 +93,17 @@ STEREO_POLICY_EXPORT int stereo_policy_video_side_by_side_by_shape(int width, in
 STEREO_POLICY_EXPORT int stereo_policy_picture_pair_by_shape(int width, int height);
 
 /*
+ * Whether an unmarked still picture is a side-by-side pair by its pixels: its two halves must be views of one scene,
+ * with strong correlation, block by block, after a small horizontal shift (the disparity) and next to no vertical one.
+ * Shape says only that a picture may be a pair, so a caller runs this after the shape rule and never decides a pair
+ * from shape alone. rgb holds the whole picture, both halves, as 8-bit RGB, three bytes a pixel, stride bytes a row;
+ * hand it a copy scaled down to a few hundred pixels wide so a thumbnailer stays fast (a larger one is reduced here
+ * to at most 192 pixels a view). A picture with too little texture to compare says nothing and is not a pair.
+ * Returns 1 for a pair, 0 for one picture, -1 for a bad argument.
+ */
+STEREO_POLICY_EXPORT int stereo_policy_picture_pair_by_content(const unsigned char *rgb, int width, int height, int stride);
+
+/*
  * The user's correction stored with a file, for a file whose mark has its eyes the wrong way round: the extended
  * attribute user.stereo-policy.swap-eyes, "1", which copies and moves that keep extended attributes keep. Returns 1
  * when the file carries it, 0 when it does not, -1 when the file system keeps no extended attributes, the file cannot

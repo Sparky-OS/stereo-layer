@@ -21,10 +21,11 @@ pkg_check_modules(STEREO_DECLARE REQUIRED IMPORTED_TARGET stereo-declare)
 pkg_check_modules(WAYLAND REQUIRED IMPORTED_TARGET wayland-client)
 pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
 # The policy without Qt, for any program; the Qt layer builds on it
-add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-policy.h)
+add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-policy-picture.c src/policy/stereo-policy.h)
 add_library(Stereo::Policy ALIAS StereoPolicy)
 set_target_properties(StereoPolicy PROPERTIES OUTPUT_NAME stereo-policy VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Policy
     C_STANDARD 11 C_VISIBILITY_PRESET hidden)
+target_link_libraries(StereoPolicy PRIVATE m)
 target_include_directories(StereoPolicy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/policy> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-policy>)
 install(TARGETS StereoPolicy EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 install(FILES src/policy/stereo-policy.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-policy)
