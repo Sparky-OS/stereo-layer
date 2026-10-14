@@ -98,6 +98,9 @@ bool WidgetLayer::prepareWindow(QWidget *window)
         return true;
     window->setAttribute(Qt::WA_TranslucentBackground);
     window->setProperty("stereoLayerPrepared", true);
+    // A tooltip or a popup draws its own panel, with the shape its style gives it (rounded corners, a shadow)
+    if (window->windowType() == Qt::ToolTip || window->windowType() == Qt::Popup)
+        return true;
     window->installEventFilter(new WindowBackground(window));
     return true;
 }
