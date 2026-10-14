@@ -31,6 +31,9 @@ enum stereo_policy_layout {
     STEREO_POLICY_LAYOUT_BLOCK_LACED = 9,
 };
 
+/* A value of user_layout for stereo_policy_video_layout(): the user says the video is not 3D, whatever its mark says. */
+#define STEREO_POLICY_USER_FORCE_2D (-1)
+
 /* Which view comes first in the packing; the values of Stereo::Picture::EyeOrder. */
 enum stereo_policy_order {
     STEREO_POLICY_LEFT_FIRST = 0,
@@ -65,11 +68,13 @@ enum stereo_policy_source {
 STEREO_POLICY_EXPORT int stereo_policy_read_mark(const char *value, int *layout, int *order, int *anaglyph);
 
 /*
- * The packing of a video frame: the stream's own mark first, whatever the shape (an anaglyph or "mono" holds no
- * packing); then the user's choice, when user_layout is not NONE; then the shape: a frame at least three times as wide
- * as high is side by side, left first (two pictures next to each other; a scope film is 2.39:1). swap_eyes, the user's
- * correction, reverses the order of whatever packing was decided. width and height are the frame as shown, the sample
- * aspect ratio applied. Returns 0, or -1 for a bad argument.
+ * The packing of a video frame, in this order: the user's choice, when user_layout is not NONE (a packing, or
+ * STEREO_POLICY_USER_FORCE_2D, which says the video is not 3D); then the stream's own mark, whatever the shape (an
+ * anaglyph or "mono" holds no packing); then the shape: a frame at least three times as wide as high is side by side,
+ * left first (two pictures next to each other; a scope film is 2.39:1). The user's explicit choice comes before the mark
+ * because a mark can be wrong and every player lets the user say so. swap_eyes, the user's correction, reverses the
+ * order of whatever packing was decided. width and height are the frame as shown, the sample aspect ratio applied.
+ * Returns 0, or -1 for a bad argument.
  */
 STEREO_POLICY_EXPORT int stereo_policy_video_layout(
     int width, int height, const char *mark, int user_layout, int user_order, int swap_eyes, int *layout, int *order, int *source);

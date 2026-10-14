@@ -60,7 +60,13 @@ void VideoTest::marksAndChoices()
     QCOMPARE(chosen.eyeOrder, Picture::EyeOrder::RightFirst);
     QCOMPARE(chosen.source, Picture::Source::User);
     options.inputLayout = Picture::Layout::TopAndBottom;
-    QCOMPARE(Video::layout(QSize(3840, 1080), QStringLiteral("sideBySideLeftFirst"), options).source, Picture::Source::FileMark);
+    // the user's explicit choice is before the mark, which can be wrong; not 3D is such a choice
+    QCOMPARE(Video::layout(QSize(3840, 1080), QStringLiteral("sideBySideLeftFirst"), options).source, Picture::Source::User);
+    QCOMPARE(Video::layout(QSize(3840, 1080), QStringLiteral("sideBySideLeftFirst"), options).layout, Picture::Layout::TopAndBottom);
+    const auto notThreeD = Video::layout(QSize(3840, 1080), QStringLiteral("sideBySideLeftFirst"), {}, true);
+    QCOMPARE(notThreeD.layout, Picture::Layout::None);
+    QCOMPARE(notThreeD.source, Picture::Source::User);
+    QCOMPARE(Video::layout(QSize(3840, 1080), {}, {}, true).layout, Picture::Layout::None);
 }
 void VideoTest::wholeMarkSet_data()
 {
