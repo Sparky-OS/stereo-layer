@@ -257,10 +257,13 @@ Picture Picture::loadPair(const QString &path, const QSize &bound, const Options
     if (decision.pixels ? decision.panorama || (size.isValid() && !pairByShape(size)) : decision.packing == Layout::None) {
         return {};
     }
-    // A packed picture holds two views in either direction, so each image is decoded to fit twice the bound.
+    // A packed picture holds two views in either direction, so each image is decoded to fit twice the bound. Interleaved,
+    // checkerboard and quincunx views are taken from the picture's own pixels, so those are decoded at their size.
     const QSize limit = bound * 2;
-    const auto read = [&reader, &limit](const QSize &size) {
-        if (size.isValid() && reader.supportsOption(QImageIOHandler::ScaledSize)
+    const bool interleaved = decision.packing == Layout::Rows || decision.packing == Layout::Columns || decision.packing == Layout::Checkerboard
+        || decision.packing == Layout::SideBySideQuincunx;
+    const auto read = [&reader, &limit, interleaved](const QSize &size) {
+        if (!interleaved && size.isValid() && reader.supportsOption(QImageIOHandler::ScaledSize)
             && (size.width() > limit.width() || size.height() > limit.height() || reader.format() == "svg" || reader.format() == "svgz")) {
             QSize scaled = size.scaled(limit, Qt::KeepAspectRatio);
             scaled = QSize(qMax(2, scaled.width() & ~1), qMax(2, scaled.height() & ~1));

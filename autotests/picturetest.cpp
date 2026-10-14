@@ -32,6 +32,7 @@ private Q_SLOTS:
     void loadPairPng();
     void svgStereo_data();
     void svgStereo();
+    void interleavedSvg();
     void wholeMarkSet_data();
     void wholeMarkSet();
     void upconversion_data();
@@ -441,6 +442,34 @@ void PictureTest::svgStereo()
     QCOMPARE(loaded.right.pixelColor(64, 64), rightFirst ? QColor(Qt::red) : QColor(Qt::blue));
 }
 
+void PictureTest::interleavedSvg()
+{
+    // A drawing of interleaved rows is decoded at its own size before the rows are taken apart: drawn larger, each row
+    // would cover several pixel rows and the views would mix
+    if (!QImageReader::supportedImageFormats().contains("svg")) {
+        QSKIP("Qt's SVG image plugin is not installed");
+    }
+    QString document = QStringLiteral(
+        "<svg xmlns='http://www.w3.org/2000/svg' xmlns:svgstereo='https://github.com/Sparky-OS/svgstereo' svgstereo:layout='rowInterleavedLeftFirst' "
+        "width='64' height='32' viewBox='0 0 64 32' shape-rendering='crispEdges'>");
+    for (int y = 0; y < 32; ++y)
+        document += QStringLiteral("<rect y='%1' width='64' height='1' fill='%2'/>")
+                        .arg(y)
+                        .arg(y % 2 ? QStringLiteral("#0000ff") : QStringLiteral("#ff0000"));
+    document += QStringLiteral("</svg>");
+    QTemporaryDir dir;
+    QFile file(dir.filePath(QStringLiteral("rows.svg")));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(document.toUtf8());
+    file.close();
+    const auto loaded = Picture::loadPair(file.fileName(), QSize(256, 256), {});
+    QVERIFY(loaded.isStereo());
+    QCOMPARE(loaded.layout, Picture::Layout::Rows);
+    for (int y = 1; y < loaded.left.height() - 1; ++y) {
+        QCOMPARE(loaded.left.pixelColor(loaded.left.width() / 2, y), QColor(Qt::red));
+        QCOMPARE(loaded.right.pixelColor(loaded.right.width() / 2, y), QColor(Qt::blue));
+    }
+}
 void PictureTest::wholeMarkSet_data()
 {
     // Every Stereo3DLayout value (RFC 9559 StereoMode, H.264/H.265 Table D-8, JPS, MPO, SVGStereo), on a 32x16 picture
