@@ -141,6 +141,27 @@ static int same_shape(long long a_w, long long a_h, long long b_w, long long b_h
     return difference * 100 <= right;
 }
 
+int stereo_policy_matroska_plane(int coded_width, int coded_height, int sar_num, int sar_den, int layout, int *plane_width, int *plane_height)
+{
+    if (coded_width <= 0 || coded_height <= 0 || sar_num <= 0 || sar_den <= 0 || !plane_width || !plane_height)
+        return -1;
+    /* FFmpeg's Matroska demuxer (libavformat/matroskadec.c) turns DisplayWidth and DisplayHeight into the stream's
+     * sample aspect ratio after multiplying the stacked axis of a side by side or top and bottom track by two, so that
+     * the frame as shown holds both planes: undo it. */
+    const long long shown_width = ((long long)coded_width * sar_num + sar_den / 2) / sar_den;
+    const long long shown_height = ((long long)coded_height * sar_den + sar_num / 2) / sar_num;
+    if (layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) {
+        *plane_width = (int)(shown_width / 2);
+        *plane_height = coded_height;
+    } else if (layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) {
+        *plane_width = coded_width;
+        *plane_height = (int)(shown_height / 2);
+    } else {
+        return -1;
+    }
+    return 0;
+}
+
 int stereo_policy_video_views(int coded_width, int coded_height, int sar_num, int sar_den, int plane_width, int plane_height,
     int upsampled_aspect_ratio, int layout, int *decided_by)
 {
@@ -181,10 +202,11 @@ int stereo_policy_video_views(int coded_width, int coded_height, int sar_num, in
         return upsampled_aspect_ratio == 0;
     }
 
-    /* The marks are silent: the shape of the frame as shown decides, in one place. */
+    /* The marks are silent: the shape of the frame decides, in one place. The stored shape is used, not the one with the
+     * sample aspect ratio applied: that ratio is meant for a decoder that does not read the SEI message (H.264 D.2.26
+     * NOTE 2), and FFmpeg folds a Matroska plane size into it. */
     set(decided_by, STEREO_POLICY_VIEWS_BY_SHAPE);
-    const long long shown_width = ((long long)coded_width * sar_num + sar_den / 2) / sar_den;
-    return stereo_policy_video_views_by_shape(shown_width > 0x7fffffff ? 0x7fffffff : (int)shown_width, coded_height, layout);
+    return stereo_policy_video_views_by_shape(coded_width, coded_height, layout);
 }
 
 int stereo_policy_file_swap_eyes(const char *path)

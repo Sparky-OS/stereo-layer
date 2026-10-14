@@ -99,7 +99,9 @@ STEREO_POLICY_EXPORT int stereo_policy_video_full_views(int width, int height, i
  * elements' default (the pixel size after cropping) and says nothing. upsampled_aspect_ratio is the H.265 frame packing SEI's flag (D.3.16): 1 for half
  * views, 0 for full ones, -1 (STEREO_POLICY_UPSAMPLED_UNKNOWN) for H.264, which has none, or when it is not at hand.
  * Layouts other than side by side and top and bottom are decided as in stereo_policy_video_full_views(). When nothing
- * says, stereo_policy_video_views_by_shape() decides, with the frame as shown. decided_by, which may be null, receives
+ * says, stereo_policy_video_views_by_shape() decides, with the frame as stored: the sample aspect ratio is meant for a
+ * decoder that does not read the SEI message (H.264 D.2.26 NOTE 2) and FFmpeg folds a Matroska plane size into it, so
+ * it does not tell the shape of a view. It is kept in the signature for a later refinement. decided_by, which may be null, receives
  * STEREO_POLICY_VIEWS_BY_MARK, _BY_SHAPE or _BY_LAYOUT. Returns 1 for full views, 0 for half, -1 for a bad argument or
  * no packing.
  */
@@ -111,6 +113,16 @@ enum stereo_policy_views_source {
 };
 STEREO_POLICY_EXPORT int stereo_policy_video_views(int coded_width, int coded_height, int sar_num, int sar_den, int plane_width, int plane_height,
     int upsampled_aspect_ratio, int layout, int *decided_by);
+
+/*
+ * The plane size (DisplayWidth and DisplayHeight) of a Matroska side by side or top and bottom track, from the frame and
+ * the sample aspect ratio FFmpeg gives it: the Matroska demuxer multiplies the stacked axis of the display size by two
+ * and folds the result into the sample aspect ratio (libavformat/matroskadec.c), so a player that reads the track
+ * through FFmpeg has the plane size only in that form. Pass the result as plane_width and plane_height to
+ * stereo_policy_video_views() for a stream that comes from Matroska (not for one whose ratio is the video's VUI).
+ * Returns 0, or -1 for a bad argument or a layout other than side by side and top and bottom.
+ */
+STEREO_POLICY_EXPORT int stereo_policy_matroska_plane(int coded_width, int coded_height, int sar_num, int sar_den, int layout, int *plane_width, int *plane_height);
 
 /*
  * The only place the shape decides full or half, for a stream whose marks are silent: side by side is full at a display

@@ -146,6 +146,28 @@ static void videoViewsTable(void)
     CHECK(rows >= 20);
 }
 
+static void matroskaPlane(void)
+{
+    int w, h;
+    /* FFmpeg: mkvmerge's 3840x1080 side by side with a 1920x1080 plane has a ratio of 1:1, with a 3840x1080 plane 2:1 */
+    CHECK(stereo_policy_matroska_plane(3840, 1080, 1, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, &w, &h) == 0 && w == 1920 && h == 1080);
+    CHECK(stereo_policy_matroska_plane(3840, 1080, 2, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, &w, &h) == 0 && w == 3840 && h == 1080);
+    CHECK(stereo_policy_matroska_plane(1920, 1080, 2, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, &w, &h) == 0 && w == 1920 && h == 1080);
+    CHECK(stereo_policy_matroska_plane(1920, 2160, 1, 1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, &w, &h) == 0 && w == 1920 && h == 1080);
+    CHECK(stereo_policy_matroska_plane(1920, 1080, 1, 2, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, &w, &h) == 0 && w == 1920 && h == 1080);
+    CHECK(stereo_policy_matroska_plane(1920, 1080, 1, 1, STEREO_POLICY_LAYOUT_ROWS, &w, &h) == -1);
+    CHECK(stereo_policy_matroska_plane(1920, 1080, 0, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, &w, &h) == -1);
+    /* through the views: ratio 1:1 is full, 2:1 is half, for both packings */
+    CHECK(stereo_policy_matroska_plane(3840, 1080, 1, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, &w, &h) == 0
+        && stereo_policy_video_views(3840, 1080, 1, 1, w, h, -1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, NULL) == 1);
+    CHECK(stereo_policy_matroska_plane(1920, 1080, 2, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, &w, &h) == 0
+        && stereo_policy_video_views(1920, 1080, 2, 1, w, h, -1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, NULL) == 0);
+    CHECK(stereo_policy_matroska_plane(1920, 2160, 1, 1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, &w, &h) == 0
+        && stereo_policy_video_views(1920, 2160, 1, 1, w, h, -1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, NULL) == 1);
+    CHECK(stereo_policy_matroska_plane(1920, 1080, 1, 2, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, &w, &h) == 0
+        && stereo_policy_video_views(1920, 1080, 1, 2, w, h, -1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, NULL) == 0);
+}
+
 static void fullViews(void)
 {
     /* side by side: full at 2.5 or more */
@@ -283,6 +305,7 @@ int main(void)
     videoLayout();
     fullViews();
     videoViewsTable();
+    matroskaPlane();
     shapes();
     contents();
     if (failures)
