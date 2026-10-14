@@ -20,7 +20,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(STEREO_DECLARE REQUIRED IMPORTED_TARGET stereo-declare)
 pkg_check_modules(WAYLAND REQUIRED IMPORTED_TARGET wayland-client)
 pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
-add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/anaglyph.cpp src/picture/panorama.cpp src/picture/render.cpp
+add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/mark.cpp src/picture/anaglyph.cpp src/picture/panorama.cpp src/picture/render.cpp
     src/video/video.cpp src/video/video.h
     src/output/screenmode.cpp src/output/screenmode.h
     src/wayland/surface.cpp src/wayland/surface_p.h

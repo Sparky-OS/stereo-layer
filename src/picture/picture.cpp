@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
 
 #include "picture.h"
+#include "mark_p.h"
 #include "panorama_p.h"
 
 #include <QByteArrayView>
@@ -162,20 +163,13 @@ Decision decide(const QString &fileMetadata, const QByteArray &format, const QBy
     }
     if (!metadata.isEmpty() && !fallback) {
         result.source = Picture::Source::FileMark;
-        if (metadata.startsWith(QLatin1String("sideBySide")))
-            result.packing = Picture::Layout::SideBySide;
-        else if (metadata.startsWith(QLatin1String("topBottom")))
-            result.packing = Picture::Layout::TopAndBottom;
-        else if (metadata.startsWith(QLatin1String("multiView")))
-            result.packing = Picture::Layout::MultiView;
-        else if (metadata.startsWith(QLatin1String("rowInterleaved")))
-            result.packing = Picture::Layout::Rows;
-        else if (metadata.startsWith(QLatin1String("columnInterleaved")))
-            result.packing = Picture::Layout::Columns;
-        else if (metadata.startsWith(QLatin1String("checkerboard")))
-            result.packing = Picture::Layout::Checkerboard;
-        else if (metadata.startsWith(QLatin1String("anaglyphRed")))
-            result.anaglyph = Picture::AnaglyphColorPair::RedCyan;
+        const Mark mark = readMark(metadata);
+        // A still is one moment: views that alternate in time or in a stream's blocks are not in it.
+        if (mark.layout != Picture::Layout::FrameSequential && mark.layout != Picture::Layout::BlockLaced) {
+            result.packing = mark.layout;
+            result.order = mark.order;
+            result.anaglyph = mark.anaglyph;
+        }
         return result;
     }
     if (options.inputLayout != Picture::Layout::None || options.anaglyph != Picture::AnaglyphColorPair::None) {
@@ -355,11 +349,63 @@ Picture Picture::fromImages(const QImage &image, const QImage &second, const QSt
     return result;
 }
 
+namespace
+{
+// One view of an interleaved, checkerboard or quincunx-sampled picture at the size of the whole frame, as a display
+// upconverts it (H.264 and H.265 Table D-8): the samples of the view stay where they are, and each missing one is the
+// mean of its two neighbours across the interleaving. phase is the first row, column or checker of the view. A quincunx
+// half holds the samples of a full-width view taken on even columns of even rows and odd columns of odd rows, both views
+// alike (FFmpeg's AV_STEREO3D_SIDEBYSIDE_QUINCUNX).
+QImage upconverted(const QImage &frame, Picture::Layout layout, int phase)
+{
+    const QImage source = frame.convertToFormat(QImage::Format_RGBA8888);
+    const bool quincunx = layout == Picture::Layout::SideBySideQuincunx;
+    const int width = quincunx ? source.width() * 2 : source.width();
+    const int height = source.height();
+    const auto own = [layout, phase](int x, int y) {
+        if (layout == Picture::Layout::Rows)
+            return y % 2 == phase;
+        if (layout == Picture::Layout::Columns)
+            return x % 2 == phase;
+        return (x + y) % 2 == phase;
+    };
+    const auto sample = [&source, quincunx](int x, int y) { return source.constScanLine(y) + 4 * (quincunx ? x / 2 : x); };
+    QImage view(width, height, QImage::Format_RGBA8888);
+    for (int y = 0; y < height; ++y) {
+        uchar *out = view.scanLine(y);
+        for (int x = 0; x < width; ++x) {
+            if (own(x, y)) {
+                std::copy_n(sample(x, y), 4, out + 4 * x);
+                continue;
+            }
+            const bool rows = layout == Picture::Layout::Rows;
+            const QPoint before = rows ? QPoint(x, y - 1) : QPoint(x - 1, y);
+            const QPoint after = rows ? QPoint(x, y + 1) : QPoint(x + 1, y);
+            const bool hasBefore = before.x() >= 0 && before.y() >= 0;
+            const bool hasAfter = after.x() < width && after.y() < height;
+            const uchar *first = sample(hasBefore ? before.x() : after.x(), hasBefore ? before.y() : after.y());
+            const uchar *second = sample(hasAfter ? after.x() : before.x(), hasAfter ? after.y() : before.y());
+            for (int channel = 0; channel < 4; ++channel)
+                out[4 * x + channel] = uchar((first[channel] + second[channel] + 1) / 2);
+        }
+    }
+    return view;
+}
+}
+
 Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder order)
 {
     Picture result;
     result.layout = layout;
-    if (layout == Layout::SideBySide && image.width() % 2 == 0 && image.width() >= 2) {
+    if (layout == Layout::SideBySideQuincunx && image.width() % 2 == 0 && image.width() >= 2) {
+        const int width = image.width() / 2;
+        result.left = upconverted(image.copy(0, 0, width, image.height()), layout, 0);
+        result.right = upconverted(image.copy(width, 0, width, image.height()), layout, 0);
+    } else if ((layout == Layout::Rows && image.height() >= 2) || (layout == Layout::Columns && image.width() >= 2)
+        || (layout == Layout::Checkerboard && image.width() >= 2)) {
+        result.left = upconverted(image, layout, 0);
+        result.right = upconverted(image, layout, 1);
+    } else if (layout == Layout::SideBySide && image.width() % 2 == 0 && image.width() >= 2) {
         const int width = image.width() / 2;
         result.left = image.copy(0, 0, width, image.height());
         result.right = image.copy(width, 0, width, image.height());
@@ -367,18 +413,6 @@ Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder or
         const int height = image.height() / 2;
         result.left = image.copy(0, 0, image.width(), height);
         result.right = image.copy(0, height, image.width(), height);
-    } else if ((layout == Layout::Rows && image.height() % 2 == 0) || (layout == Layout::Columns && image.width() % 2 == 0)) {
-        const QSize size = layout == Layout::Rows ? QSize(image.width(), image.height() / 2) : QSize(image.width() / 2, image.height());
-        result.left = QImage(size, QImage::Format_RGBA8888);
-        result.right = QImage(size, QImage::Format_RGBA8888);
-        for (int y = 0; y < size.height(); ++y) {
-            for (int x = 0; x < size.width(); ++x) {
-                const QPoint first = layout == Layout::Rows ? QPoint(x, y * 2) : QPoint(x * 2, y);
-                const QPoint second = first + (layout == Layout::Rows ? QPoint(0, 1) : QPoint(1, 0));
-                result.left.setPixelColor(x, y, image.pixelColor(first));
-                result.right.setPixelColor(x, y, image.pixelColor(second));
-            }
-        }
     } else {
         result.layout = Layout::None;
     }

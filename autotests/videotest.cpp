@@ -10,6 +10,8 @@ private Q_SLOTS:
     void shape_data();
     void shape();
     void marksAndChoices();
+    void wholeMarkSet_data();
+    void wholeMarkSet();
     void plainC();
 };
 void VideoTest::shape_data()
@@ -57,6 +59,56 @@ void VideoTest::marksAndChoices()
     QCOMPARE(chosen.source, Picture::Source::User);
     options.inputLayout = Picture::Layout::TopAndBottom;
     QCOMPARE(Video::layout(QSize(3840, 1080), QStringLiteral("sideBySideLeftFirst"), options).source, Picture::Source::FileMark);
+}
+void VideoTest::wholeMarkSet_data()
+{
+    // Every Stereo3DLayout value a stream can carry (RFC 9559 StereoMode, H.264/H.265 Table D-8): its packing and order
+    QTest::addColumn<QString>("mark");
+    QTest::addColumn<Picture::Layout>("layout");
+    QTest::addColumn<Picture::EyeOrder>("order");
+    const auto L = Picture::EyeOrder::LeftFirst;
+    const auto R = Picture::EyeOrder::RightFirst;
+    QTest::newRow("mono") << QStringLiteral("mono") << Picture::Layout::None << L;
+    struct Row {
+        const char *name;
+        Picture::Layout layout;
+    };
+    const Row rows[] = {
+        { "sideBySide", Picture::Layout::SideBySide },
+        { "sideBySideQuincunx", Picture::Layout::SideBySideQuincunx },
+        { "topBottom", Picture::Layout::TopAndBottom },
+        { "checkerboard", Picture::Layout::Checkerboard },
+        { "rowInterleaved", Picture::Layout::Rows },
+        { "columnInterleaved", Picture::Layout::Columns },
+        { "frameSequential", Picture::Layout::FrameSequential },
+        { "blockLaced", Picture::Layout::BlockLaced },
+        { "multiView", Picture::Layout::MultiView },
+    };
+    for (const Row &row : rows) {
+        for (const auto order : { L, R }) {
+            const QString mark = QLatin1String(row.name) + (order == L ? QLatin1String("LeftFirst") : QLatin1String("RightFirst"));
+            QTest::addRow("%s", qPrintable(mark)) << mark << row.layout << order;
+        }
+    }
+    // One picture holding both views in colours (StereoMode 10 and 12), and marks outside the set: no packing
+    for (const char *mark : { "anaglyphCyanRed", "anaglyphGreenMagenta", "anaglyphRedLeft", "anaglyphRedRight", "sideBySide", "quincunx" })
+        QTest::addRow("%s", mark) << QString::fromLatin1(mark) << Picture::Layout::None << L;
+}
+void VideoTest::wholeMarkSet()
+{
+    QFETCH(QString, mark);
+    QFETCH(Picture::Layout, layout);
+    QFETCH(Picture::EyeOrder, order);
+    // a 3:1 frame, so that a mark that says nothing could not fall back on the shape
+    const auto result = Video::layout(QSize(3840, 1080), mark);
+    QCOMPARE(result.source, Picture::Source::FileMark);
+    QCOMPARE(result.layout, layout);
+    QCOMPARE(result.eyeOrder, order);
+    int cLayout = -1, cOrder = -1, cSource = -1;
+    QCOMPARE(stereo_layer_video_layout(3840, 1080, mark.toUtf8().constData(), &cLayout, &cOrder, &cSource), 0);
+    QCOMPARE(cLayout, int(layout));
+    QCOMPARE(cOrder, int(order));
+    QCOMPARE(cSource, int(Picture::Source::FileMark));
 }
 void VideoTest::plainC()
 {

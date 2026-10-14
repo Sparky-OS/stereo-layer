@@ -13,7 +13,10 @@ enum class OutputMode { Unknown, Mono, Stereo, Anaglyph };
 class STEREO_LAYER_EXPORT Picture
 {
 public:
-    enum class Layout { None, SideBySide, TopAndBottom, MultiView, Rows, Columns, Checkerboard };
+    // Every packing of RFC 9559 StereoMode and H.264/H.265 Table D-8. SideBySideQuincunx: side by side, each view
+    // quincunx sampled. FrameSequential and BlockLaced alternate views in time or in a stream's blocks: a still never
+    // has them, a video frame holds one view of them.
+    enum class Layout { None, SideBySide, TopAndBottom, MultiView, Rows, Columns, Checkerboard, SideBySideQuincunx, FrameSequential, BlockLaced };
     enum class EyeOrder { LeftFirst, RightFirst };
     enum class AnaglyphColorPair { None, RedCyan, GreenMagenta, AmberBlue };
     enum class Source { None, FileMark, User, Format, Detection, Shape };

@@ -32,6 +32,10 @@ private Q_SLOTS:
     void loadPairPng();
     void svgStereo_data();
     void svgStereo();
+    void wholeMarkSet_data();
+    void wholeMarkSet();
+    void upconversion_data();
+    void upconversion();
 };
 static QImage packed()
 {
@@ -435,6 +439,124 @@ void PictureTest::svgStereo()
     QCOMPARE(loaded.left.size(), QSize(128, 128));
     QCOMPARE(loaded.left.pixelColor(64, 64), rightFirst ? QColor(Qt::blue) : QColor(Qt::red));
     QCOMPARE(loaded.right.pixelColor(64, 64), rightFirst ? QColor(Qt::red) : QColor(Qt::blue));
+}
+
+void PictureTest::wholeMarkSet_data()
+{
+    // Every Stereo3DLayout value (RFC 9559 StereoMode, H.264/H.265 Table D-8, JPS, MPO, SVGStereo), on a 32x16 picture
+    QTest::addColumn<QString>("mark");
+    QTest::addColumn<bool>("stereo");
+    QTest::addColumn<Picture::Layout>("layout");
+    QTest::addColumn<Picture::EyeOrder>("order");
+    QTest::addColumn<Picture::AnaglyphColorPair>("anaglyph");
+    QTest::addColumn<QSize>("view");
+    const auto L = Picture::EyeOrder::LeftFirst;
+    const auto R = Picture::EyeOrder::RightFirst;
+    const auto none = Picture::AnaglyphColorPair::None;
+    QTest::newRow("mono") << QStringLiteral("mono") << false << Picture::Layout::None << L << none << QSize();
+    struct Row {
+        const char *name;
+        Picture::Layout layout;
+        QSize view;
+    };
+    const Row rows[] = {
+        { "sideBySide", Picture::Layout::SideBySide, QSize(16, 16) },
+        { "sideBySideQuincunx", Picture::Layout::SideBySideQuincunx, QSize(32, 16) },
+        { "topBottom", Picture::Layout::TopAndBottom, QSize(32, 8) },
+        { "checkerboard", Picture::Layout::Checkerboard, QSize(32, 16) },
+        { "rowInterleaved", Picture::Layout::Rows, QSize(32, 16) },
+        { "columnInterleaved", Picture::Layout::Columns, QSize(32, 16) },
+    };
+    for (const Row &row : rows) {
+        for (const auto order : { L, R }) {
+            const QString mark = QLatin1String(row.name) + (order == L ? QLatin1String("LeftFirst") : QLatin1String("RightFirst"));
+            QTest::addRow("%s", qPrintable(mark)) << mark << true << row.layout << order << none << row.view;
+        }
+    }
+    // Views that alternate in time or in a stream's blocks are not in one still
+    for (const char *mark : { "frameSequentialLeftFirst", "frameSequentialRightFirst", "blockLacedLeftFirst", "blockLacedRightFirst" })
+        QTest::addRow("%s", mark) << QString::fromLatin1(mark) << false << Picture::Layout::None << L << none << QSize();
+    QTest::newRow("anaglyphCyanRed") << QStringLiteral("anaglyphCyanRed") << true << Picture::Layout::None << L << Picture::AnaglyphColorPair::RedCyan
+                                     << QSize(32, 16);
+    QTest::newRow("anaglyphGreenMagenta") << QStringLiteral("anaglyphGreenMagenta") << true << Picture::Layout::None << L
+                                          << Picture::AnaglyphColorPair::GreenMagenta << QSize(32, 16);
+    QTest::newRow("anaglyphRedLeft") << QStringLiteral("anaglyphRedLeft") << true << Picture::Layout::None << L << Picture::AnaglyphColorPair::RedCyan
+                                     << QSize(32, 16);
+    QTest::newRow("anaglyphRedRight") << QStringLiteral("anaglyphRedRight") << true << Picture::Layout::None << R
+                                      << Picture::AnaglyphColorPair::RedCyan << QSize(32, 16);
+    // Outside the set: one picture
+    for (const char *mark : { "sideBySide", "sideBySideLeft", "anaglyphCyan", "topBottomleftFirst", "quincunx" })
+        QTest::addRow("unknown %s", mark) << QString::fromLatin1(mark) << false << Picture::Layout::None << L << none << QSize();
+}
+void PictureTest::wholeMarkSet()
+{
+    QFETCH(QString, mark);
+    QFETCH(bool, stereo);
+    QFETCH(Picture::Layout, layout);
+    QFETCH(Picture::EyeOrder, order);
+    QFETCH(Picture::AnaglyphColorPair, anaglyph);
+    QFETCH(QSize, view);
+    QImage image(32, 16, QImage::Format_RGB32);
+    image.fill(QColor(200, 60, 60));
+    const auto picture = Picture::fromImages(image, {}, mark, "png", {}, {}, OutputMode::Stereo);
+    QCOMPARE(picture.source, Picture::Source::FileMark);
+    QCOMPARE(picture.isStereo(), stereo);
+    QCOMPARE(picture.anaglyph, anaglyph);
+    if (anaglyph == Picture::AnaglyphColorPair::None)
+        QCOMPARE(picture.layout, layout);
+    if (stereo) {
+        QCOMPARE(picture.eyeOrder, order);
+        QCOMPARE(picture.left.size(), view);
+        QCOMPARE(picture.right.size(), view);
+    }
+}
+void PictureTest::upconversion_data()
+{
+    QTest::addColumn<Picture::Layout>("layout");
+    QTest::addColumn<Picture::EyeOrder>("order");
+    for (const auto layout :
+        { Picture::Layout::Rows, Picture::Layout::Columns, Picture::Layout::Checkerboard, Picture::Layout::SideBySideQuincunx }) {
+        for (const auto order : { Picture::EyeOrder::LeftFirst, Picture::EyeOrder::RightFirst })
+            QTest::addRow("%d %s", int(layout), order == Picture::EyeOrder::LeftFirst ? "left first" : "right first") << layout << order;
+    }
+}
+void PictureTest::upconversion()
+{
+    QFETCH(Picture::Layout, layout);
+    QFETCH(Picture::EyeOrder, order);
+    // Two views of 32x16: linear ramps, the left one in red across x and y, the right one in blue; packed as the layout
+    // says, each view keeps its samples and gets back the missing ones exactly (a ramp is its neighbours' mean).
+    const auto left = [](int x, int y) { return QColor(4 * x + 2 * y, 0, 0); };
+    const auto right = [](int x, int y) { return QColor(0, 0, 4 * x + 2 * y); };
+    const bool quincunx = layout == Picture::Layout::SideBySideQuincunx;
+    QImage frame(32, 16, QImage::Format_RGB32);
+    for (int y = 0; y < 16; ++y) {
+        for (int x = 0; x < 32; ++x) {
+            if (quincunx) {
+                // the half of each view: its samples on even columns of even rows and odd columns of odd rows
+                const int view = x / 16;
+                const int column = 2 * (x % 16) + (y % 2);
+                const bool firstView = view == 0;
+                const bool leftView = firstView == (order == Picture::EyeOrder::LeftFirst);
+                frame.setPixelColor(x, y, leftView ? left(column, y) : right(column, y));
+                continue;
+            }
+            const int which = layout == Picture::Layout::Rows ? y % 2 : (layout == Picture::Layout::Columns ? x % 2 : (x + y) % 2);
+            const bool leftView = (which == 0) == (order == Picture::EyeOrder::LeftFirst);
+            frame.setPixelColor(x, y, leftView ? left(x, y) : right(x, y));
+        }
+    }
+    const auto picture = Picture::fromPackedImage(frame, layout, order);
+    QVERIFY(picture.isStereo());
+    QCOMPARE(picture.left.size(), QSize(32, 16));
+    QCOMPARE(picture.right.size(), QSize(32, 16));
+    // the edges have one neighbour across the interleaving; inside, every pixel is the view's own
+    for (int y = 1; y < 15; ++y) {
+        for (int x = 1; x < 31; ++x) {
+            QCOMPARE(picture.left.pixelColor(x, y), left(x, y));
+            QCOMPARE(picture.right.pixelColor(x, y), right(x, y));
+        }
+    }
 }
 
 QTEST_MAIN(PictureTest)

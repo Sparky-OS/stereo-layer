@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
 
 #include "video.h"
+#include "mark_p.h"
 
 namespace Stereo
 {
@@ -15,22 +16,12 @@ Video::Layout Video::layout(QSize displaySize, const QString &mark, const Pictur
     Layout result;
     if (!mark.isEmpty()) {
         result.source = Picture::Source::FileMark;
-        if (mark.endsWith(QLatin1String("RightFirst")))
-            result.eyeOrder = Picture::EyeOrder::RightFirst;
-        if (mark.startsWith(QLatin1String("sideBySide")))
-            result.layout = Picture::Layout::SideBySide;
-        else if (mark.startsWith(QLatin1String("topBottom")))
-            result.layout = Picture::Layout::TopAndBottom;
-        else if (mark.startsWith(QLatin1String("multiView")))
-            result.layout = Picture::Layout::MultiView;
-        else if (mark.startsWith(QLatin1String("rowInterleaved")))
-            result.layout = Picture::Layout::Rows;
-        else if (mark.startsWith(QLatin1String("columnInterleaved")))
-            result.layout = Picture::Layout::Columns;
-        else if (mark.startsWith(QLatin1String("checkerboard")))
-            result.layout = Picture::Layout::Checkerboard;
-        else
-            result.eyeOrder = Picture::EyeOrder::LeftFirst; // "mono", or a mark this policy does not know: not 3D
+        // "mono", an anaglyph (one picture holding both views in colours), or a mark outside the set: no packing
+        const Mark read = readMark(mark);
+        if (read.anaglyph == Picture::AnaglyphColorPair::None) {
+            result.layout = read.layout;
+            result.eyeOrder = read.order;
+        }
         return result;
     }
     if (options.inputLayout != Picture::Layout::None) {
