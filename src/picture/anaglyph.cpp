@@ -11,10 +11,19 @@ namespace Stereo
 {
 namespace
 {
+// A pair has two colour sides: one channel (red, green or blue) stands out from the other two, or the other two stand out
+// from it (cyan, magenta or amber). A side counts where it leads by at least this many levels of 255, and a picture can
+// only be an anaglyph of the pair when each side covers at least this share of the sample; a picture of one colour on a
+// neutral ground has a single side.
+constexpr int sideLevels = 8;
+constexpr double sideShare = 0.01;
+
 struct ColorEdges {
     int width = 0;
     int height = 0;
     std::array<QVector<double>, 3> channels;
+    // per channel: the share of the sample where that channel leads the other two, and where it trails both
+    std::array<std::array<double, 2>, 3> sides = {};
 };
 
 ColorEdges colorEdges(const QImage &image)
@@ -33,6 +42,20 @@ ColorEdges colorEdges(const QImage &image)
             edges.channels[1].append(qGreen(row[x + 2]) - qGreen(row[x]));
             edges.channels[2].append(qBlue(row[x + 2]) - qBlue(row[x]));
         }
+        for (int x = 0; x < sample.width(); ++x) {
+            const int level[3] = { qRed(row[x]), qGreen(row[x]), qBlue(row[x]) };
+            for (int channel = 0; channel < 3; ++channel) {
+                const int first = level[(channel + 1) % 3];
+                const int second = level[(channel + 2) % 3];
+                edges.sides[channel][0] += level[channel] - std::max(first, second) >= sideLevels;
+                edges.sides[channel][1] += std::min(first, second) - level[channel] >= sideLevels;
+            }
+        }
+    }
+    const double pixels = double(sample.width()) * sample.height();
+    for (auto &side : edges.sides) {
+        side[0] /= pixels;
+        side[1] /= pixels;
     }
     return edges;
 }
@@ -74,7 +97,7 @@ double anaglyphScore(const ColorEdges &edges, Picture::AnaglyphColorPair pair)
     const int secondChannel = (firstChannel + 1) % 3;
     const int thirdChannel = (firstChannel + 2) % 3;
     const int limit = std::min(32, edges.width / 8);
-    if (limit == 0) {
+    if (limit == 0 || std::min(edges.sides[firstChannel][0], edges.sides[firstChannel][1]) < sideShare) {
         return 0;
     }
     const auto correlation = [&](int offset) {

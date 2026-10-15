@@ -23,6 +23,8 @@ private Q_SLOTS:
     void viewControls();
     void detector_data();
     void detector();
+    void detectorSingleColour_data();
+    void detectorSingleColour();
     void geometry();
     void panorama();
     void shape_data();
@@ -225,6 +227,39 @@ void PictureTest::detector()
     QCOMPARE(anaglyph.original, image);
     image.fill(Qt::gray);
     QCOMPARE(Picture::detectAnaglyph(image), Picture::AnaglyphColorPair::None);
+}
+void PictureTest::detectorSingleColour_data()
+{
+    QTest::addColumn<QColor>("ink");
+    QTest::addColumn<QColor>("ground");
+    QTest::newRow("red on grey") << QColor(220, 30, 30) << QColor(96, 96, 96);
+    QTest::newRow("green on grey") << QColor(40, 200, 70) << QColor(96, 96, 96);
+    QTest::newRow("blue on grey") << QColor(30, 30, 220) << QColor(96, 96, 96);
+    QTest::newRow("cyan on grey") << QColor(30, 200, 220) << QColor(96, 96, 96);
+    QTest::newRow("magenta on grey") << QColor(220, 30, 200) << QColor(96, 96, 96);
+    QTest::newRow("amber on grey") << QColor(230, 170, 30) << QColor(96, 96, 96);
+    QTest::newRow("red on black") << QColor(255, 0, 0) << QColor(0, 0, 0);
+    QTest::newRow("red on white") << QColor(200, 20, 20) << QColor(240, 240, 240);
+}
+void PictureTest::detectorSingleColour()
+{
+    QFETCH(QColor, ink);
+    QFETCH(QColor, ground);
+    // A small square and a word of one colour on a neutral ground: the red-on-grey wallpaper that was shown washed out
+    QImage image(1280, 800, QImage::Format_RGB32);
+    image.fill(ground);
+    QPainter painter(&image);
+    painter.fillRect(200, 120, 60, 60, ink);
+    painter.setPen(ink);
+    QFont font(QStringLiteral("sans"));
+    font.setPixelSize(56);
+    font.setBold(true);
+    painter.setFont(font);
+    painter.drawText(282, 170, QStringLiteral("LEFT"));
+    painter.end();
+    QCOMPARE(Picture::detectAnaglyph(image), Picture::AnaglyphColorPair::None);
+    QCOMPARE(Picture::detectAnaglyph(image.scaled(320, 200)), Picture::AnaglyphColorPair::None);
+    QVERIFY(!Picture::fromImages(image, {}, {}, {}, {}, {}, OutputMode::Stereo).isStereo());
 }
 void PictureTest::geometry()
 {
