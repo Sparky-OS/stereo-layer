@@ -1,3 +1,30 @@
+stereo-layer (1.5.0-1) unstable; urgency=medium
+
+  * libstereo-policy: one rule for every video player. The user's explicit
+    choice of a packing, or STEREO_POLICY_USER_FORCE_2D (not 3D), comes before
+    the stream's mark; swap eyes still reverses what was decided.
+  * stereo_policy_video_views() tells full from half views by what the stream
+    says: Matroska's one-plane display size (RFC 9559 section 18.10) and the
+    H.265 upsampled_aspect_ratio_flag (D.3.16), then by shape.
+    stereo_policy_matroska_plane() and Stereo::Video::matroskaPlane() undo
+    the folding of the plane size into the sample aspect ratio by FFmpeg.
+  * The shape rule is named: a single picture is 5:4 to 12:5
+    (STEREO_POLICY_SINGLE_PICTURE_*), so a marked frame of that shape holds
+    half views and a doubled one full views. The private 2.5 and 1.2 limits
+    are gone.
+  * stereo_policy_name_tag() and stereo_policy_video_layout_named() read the
+    3D tag of a file name (3D, SBS, TAB, OU and their half and full forms,
+    LR, RL) after the user's choice and the stream's marks and before the
+    shape. stereo_policy_halves_test() compares the halves of a decoded frame
+    for a bare 3D tag. Stereo::Video gets nameTag().
+  * The 1.4 signatures and symbols stay.
+  * Carries the anaglyph detector fix of the picture lane: both colour sides
+    of the pair are required, so a red-on-grey 2D picture no longer counts as
+    an anaglyph. The H.264 frame packing table is cited as D-8 in V15 and D-9
+    in V16.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Wed, 14 Oct 2026 23:40:00 -0300
+
 stereo-layer (1.4.2-1) unstable; urgency=medium
 
   * Quick item: the stereo and pictureSize properties say whether the policy
