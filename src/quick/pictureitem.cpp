@@ -163,6 +163,8 @@ void PictureItem::setPan(const QPointF &pan)
     }
 }
 bool PictureItem::stereoActive() const { return d->active; }
+bool PictureItem::isStereo() const { return d->picture.isStereo(); }
+QSize PictureItem::pictureSize() const { return d->picture.isStereo() ? d->picture.left.size() : d->picture.original.size(); }
 bool PictureItem::approximateColor() const { return d->picture.approximateColor; }
 QString PictureItem::colorDisclaimer() const { return Picture::colorDisclaimer(); }
 void PictureItem::updatePolish()

@@ -1,3 +1,12 @@
+stereo-layer (1.4.2-1) unstable; urgency=medium
+
+  * Quick item: the stereo and pictureSize properties say whether the policy
+    made a pair of the source, on any output, and one view's size, so a QML
+    client (the Stereo Image wallpaper) can keep its ordinary image path for
+    ordinary pictures and fit a pair to its area.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Wed, 14 Oct 2026 21:50:00 -0300
+
 stereo-layer (1.4.1-1) unstable; urgency=medium
 
   * A still picture with no mark is a side-by-side pair only when its pixels

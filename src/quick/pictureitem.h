@@ -3,6 +3,7 @@
 #pragma once
 #include "picture.h"
 #include <QQuickItem>
+#include <QSize>
 #include <QUrl>
 #include <QtQml/qqmlregistration.h>
 #include <memory>
@@ -21,6 +22,8 @@ class STEREO_LAYER_EXPORT PictureItem : public QQuickItem
     Q_PROPERTY(qreal zoom READ zoom WRITE setZoom NOTIFY transformChanged)
     Q_PROPERTY(QPointF pan READ pan WRITE setPan NOTIFY transformChanged)
     Q_PROPERTY(bool stereoActive READ stereoActive NOTIFY stereoActiveChanged)
+    Q_PROPERTY(bool stereo READ isStereo NOTIFY pictureChanged)
+    Q_PROPERTY(QSize pictureSize READ pictureSize NOTIFY pictureChanged)
     Q_PROPERTY(bool approximateColor READ approximateColor NOTIFY pictureChanged)
     Q_PROPERTY(QString colorDisclaimer READ colorDisclaimer CONSTANT)
 public:
@@ -44,6 +47,9 @@ public:
     QPointF pan() const;
     void setPan(const QPointF &pan);
     bool stereoActive() const;
+    // Whether the policy made a pair of the source, on any output; one view's size, or the picture's.
+    bool isStereo() const;
+    QSize pictureSize() const;
     bool approximateColor() const;
     QString colorDisclaimer() const;
 Q_SIGNALS:
