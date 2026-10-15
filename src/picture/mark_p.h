@@ -8,7 +8,7 @@ namespace Stereo
 {
 // A Stereo3DLayout value: the edition's words for every stereo layout of a picture or a video (RFC 9559 StereoMode,
 // section 5.1.4.1.28.3; H.264 and H.265 Table D-8; the JPS and MPO marks; SVGStereo), read exactly. A value outside
-// the set is not known, and says one picture.
+// the set is not known, and says one picture. H.264 V15 (08/2024) numbers the frame packing table D-8, V16 (06/2026) D-9.
 struct Mark {
     bool known = false;
     Picture::Layout layout = Picture::Layout::None;

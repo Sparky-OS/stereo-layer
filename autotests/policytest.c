@@ -2,7 +2,8 @@
 /* SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com> */
 
 /* The stereo policy without Qt: every mark of the set, the video packing in its order of precedence, the user's
- * correction, full or half views and the shape rules, checked against what RFC 9559, Table D-8 and the edition say. */
+ * correction, full or half views and the shape rules, checked against what RFC 9559, Table D-8 and the edition say
+ * (H.264 V15, 08/2024 numbers that table D-8; V16, 06/2026 D-9). */
 
 #include "stereo-policy.h"
 

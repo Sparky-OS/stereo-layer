@@ -5,7 +5,8 @@
  * The stereo policy of Sparky Stereo OS for programs without Qt (a browser, a player): how a stereo mark reads, which
  * packing a video frame holds, whether its views are full or half, and the user's correction. libstereo-layer builds on
  * it, so every program decides alike. The marks are the Stereo3DLayout words (RFC 9559 StereoMode, section
- * 5.1.4.1.28.3; H.264 and H.265 Table D-8; the JPS and MPO marks; SVGStereo).
+ * 5.1.4.1.28.3; H.264 and H.265 Table D-8; the JPS and MPO marks; SVGStereo). H.264 V15 (08/2024) numbers the frame
+ * packing table D-8, V16 (06/2026) D-9.
  */
 
 #ifndef STEREO_POLICY_H
@@ -17,7 +18,8 @@ extern "C" {
 
 #define STEREO_POLICY_EXPORT __attribute__((visibility("default")))
 
-/* Every packing of RFC 9559 StereoMode and H.264/H.265 Table D-8; the values of Stereo::Picture::Layout. */
+/* Every packing of RFC 9559 StereoMode and H.264/H.265 Table D-8 (H.264 V15, 08/2024; D-9 in H.264 V16, 06/2026);
+ * the values of Stereo::Picture::Layout. */
 enum stereo_policy_layout {
     STEREO_POLICY_LAYOUT_NONE = 0,
     STEREO_POLICY_LAYOUT_SIDE_BY_SIDE = 1,

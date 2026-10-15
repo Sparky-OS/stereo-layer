@@ -380,9 +380,9 @@ Picture Picture::fromImages(const QImage &image, const QImage &second, const QSt
 namespace
 {
 // One view of an interleaved, checkerboard or quincunx-sampled picture at the size of the whole frame, as a display
-// upconverts it (H.264 and H.265 Table D-8): the samples of the view stay where they are, and each missing one is the
-// mean of its two neighbours across the interleaving. phase is the first row, column or checker of the view. A quincunx
-// half holds the samples of a full-width view taken on even columns of even rows and odd columns of odd rows, both views
+// upconverts it (H.264 and H.265 Table D-8; H.264 V15, 08/2024 numbers it D-8, V16, 06/2026 D-9): the samples of the view stay
+// where they are, and each missing one is the mean of its two neighbours across the interleaving. phase is the first row,
+// column or checker of the view. A quincunx half holds the samples of a full-width view taken on even columns of even rows and odd columns of odd rows, both views
 // alike (FFmpeg's AV_STEREO3D_SIDEBYSIDE_QUINCUNX).
 QImage upconverted(const QImage &frame, Picture::Layout layout, int phase)
 {

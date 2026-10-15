@@ -64,7 +64,8 @@ void VideoTest::marksAndChoices()
 }
 void VideoTest::wholeMarkSet_data()
 {
-    // Every Stereo3DLayout value a stream can carry (RFC 9559 StereoMode, H.264/H.265 Table D-8): its packing and order
+    // Every Stereo3DLayout value a stream can carry (RFC 9559 StereoMode, H.264/H.265 Table D-8; H.264 V15, 08/2024 numbers
+    // it D-8, V16, 06/2026 D-9): its packing and order
     QTest::addColumn<QString>("mark");
     QTest::addColumn<Picture::Layout>("layout");
     QTest::addColumn<Picture::EyeOrder>("order");

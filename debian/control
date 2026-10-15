@@ -33,9 +33,9 @@ Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Shared stereo policy for programs without Qt
  How a stereo mark reads (the Stereo3DLayout words of RFC 9559 StereoMode and
- H.264/H.265 Table D-8), which packing a video frame holds, whether its views
- are full or half, and the user's correction, as a small C library a browser
- or a player can load. libstereo-layer builds on it, so every program
+ H.264/H.265 Table D-8; H.264 V15, 08/2024 numbers it D-8, V16, 06/2026 D-9),
+ which packing a video frame holds, whether its views are full or half, and
+ the user's correction, as a small C library a browser or a player can load. libstereo-layer builds on it, so every program
  decides alike.
  .
  Sparky Stereo OS, Daniel Ramos's edition of SparkyLinux (by Paweł "pavroo"

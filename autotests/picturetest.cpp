@@ -546,7 +546,8 @@ void PictureTest::interleavedSvg()
 }
 void PictureTest::wholeMarkSet_data()
 {
-    // Every Stereo3DLayout value (RFC 9559 StereoMode, H.264/H.265 Table D-8, JPS, MPO, SVGStereo), on a 32x16 picture
+    // Every Stereo3DLayout value (RFC 9559 StereoMode, H.264/H.265 Table D-8, JPS, MPO, SVGStereo), on a 32x16 picture;
+    // H.264 V15 (08/2024) numbers that table D-8, V16 (06/2026) D-9
     QTest::addColumn<QString>("mark");
     QTest::addColumn<bool>("stereo");
     QTest::addColumn<Picture::Layout>("layout");
