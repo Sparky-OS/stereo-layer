@@ -203,6 +203,24 @@ Decision decide(const QString &fileMetadata, const QByteArray &format, const QBy
 // (Picture::pairByContent()).
 bool pairByShape(const QSize &size) { return stereo_policy_picture_pair_by_shape(size.width(), size.height()) == 1; }
 
+// The width at which the halves of a picture are compared (Picture::pairByContent()).
+constexpr int pairSampleWidth = 384;
+
+// A file's pixels as the comparison of its halves sees them: decoded at one size, whatever size the picture is decoded
+// at for showing, so that a thumbnail, a larger preview and a viewer give the same answer. A comparison of the picture
+// decoded at the size of each preview lies on the other side of its thresholds for some pictures at some sizes.
+QImage pairSample(const QString &path, const QSize &size)
+{
+    QImageReader reader(path);
+    if (size.isValid() && size.width() > pairSampleWidth && reader.supportsOption(QImageIOHandler::ScaledSize)) {
+        reader.setScaledSize(QSize(pairSampleWidth, qMax(1, qRound(double(size.height()) * pairSampleWidth / size.width()))));
+    }
+    return reader.read();
+}
+
+Picture fromImagesComparing(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
+    const Picture::Options &options, OutputMode output, const QImage &sample);
+
 Picture unpackPng(const QImage &image, Picture::EyeOrder order)
 {
     const int padding = 15 - ((image.width() - 1) % 16);
@@ -223,7 +241,8 @@ bool Picture::pairByContent(const QImage &image)
     if (image.isNull())
         return false;
     // The function reduces a larger picture itself; a copy of a few hundred pixels keeps a thumbnailer fast.
-    const QImage small = (image.width() > 384 ? image.scaledToWidth(384, Qt::SmoothTransformation) : image).convertToFormat(QImage::Format_RGB888);
+    const QImage small = (image.width() > pairSampleWidth ? image.scaledToWidth(pairSampleWidth, Qt::SmoothTransformation) : image)
+                             .convertToFormat(QImage::Format_RGB888);
     return stereo_policy_picture_pair_by_content(small.constBits(), small.width(), small.height(), small.bytesPerLine()) == 1;
 }
 
@@ -260,7 +279,8 @@ Picture Picture::load(const QString &path, const Options &fileOptions, OutputMod
     if (multiView && reader.jumpToImage(1)) {
         second = reader.read();
     }
-    return fromImages(image, second, metadata, format, header, options, output);
+    const bool pixels = decide(metadata, format, header, !second.isNull(), options).pixels;
+    return fromImagesComparing(image, second, metadata, format, header, options, output, pixels ? pairSample(path, image.size()) : QImage());
 }
 
 Picture Picture::loadPair(const QString &path, const QSize &bound, const Options &fileOptions)
@@ -304,7 +324,8 @@ Picture Picture::loadPair(const QString &path, const QSize &bound, const Options
     if (multiView && reader.jumpToImage(1)) {
         second = read(reader.size());
     }
-    Picture result = fromImages(image, second, metadata, format, header, options, OutputMode::Unknown);
+    const QImage sample = decision.pixels ? pairSample(path, size) : QImage();
+    Picture result = fromImagesComparing(image, second, metadata, format, header, options, OutputMode::Unknown, sample);
     if (!result.isStereo()) {
         return {};
     }
@@ -316,9 +337,18 @@ Picture Picture::loadPair(const QString &path, const QSize &bound, const Options
     return result;
 }
 
-Picture Picture::fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
-    const Options &options, OutputMode output)
+namespace
 {
+// fromImages(), with the halves of the picture compared on sample, the file's pixels at the size of the comparison
+// (pairSample())
+Picture fromImagesComparing(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
+    const Picture::Options &options, OutputMode output, const QImage &sample)
+{
+    using Layout = Picture::Layout;
+    using EyeOrder = Picture::EyeOrder;
+    using Source = Picture::Source;
+    using View = Picture::View;
+    using AnaglyphColorPair = Picture::AnaglyphColorPair;
     Picture result;
     result.original = image;
     if (image.isNull() || options.view == View::Mono) {
@@ -326,10 +356,10 @@ Picture Picture::fromImages(const QImage &image, const QImage &second, const QSt
     }
     Decision decision = decide(metadata, format, header, !second.isNull(), options);
     if (decision.pixels) {
-        decision.anaglyph = detectAnaglyph(image);
+        decision.anaglyph = Picture::detectAnaglyph(image);
         if (decision.anaglyph != AnaglyphColorPair::None) {
             decision.source = Source::Detection;
-        } else if (!decision.panorama && pairByShape(image.size()) && pairByContent(image)) {
+        } else if (!decision.panorama && pairByShape(image.size()) && Picture::pairByContent(sample.isNull() ? image : sample)) {
             decision.packing = Layout::SideBySide;
             decision.source = Source::Shape;
         }
@@ -349,7 +379,7 @@ Picture Picture::fromImages(const QImage &image, const QImage &second, const QSt
             result.anaglyph = anaglyph;
             return result;
         }
-        result = fromAnaglyph(image, anaglyph);
+        result = Picture::fromAnaglyph(image, anaglyph);
         if (order == EyeOrder::RightFirst)
             result = result.swapped();
     } else if (packing == Layout::MultiView) {
@@ -361,7 +391,7 @@ Picture Picture::fromImages(const QImage &image, const QImage &second, const QSt
     } else if (source == Source::FileMark && (format == "png" || format == "pns") && packing == Layout::SideBySide) {
         result = unpackPng(image, order);
     } else {
-        result = fromPackedImage(image, packing, order);
+        result = Picture::fromPackedImage(image, packing, order);
     }
     result.original = image;
     result.source = source;
@@ -376,6 +406,14 @@ Picture Picture::fromImages(const QImage &image, const QImage &second, const QSt
     }
     return result;
 }
+}
+
+Picture Picture::fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
+    const Options &options, OutputMode output)
+{
+    return fromImagesComparing(image, second, metadata, format, header, options, output, image);
+}
+
 
 namespace
 {

@@ -35,6 +35,7 @@ private Q_SLOTS:
     void loadPair_data();
     void loadPair();
     void loadPairPng();
+    void pairAtEverySize();
     void svgStereo_data();
     void svgStereo();
     void interleavedSvg();
@@ -430,6 +431,45 @@ void PictureTest::loadPair()
     const QColor a = expected.pixelColor(expected.width() / 2, expected.height() / 2);
     const QColor b = pair.left.pixelColor(pair.left.width() / 2, pair.left.height() / 2);
     QVERIFY(qAbs(a.red() - b.red()) < 48 && qAbs(a.blue() - b.blue()) < 48);
+}
+// A thumbnail, a larger preview and a viewer show the same picture: the pixels of a file are compared at one size,
+// whatever size it is decoded at for showing, so the answer does not change with it. The pictures go from a pair to two
+// unrelated views, through the ones the comparison only just accepts or refuses, as JPEG files of a phone's shape.
+void PictureTest::pairAtEverySize()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QSize size(2400, 1080);
+    const QImage pair = picture(size, Content::Pair);
+    const QImage unrelated = picture(size, Content::Unrelated);
+    const int half = size.width() / 2;
+    int pairs = 0;
+    int ones = 0;
+    for (int step = 0; step <= 20; ++step) {
+        const double share = step / 20.0;
+        QImage image = pair;
+        for (int y = 0; y < size.height(); ++y) {
+            QRgb *row = reinterpret_cast<QRgb *>(image.scanLine(y));
+            const QRgb *other = reinterpret_cast<const QRgb *>(unrelated.constScanLine(y));
+            for (int x = half; x < size.width(); ++x) {
+                const auto mix = [share](int a, int b) {
+                    return qBound(0, qRound(a * (1 - share) + b * share), 255);
+                };
+                row[x] = qRgb(mix(qRed(row[x]), qRed(other[x])), mix(qGreen(row[x]), qGreen(other[x])), mix(qBlue(row[x]), qBlue(other[x])));
+            }
+        }
+        const QString path = dir.filePath(QStringLiteral("phone-%1.jpg").arg(step));
+        QVERIFY(image.save(path, "jpg", 90));
+        const bool viewer = Picture::load(path, {}, OutputMode::Unknown).isStereo();
+        for (const int bound : {128, 256, 384, 512, 768, 1024, 2048}) {
+            QVERIFY2(Picture::loadPair(path, QSize(bound, bound), {}).isStereo() == viewer,
+                     qPrintable(QStringLiteral("step %1 at %2: not as in a viewer (%3)").arg(step).arg(bound).arg(viewer ? QStringLiteral("pair") : QStringLiteral("one"))));
+        }
+        ++(viewer ? pairs : ones);
+    }
+    // the range holds both answers
+    QVERIFY(pairs > 0);
+    QVERIFY(ones > 0);
 }
 static QByteArray pngChunk(const QByteArray &type, const QByteArray &data)
 {
