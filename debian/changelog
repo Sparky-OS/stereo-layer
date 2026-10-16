@@ -1,3 +1,13 @@
+stereo-layer (1.5.1-1) unstable; urgency=medium
+
+  * Picture::load() and Picture::loadPair() compare the halves of an unmarked
+    picture with the file decoded at the width of the comparison, apart from
+    the decode that is shown, so a thumbnail, a larger preview and a viewer
+    give the same answer: before, a picture near the thresholds could be flat
+    in its thumbnail and 3D in a larger preview, or the other way round.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Fri, 16 Oct 2026 07:00:00 -0300
+
 stereo-layer (1.5.0-1) unstable; urgency=medium
 
   * libstereo-policy: one rule for every video player. The user's explicit
