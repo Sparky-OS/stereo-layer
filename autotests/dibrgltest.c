@@ -135,6 +135,8 @@ static void scene(void)
 }
 
 /* the C render into 4 planes, interleaved back into RGBA rows of 2W */
+static float layer_table[256];
+
 static int render_c(const struct stereo_dibr_params *prm, const float *table, int table_size, const void *depth, int dw, int dh, int bytes,
     int role, int with_layer, unsigned char out[H][2 * W][4])
 {
@@ -154,7 +156,7 @@ static int render_c(const struct stereo_dibr_params *prm, const float *table, in
     struct stereo_dibr_depth dm = { depth, (ptrdiff_t)dw * bytes, bytes, dw, dh };
     struct stereo_dibr_depth lm = { layer_depth8, W, 1, W, H };
     stereo_dibr *d = stereo_dibr_alloc();
-    int ret = with_layer ? stereo_dibr_render_layer(d, prm, table, table_size, &pic, &dm, role, &lay, &lm, &l, &r)
+    int ret = with_layer ? stereo_dibr_render_layer(d, prm, table, table_size, &pic, &dm, role, &lay, layer_table, 256, &lm, &l, &r)
                          : stereo_dibr_render(d, prm, table, table_size, &pic, &dm, &l, &r);
     stereo_dibr_free(d);
     for (int y = 0; y < H; y++)
@@ -177,7 +179,7 @@ static int render_gl(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, c
     }
     const float hole[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
     int ret = with_layer
-        ? stereo_dibr_gl_render_layer(gl, prm, table, table_size, pic, W, H, depth, dw, dh, 1, role, layer, layer_depth, W, H, target, hole)
+        ? stereo_dibr_gl_render_layer(gl, prm, table, table_size, pic, W, H, depth, dw, dh, 1, role, layer, layer_table, 256, layer_depth, W, H, target, hole)
         : stereo_dibr_gl_render(gl, prm, table, table_size, pic, W, H, depth, dw, dh, 1, target, hole);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target, 0);
@@ -279,7 +281,8 @@ int main(void)
         conv.bits = 8;
         conv.z_present = 0;
         CHECK(stereo_depth_parallax_table(&conv, W, table) == 0);
-        table[0] = NAN;
+        memcpy(layer_table, table, sizeof(layer_table));
+        layer_table[0] = NAN; /* a layer's 0: nothing there */
         GLuint lay = upload(GL_RGBA8, W, H, GL_RGBA, GL_UNSIGNED_BYTE, layer_rgba);
         GLuint ldepth = upload(GL_R8UI, W, H, GL_RED_INTEGER, GL_UNSIGNED_BYTE, layer_depth8);
         for (int role = 0; role < 2; role++) {

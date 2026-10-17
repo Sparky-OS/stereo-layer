@@ -616,15 +616,16 @@ static void layers(void)
             set_px(&gfx, 0, x, y, 230);
             gfx_depth[y * W + x] = x >= 4 && x < 12 ? 255 : 0;
         }
+    float layer_table[256];
     for (int i = 0; i < 256; i++)
-        table[i] = 6.0f - 12.0f * i / 255.0f;
-    table[0] = NAN; /* no depth: no graphics, no background */
+        table[i] = layer_table[i] = 6.0f - 12.0f * i / 255.0f;
+    layer_table[0] = NAN; /* a layer's 0: no graphics, no background */
     stereo_dibr_params_default(&prm);
     prm.fill = STEREO_DIBR_FILL_NONE;
 
     /* the background layer: the 12 columns the square uncovers (34 to 45) show the hidden background's 120 where it
      * lands (its x 28..39 move 6 right, to 34..45) */
-    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, STEREO_DIBR_LAYER_BACKGROUND, &bg.pic, &bm, &left.pic, &right.pic)
+    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, STEREO_DIBR_LAYER_BACKGROUND, &bg.pic, layer_table, 256, &bm, &left.pic, &right.pic)
         == 0);
     int bad = 0;
     for (int y = 0; y < H; y++)
@@ -635,7 +636,7 @@ static void layers(void)
         fprintf(stderr, "  background layer: %d\n", bad);
 
     /* the overlay: the bar at -6 moves 6 left in the right eye (x -2..5, so 0..5 shown), stays in the left eye */
-    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, STEREO_DIBR_LAYER_OVERLAY, &gfx.pic, &gm, &left.pic, &right.pic) == 0);
+    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, STEREO_DIBR_LAYER_OVERLAY, &gfx.pic, layer_table, 256, &gm, &left.pic, &right.pic) == 0);
     bad = 0;
     for (int y = 0; y < H; y++) {
         for (int x = 4; x < 12; x++)
@@ -649,8 +650,8 @@ static void layers(void)
     CHECK(bad == 0);
     if (bad)
         fprintf(stderr, "  overlay layer: %d\n", bad);
-    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, 7, &gfx.pic, &gm, &left.pic, &right.pic) == -1);
-    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, STEREO_DIBR_LAYER_OVERLAY, NULL, &gm, &left.pic, &right.pic) == -1);
+    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, 7, &gfx.pic, layer_table, 256, &gm, &left.pic, &right.pic) == -1);
+    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, STEREO_DIBR_LAYER_OVERLAY, NULL, layer_table, 256, &gm, &left.pic, &right.pic) == -1);
 
     stereo_dibr_free(d);
     image_free(&pic);

@@ -791,7 +791,8 @@ static void warp_view(stereo_dibr *d, const struct stereo_dibr_params *p, int w,
 
 static int render(stereo_dibr *d, const struct stereo_dibr_params *p, const float *table, int table_size,
     const struct stereo_dibr_picture *picture, const struct stereo_dibr_depth *depth, int role, const struct stereo_dibr_picture *layer,
-    const struct stereo_dibr_depth *layer_depth, struct stereo_dibr_picture *left, struct stereo_dibr_picture *right)
+    const float *layer_table, int layer_table_size, const struct stereo_dibr_depth *layer_depth, struct stereo_dibr_picture *left,
+    struct stereo_dibr_picture *right)
 {
     if (!d || !p || !table || table_size < 1 || !depth || !depth->data || depth->width <= 0 || depth->height <= 0
         || (depth->bytes != 1 && depth->bytes != 2))
@@ -800,7 +801,8 @@ static int render(stereo_dibr *d, const struct stereo_dibr_params *p, const floa
         return -1;
     if (layer
         && (check_picture(layer, picture) || !layer_depth || !layer_depth->data || layer_depth->width <= 0 || layer_depth->height <= 0
-            || (layer_depth->bytes != 1 && layer_depth->bytes != 2) || (role != STEREO_DIBR_LAYER_BACKGROUND && role != STEREO_DIBR_LAYER_OVERLAY)))
+            || (layer_depth->bytes != 1 && layer_depth->bytes != 2) || (role != STEREO_DIBR_LAYER_BACKGROUND && role != STEREO_DIBR_LAYER_OVERLAY)
+            || !layer_table || layer_table_size < 1))
         return -1;
 
     const int w = picture->width, h = picture->height;
@@ -821,7 +823,7 @@ static int render(stereo_dibr *d, const struct stereo_dibr_params *p, const floa
     }
     /* the second layer keeps its places with no depth: a background with nothing there, graphics that are not there */
     if (layer)
-        depth_to_parallax(d, table, table_size, layer_depth, w, h, d->lpar, 0);
+        depth_to_parallax(d, layer_table, layer_table_size, layer_depth, w, h, d->lpar, 0);
 
     for (int eye = 0; eye < 2; eye++) {
         struct stereo_dibr_picture *out = eye ? right : left;
@@ -921,14 +923,15 @@ int stereo_dibr_render(stereo_dibr *d, const struct stereo_dibr_params *p, const
     const struct stereo_dibr_picture *picture, const struct stereo_dibr_depth *depth, struct stereo_dibr_picture *left,
     struct stereo_dibr_picture *right)
 {
-    return render(d, p, table, table_size, picture, depth, 0, NULL, NULL, left, right);
+    return render(d, p, table, table_size, picture, depth, 0, NULL, NULL, 0, NULL, left, right);
 }
 
 int stereo_dibr_render_layer(stereo_dibr *d, const struct stereo_dibr_params *p, const float *table, int table_size,
     const struct stereo_dibr_picture *picture, const struct stereo_dibr_depth *depth, int role, const struct stereo_dibr_picture *layer,
-    const struct stereo_dibr_depth *layer_depth, struct stereo_dibr_picture *left, struct stereo_dibr_picture *right)
+    const float *layer_table, int layer_table_size, const struct stereo_dibr_depth *layer_depth, struct stereo_dibr_picture *left,
+    struct stereo_dibr_picture *right)
 {
     if (!layer)
         return -1;
-    return render(d, p, table, table_size, picture, depth, role, layer, layer_depth, left, right);
+    return render(d, p, table, table_size, picture, depth, role, layer, layer_table, layer_table_size, layer_depth, left, right);
 }

@@ -151,6 +151,7 @@ enum {
 /* the working textures */
 enum {
     T_TABLE, /* the parallax table, 256 wide */
+    T_LTABLE, /* the second layer's */
     T_DPAR0, /* at the depth map's size: parallax, valid */
     T_DPAR1,
     T_PAR, /* at the picture's size */
@@ -416,13 +417,13 @@ static void restore(stereo_dibr_gl *gl, const struct saved *s)
 }
 
 /* depth to parallax at the picture's size, into T_PAR (fill set: samples with no depth filled) or T_LPAR */
-static int parallax(stereo_dibr_gl *gl, int table_size, GLuint depth, int dw, int dh, int integer, int w, int h, int fill, int out)
+static int parallax(stereo_dibr_gl *gl, int table, int table_size, GLuint depth, int dw, int dh, int integer, int w, int h, int fill, int out)
 {
     struct pass p = use(gl, integer ? P_depth_integer : P_depth_frag);
     texture(gl, T_DPAR0, GL_RG32F, dw, dh, NULL);
     texture(gl, T_DPAR1, GL_RG32F, dw, dh, NULL);
     bind(&p, "u_depth", depth);
-    bind_t(&p, "u_table", T_TABLE);
+    bind_t(&p, "u_table", table);
     set_i(&p, "u_table_size", table_size);
     if (draw_t(&p, T_DPAR0, -1, dw, dh, 0) < 0)
         return -1;
@@ -536,13 +537,40 @@ static void hole_uniform(struct pass *p, void *data)
     p->gl->Uniform4f(p->gl->GetUniformLocation(p->prog, "u_hole"), hole[0], hole[1], hole[2], hole[3]);
 }
 
+/* a parallax table as a texture, its range added to [*pmin, *pmax] */
+static int upload_table(stereo_dibr_gl *gl, int t, const float *table, int size, float *pmin, float *pmax, int *first)
+{
+    const int rows = (size + 255) / 256;
+    float *data = calloc((size_t)rows * 256 * 2, sizeof(float));
+    if (!data)
+        return -1;
+    for (int i = 0; i < size; i++) {
+        if (isnan(table[i]))
+            continue;
+        data[2 * i] = table[i];
+        data[2 * i + 1] = 1.0f;
+        if (*first || table[i] < *pmin)
+            *pmin = table[i];
+        if (*first || table[i] > *pmax)
+            *pmax = table[i];
+        *first = 0;
+    }
+    texture(gl, t, GL_RG32F, 256, rows, data);
+    gl->tex_w[t] = -1; /* uploaded each time */
+    free(data);
+    return 0;
+}
+
 static int render(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, const float *table, int table_size, GLuint picture, int w, int h,
-    GLuint depth, int dw, int dh, int integer, int role, GLuint layer, GLuint layer_depth, int ldw, int ldh, GLuint target, const float hole[4])
+    GLuint depth, int dw, int dh, int integer, int role, GLuint layer, const float *ltable, int ltable_size, GLuint layer_depth, int ldw, int ldh,
+    GLuint target, const float hole[4])
 {
     if (!gl || !prm || !table || table_size < 1 || table_size > 65536 || !picture || w <= 0 || h <= 0 || !depth || dw <= 0 || dh <= 0 || !target
         || !hole)
         return -1;
-    if (layer && (!layer_depth || ldw <= 0 || ldh <= 0 || (role != STEREO_DIBR_LAYER_BACKGROUND && role != STEREO_DIBR_LAYER_OVERLAY)))
+    if (layer
+        && (!layer_depth || ldw <= 0 || ldh <= 0 || (role != STEREO_DIBR_LAYER_BACKGROUND && role != STEREO_DIBR_LAYER_OVERLAY) || !ltable
+            || ltable_size < 1 || ltable_size > 65536))
         return -1;
 
     struct saved saved;
@@ -550,31 +578,15 @@ static int render(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, cons
     save(gl, &saved);
     gl->error[0] = 0;
 
-    /* the table, 256 wide: (parallax, 1), or (0, 0) for no depth; its range bounds the splats' search */
-    const int rows = (table_size + 255) / 256;
-    float *data = calloc((size_t)rows * 256 * 2, sizeof(float));
+    /* the tables, 256 wide: (parallax, 1), or (0, 0) for no depth; their range bounds the splats' search */
     float pmin = 0.0f, pmax = 0.0f;
     int first = 1;
-    if (!data) {
+    if (upload_table(gl, T_TABLE, table, table_size, &pmin, &pmax, &first) < 0 || (layer && upload_table(gl, T_LTABLE, ltable, ltable_size, &pmin, &pmax, &first) < 0)) {
         restore(gl, &saved);
         return -1;
     }
-    for (int i = 0; i < table_size; i++) {
-        if (isnan(table[i]))
-            continue;
-        data[2 * i] = table[i];
-        data[2 * i + 1] = 1.0f;
-        if (first || table[i] < pmin)
-            pmin = table[i];
-        if (first || table[i] > pmax)
-            pmax = table[i];
-        first = 0;
-    }
-    texture(gl, T_TABLE, GL_RG32F, 256, rows, data);
-    gl->tex_w[T_TABLE] = -1; /* uploaded each time */
-    free(data);
 
-    if (parallax(gl, table_size, depth, dw, dh, integer, w, h, 1, T_PAR) < 0)
+    if (parallax(gl, T_TABLE, table_size, depth, dw, dh, integer, w, h, 1, T_PAR) < 0)
         goto fail;
     const int smooth = prm->smooth == STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN;
     if (smooth) {
@@ -595,7 +607,7 @@ static int render(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, cons
         if (draw_t(&p, T_PAR, -1, w, h, 0) < 0)
             goto fail;
     }
-    if (layer && parallax(gl, table_size, layer_depth, ldw, ldh, integer, w, h, 0, T_LPAR) < 0)
+    if (layer && parallax(gl, T_LTABLE, ltable_size, layer_depth, ldw, ldh, integer, w, h, 0, T_LPAR) < 0)
         goto fail;
 
     for (int i = T_COLOR0; i <= T_STATE1; i++)
@@ -709,15 +721,16 @@ fail:
 int stereo_dibr_gl_render(stereo_dibr_gl *gl, const struct stereo_dibr_params *p, const float *table, int table_size, unsigned picture, int width,
     int height, unsigned depth, int depth_width, int depth_height, int depth_integer, unsigned target, const float hole[4])
 {
-    return render(gl, p, table, table_size, picture, width, height, depth, depth_width, depth_height, depth_integer, 0, 0, 0, 0, 0, target, hole);
+    return render(gl, p, table, table_size, picture, width, height, depth, depth_width, depth_height, depth_integer, 0, 0, NULL, 0, 0, 0, 0, target,
+        hole);
 }
 
 int stereo_dibr_gl_render_layer(stereo_dibr_gl *gl, const struct stereo_dibr_params *p, const float *table, int table_size, unsigned picture,
-    int width, int height, unsigned depth, int depth_width, int depth_height, int depth_integer, int role, unsigned layer, unsigned layer_depth,
-    int layer_depth_width, int layer_depth_height, unsigned target, const float hole[4])
+    int width, int height, unsigned depth, int depth_width, int depth_height, int depth_integer, int role, unsigned layer, const float *layer_table,
+    int layer_table_size, unsigned layer_depth, int layer_depth_width, int layer_depth_height, unsigned target, const float hole[4])
 {
     if (!layer)
         return -1;
-    return render(gl, p, table, table_size, picture, width, height, depth, depth_width, depth_height, depth_integer, role, layer, layer_depth,
-        layer_depth_width, layer_depth_height, target, hole);
+    return render(gl, p, table, table_size, picture, width, height, depth, depth_width, depth_height, depth_integer, role, layer, layer_table,
+        layer_table_size, layer_depth, layer_depth_width, layer_depth_height, target, hole);
 }

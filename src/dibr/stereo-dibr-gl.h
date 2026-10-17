@@ -53,10 +53,11 @@ STEREO_DIBR_EXPORT int stereo_dibr_gl_render(stereo_dibr_gl *gl, const struct st
     const float hole[4]);
 
 /* stereo_dibr_gl_render() with a second layer, as stereo_dibr_render_layer(): layer is a texture of the picture's size,
- * layer_depth one of the layer's depth, of the same kind as depth. */
+ * layer_depth one of the layer's depth, of the same kind as depth, read through layer_table. */
 STEREO_DIBR_EXPORT int stereo_dibr_gl_render_layer(stereo_dibr_gl *gl, const struct stereo_dibr_params *p, const float *table, int table_size,
     unsigned picture, int width, int height, unsigned depth, int depth_width, int depth_height, int depth_integer, int role, unsigned layer,
-    unsigned layer_depth, int layer_depth_width, int layer_depth_height, unsigned target, const float hole[4]);
+    const float *layer_table, int layer_table_size, unsigned layer_depth, int layer_depth_width, int layer_depth_height, unsigned target,
+    const float hole[4]);
 
 #ifdef __cplusplus
 }

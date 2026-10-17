@@ -217,14 +217,15 @@ enum stereo_dibr_layer_role {
 };
 
 /*
- * stereo_dibr_render() with a second layer, layer with layer_depth, read with the same table: the background behind
- * the picture or graphics over it (an enum stereo_dibr_layer_role). layer has the picture's size and planes. The
- * layer is warped as the picture is (forward warping when the warp is layered), and nothing fills its own holes.
- * Returns as stereo_dibr_render().
+ * stereo_dibr_render() with a second layer, layer with layer_depth read through layer_table: the background behind the
+ * picture or graphics over it (an enum stereo_dibr_layer_role). layer has the picture's size and planes. The layer's
+ * samples with no depth (NaN in its table) hold nothing; the layer is warped as the picture is (forward warping when
+ * the warp is layered), and nothing fills its own holes. Returns as stereo_dibr_render().
  */
 STEREO_DIBR_EXPORT int stereo_dibr_render_layer(stereo_dibr *dibr, const struct stereo_dibr_params *p, const float *table, int table_size,
     const struct stereo_dibr_picture *picture, const struct stereo_dibr_depth *depth, int role, const struct stereo_dibr_picture *layer,
-    const struct stereo_dibr_depth *layer_depth, struct stereo_dibr_picture *left, struct stereo_dibr_picture *right);
+    const float *layer_table, int layer_table_size, const struct stereo_dibr_depth *layer_depth, struct stereo_dibr_picture *left,
+    struct stereo_dibr_picture *right);
 
 #ifdef __cplusplus
 }
