@@ -33,14 +33,21 @@ configure_file(src/policy/stereo-policy.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 
 # Depth-image-based rendering without Qt, for any program that turns a picture and its depth into stereo
-add_library(StereoDibr SHARED src/dibr/stereo-dibr.c src/dibr/stereo-depth.c src/dibr/stereo-dibr.h)
+# The GLSL passes of the DIBR core, built into the library as byte arrays and installed for other programs
+file(GLOB STEREO_DIBR_GLSL CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/dibr/glsl/*.frag ${CMAKE_CURRENT_SOURCE_DIR}/src/dibr/glsl/*.vert)
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr-glsl.c
+    COMMAND ${CMAKE_COMMAND} -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr-glsl.c "-DFILES=${STEREO_DIBR_GLSL}" -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedGlsl.cmake
+    DEPENDS ${STEREO_DIBR_GLSL} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedGlsl.cmake VERBATIM)
+add_library(StereoDibr SHARED src/dibr/stereo-dibr.c src/dibr/stereo-depth.c src/dibr/stereo-dibr.h src/dibr/stereo-dibr-gl.c src/dibr/stereo-dibr-gl.h
+    ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr-glsl.c)
 add_library(Stereo::Dibr ALIAS StereoDibr)
 set_target_properties(StereoDibr PROPERTIES OUTPUT_NAME stereo-dibr VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Dibr
     C_STANDARD 11 C_VISIBILITY_PRESET hidden)
 target_link_libraries(StereoDibr PRIVATE m)
 target_include_directories(StereoDibr PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/dibr> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-dibr>)
 install(TARGETS StereoDibr EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
-install(FILES src/dibr/stereo-dibr.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-dibr)
+install(FILES src/dibr/stereo-dibr.h src/dibr/stereo-dibr-gl.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-dibr)
+install(FILES ${STEREO_DIBR_GLSL} DESTINATION ${KDE_INSTALL_DATADIR}/stereo-dibr/glsl)
 configure_file(src/dibr/stereo-dibr.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 
