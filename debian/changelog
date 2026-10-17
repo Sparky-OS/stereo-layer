@@ -1,3 +1,19 @@
+stereo-layer (1.8.0-1) unstable; urgency=medium
+
+  * Picture::load() and Picture::loadPair() read a depthSeparate picture's
+    depth map as the reader's second image (the edition's KImageFormats gives
+    HEIF and AVIF depth items, Dynamic Depth, GDepth and Apple's portrait
+    photos so) and draw its views; new overloads take the user's DepthOptions
+    and the picture the views are drawn from (as shown, or the original
+    before the camera's effects, a reader's third image).
+  * Depth marks 0.2 (docs/depth-marks.md): how readers give the images, and
+    the phones' formats: Apple's depth description first, Dynamic Depth,
+    GDepth, and the auxiliary images that are no depth.
+  * libstereo-layer1 depends on kimageformat6-plugins 6.30.0-1+stereo3d3,
+    the readers that give pictures with their depth map.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sat, 17 Oct 2026 08:45:29 -0300
+
 stereo-layer (1.7.0-1) unstable; urgency=medium
 
   * Depth marks (docs/depth-marks.md, version 0.1): the depth layouts of
