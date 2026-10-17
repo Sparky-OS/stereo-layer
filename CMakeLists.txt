@@ -60,7 +60,7 @@ add_library(Stereo::Layer ALIAS StereoLayer)
 ecm_generate_export_header(StereoLayer BASE_NAME STEREO_LAYER VERSION ${PROJECT_VERSION} EXPORT_FILE_NAME stereo_layer_export.h)
 set_target_properties(StereoLayer PROPERTIES OUTPUT_NAME stereo-layer VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Layer)
 target_include_directories(StereoLayer PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/picture> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/video> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/widgets> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/output> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/quick> $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-layer>)
-target_link_libraries(StereoLayer PUBLIC Qt6::Gui Qt6::Quick PRIVATE StereoPolicy Qt6::Widgets Qt6::GuiPrivate KF6::Screen ZLIB::ZLIB PkgConfig::STEREO_DECLARE PkgConfig::WAYLAND)
+target_link_libraries(StereoLayer PUBLIC Qt6::Gui Qt6::Quick PRIVATE StereoPolicy StereoDibr Qt6::Widgets Qt6::GuiPrivate KF6::Screen ZLIB::ZLIB PkgConfig::STEREO_DECLARE PkgConfig::WAYLAND)
 target_include_directories(StereoLayer PRIVATE src/wayland)
 qt6_generate_wayland_protocol_client_sources(StereoLayer FILES ${WAYLAND_PROTOCOLS_DIR}/stable/viewporter/viewporter.xml)
 qt_add_qml_module(StereoLayer URI org.sparky.stereo VERSION 1.0

@@ -104,7 +104,10 @@ void PictureItem::setSwapEyes(bool swap)
 int PictureItem::inputLayout() const { return int(d->options.inputLayout); }
 void PictureItem::setInputLayout(int layout)
 {
-    if (layout >= 0 && layout <= int(Picture::Layout::SideBySideQuincunx) && layout != inputLayout()) {
+    if (layout >= 0
+        && (layout <= int(Picture::Layout::SideBySideQuincunx)
+            || (layout >= int(Picture::Layout::DepthSideBySide) && layout <= int(Picture::Layout::DepthBackground)))
+        && layout != inputLayout()) {
         d->options.inputLayout = Picture::Layout(layout);
         reload();
         Q_EMIT optionsChanged();

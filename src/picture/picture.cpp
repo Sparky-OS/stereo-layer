@@ -4,6 +4,7 @@
 #include "picture.h"
 #include "mark_p.h"
 #include "panorama_p.h"
+#include "stereo-dibr.h"
 #include "stereo-policy.h"
 
 #include <QByteArrayView>
@@ -14,6 +15,7 @@
 #include <QXmlStreamReader>
 #include <QtEndian>
 #include <algorithm>
+#include <vector>
 #include <zlib.h>
 
 namespace Stereo
@@ -382,6 +384,12 @@ Picture fromImagesComparing(const QImage &image, const QImage &second, const QSt
         result = Picture::fromAnaglyph(image, anaglyph);
         if (order == EyeOrder::RightFirst)
             result = result.swapped();
+    } else if (packing == Layout::DepthSeparate) {
+        // the depth map is the file's second image
+        const QString depthMark = image.text(QStringLiteral("Stereo3DDepth")).isEmpty() ? second.text(QStringLiteral("Stereo3DDepth"))
+                                                                                        : image.text(QStringLiteral("Stereo3DDepth"));
+        result = second.isNull() ? Picture() : Picture::fromDepth(image, second, depthMark);
+        result.layout = result.isStereo() ? packing : Layout::None;
     } else if (packing == Layout::MultiView) {
         result.left = image;
         result.right = second;
@@ -478,11 +486,176 @@ Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder or
         const int height = image.height() / 2;
         result.left = image.copy(0, 0, image.width(), height);
         result.right = image.copy(0, height, image.width(), height);
+    } else if (layout >= Layout::DepthSideBySide && layout <= Layout::DepthBackground) {
+        // a picture and its depth in one frame: the views are drawn, so the order is where the picture is
+        const QString depthMark = image.text(QStringLiteral("Stereo3DDepth"));
+        const int w = image.width(), h = image.height();
+        Picture drawn;
+        if (layout == Layout::DepthSideBySide && w % 2 == 0 && w >= 2) {
+            const QImage first = image.copy(0, 0, w / 2, h), second = image.copy(w / 2, 0, w / 2, h);
+            drawn = order == EyeOrder::LeftFirst ? fromDepth(first, second, depthMark) : fromDepth(second, first, depthMark);
+        } else if (layout == Layout::DepthTopAndBottom && h % 2 == 0 && h >= 2) {
+            const QImage first = image.copy(0, 0, w, h / 2), second = image.copy(0, h / 2, w, h / 2);
+            drawn = order == EyeOrder::LeftFirst ? fromDepth(first, second, depthMark) : fromDepth(second, first, depthMark);
+        } else if (layout == Layout::DepthGraphics && h % 4 == 0 && h >= 4) {
+            const int q = h / 4;
+            drawn = fromDepth(
+                image.copy(0, 0, w, q), image.copy(0, q, w, q), depthMark, {}, image.copy(0, 2 * q, w, q), image.copy(0, 3 * q, w, q), false);
+        } else if (layout == Layout::DepthBackground && w % 2 == 0 && h % 2 == 0 && w >= 2 && h >= 2) {
+            const int hw = w / 2, hh = h / 2;
+            drawn = fromDepth(
+                image.copy(0, 0, hw, hh), image.copy(hw, 0, hw, hh), depthMark, {}, image.copy(0, hh, hw, hh), image.copy(hw, hh, hw, hh), true);
+        }
+        if (drawn.isStereo()) {
+            result.left = drawn.left;
+            result.right = drawn.right;
+        } else {
+            result.layout = Layout::None;
+        }
+        result.original = image;
+        return result;
     } else {
         result.layout = Layout::None;
     }
     result.original = image;
     return order == EyeOrder::RightFirst ? result.swapped() : result;
+}
+
+namespace
+{
+// An image as planes for libstereo-dibr: RGBA, 8 or 16 bits a sample.
+struct Planes {
+    int bytes = 1;
+    std::vector<uint8_t> data[4];
+    stereo_dibr_picture picture {};
+};
+
+void toPlanes(const QImage &image, Planes &planes, bool wide)
+{
+    const QImage source = image.convertToFormat(wide ? QImage::Format_RGBA64 : QImage::Format_RGBA8888);
+    const int w = source.width(), h = source.height();
+    planes.bytes = wide ? 2 : 1;
+    planes.picture.width = w;
+    planes.picture.height = h;
+    planes.picture.nb_planes = 4;
+    for (int k = 0; k < 4; k++) {
+        planes.data[k].assign(size_t(w) * h * planes.bytes, 0);
+        planes.picture.plane[k] = { planes.data[k].data(), ptrdiff_t(w) * planes.bytes, planes.bytes, 0, 0, k == 3 ? (wide ? 65535u : 255u) : 0u };
+    }
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            for (int k = 0; k < 4; k++) {
+                if (wide)
+                    reinterpret_cast<uint16_t *>(planes.data[k].data())[size_t(y) * w + x]
+                        = reinterpret_cast<const uint16_t *>(source.constScanLine(y))[4 * x + k];
+                else
+                    planes.data[k][size_t(y) * w + x] = source.constScanLine(y)[4 * x + k];
+            }
+        }
+    }
+}
+
+QImage fromPlanes(const Planes &planes)
+{
+    const int w = planes.picture.width, h = planes.picture.height;
+    const bool wide = planes.bytes == 2;
+    QImage image(w, h, wide ? QImage::Format_RGBA64 : QImage::Format_RGBA8888);
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            for (int k = 0; k < 4; k++) {
+                if (wide)
+                    reinterpret_cast<uint16_t *>(image.scanLine(y))[4 * x + k]
+                        = reinterpret_cast<const uint16_t *>(planes.data[k].data())[size_t(y) * w + x];
+                else
+                    image.scanLine(y)[4 * x + k] = planes.data[k][size_t(y) * w + x];
+            }
+        }
+    }
+    return image;
+}
+
+// A depth map as one plane of samples: 16 bits when the image has more than 8 a channel.
+QImage depthPlane(const QImage &depth)
+{
+    const bool wide = depth.format() == QImage::Format_Grayscale16 || depth.depth() >= 48;
+    return depth.convertToFormat(wide ? QImage::Format_Grayscale16 : QImage::Format_Grayscale8);
+}
+}
+
+Picture Picture::fromDepth(const QImage &picture, const QImage &depth, const QString &depthMark, const DepthOptions &options, const QImage &layer,
+    const QImage &layerDepth, bool layerIsBackground)
+{
+    Picture result;
+    result.original = picture;
+    if (picture.isNull() || depth.isNull() || (!layer.isNull() && (layer.size() != picture.size() || layerDepth.isNull()))) {
+        return result;
+    }
+    const QImage plane = depthPlane(depth);
+    const int bits = plane.format() == QImage::Format_Grayscale16 ? 16 : 8;
+
+    // what the samples mean: the mark, over the options' range, screen and shift
+    stereo_depth_convention convention {};
+    convention.kind = STEREO_DEPTH_NEARNESS;
+    convention.bits = bits;
+    convention.zero = options.zero;
+    convention.range = options.range;
+    convention.shift = options.shift;
+    uint16_t model[65];
+    int nbModel = 0;
+    if (!depthMark.isEmpty() && stereo_depth_read_mark(depthMark.toUtf8().constData(), &convention, model, &nbModel) < 0) {
+        return result;
+    }
+    convention.bits = bits;
+    std::vector<uint16_t> lut;
+    if (convention.kind == STEREO_DEPTH_NONLINEAR_DISPARITY && nbModel >= 3) {
+        lut.resize(size_t(1) << bits);
+        if (stereo_depth_nonlinear_lut(model, nbModel, bits, lut.data()) == 0)
+            convention.lut = lut.data();
+    }
+    std::vector<float> table(size_t(1) << bits);
+    if (stereo_depth_parallax_table(&convention, picture.width(), table.data()) < 0) {
+        return result;
+    }
+
+    const bool wide = picture.depth() > 32;
+    Planes in, left, right, second;
+    toPlanes(picture, in, wide);
+    toPlanes(picture, left, wide);
+    toPlanes(picture, right, wide);
+    const stereo_dibr_depth depthMap { plane.constBits(), plane.bytesPerLine(), bits / 8, plane.width(), plane.height() };
+    stereo_dibr_params params;
+    stereo_dibr_params_default(&params);
+    params.view = options.view == DepthOptions::View::Center ? STEREO_DIBR_VIEW_CENTER : STEREO_DIBR_VIEW_LEFT;
+    params.warp = int(options.warp);
+    params.fill = int(options.fill);
+    params.smooth = options.smooth ? STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN : STEREO_DIBR_SMOOTH_OFF;
+    params.sigma_h = options.sigmaH;
+    params.sigma_v = options.sigmaV;
+    params.radius = options.radius;
+
+    stereo_dibr *dibr = stereo_dibr_alloc();
+    int ret = -2;
+    if (dibr && layer.isNull()) {
+        ret = stereo_dibr_render(dibr, &params, table.data(), int(table.size()), &in.picture, &depthMap, &left.picture, &right.picture);
+    } else if (dibr) {
+        toPlanes(layer, second, wide);
+        const QImage layerPlane = depthPlane(layerDepth).convertToFormat(plane.format());
+        const stereo_dibr_depth layerMap { layerPlane.constBits(), layerPlane.bytesPerLine(), bits / 8, layerPlane.width(), layerPlane.height() };
+        // a layer's samples of 0 hold nothing: no background there, no graphics there
+        std::vector<float> layerTable = table;
+        layerTable[0] = NAN;
+        ret = stereo_dibr_render_layer(dibr, &params, table.data(), int(table.size()), &in.picture, &depthMap,
+            layerIsBackground ? STEREO_DIBR_LAYER_BACKGROUND : STEREO_DIBR_LAYER_OVERLAY, &second.picture, layerTable.data(), int(layerTable.size()),
+            &layerMap, &left.picture, &right.picture);
+    }
+    stereo_dibr_free(dibr);
+    if (ret != 0) {
+        return result;
+    }
+    result.left = fromPlanes(left);
+    result.right = fromPlanes(right);
+    result.layout = Layout::DepthSeparate;
+    return result;
 }
 
 bool Picture::isStereo() const { return layout != Layout::None && !left.isNull() && !right.isNull(); }

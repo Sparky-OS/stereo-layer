@@ -45,6 +45,9 @@ private Q_SLOTS:
     void upconversion();
     void swapOverMark();
     void storedCorrection();
+    void depthLayouts_data();
+    void depthLayouts();
+    void depthSeparate();
 };
 // A scene of smooth texture, sums of waves, one set per seed (the same as policytest.c).
 static double scene(double x, double y, int seed)
@@ -794,6 +797,137 @@ void PictureTest::storedCorrection()
     QVERIFY(Picture::setUserSwapEyes(path, false));
     QVERIFY(!Picture::userSwapEyes(path));
     QCOMPARE(Picture::loadPair(path, QSize(256, 256), {}).left.pixelColor(64, 64), QColor(Qt::red));
+}
+
+// A picture of vertical stripes with a near square on a far background, as a depth map of 2D-plus-depth: larger
+// samples nearer, the screen in the middle. The right eye shows the square moved left and the background right by
+// range / 2 at this width.
+static QImage stripes(int w, int h)
+{
+    QImage image(w, h, QImage::Format_RGBA8888);
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+            image.setPixelColor(x, y, QColor((x * 16) % 256, x >= 40 && x < 60 ? 240 : 60, 128));
+    return image;
+}
+
+static QImage depthOf(int w, int h, int nearSample, int farSample)
+{
+    QImage depth(w, h, QImage::Format_Grayscale8);
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+            depth.scanLine(y)[x] = uchar(x >= 40 && x < 60 ? nearSample : farSample);
+    return depth;
+}
+
+void PictureTest::depthLayouts_data()
+{
+    QTest::addColumn<QString>("mark");
+    QTest::newRow("side by side, picture first") << QStringLiteral("depthSideBySidePictureFirst");
+    QTest::newRow("side by side, depth first") << QStringLiteral("depthSideBySideDepthFirst");
+    QTest::newRow("top and bottom, picture first") << QStringLiteral("depthTopBottomPictureFirst");
+    QTest::newRow("top and bottom, depth first") << QStringLiteral("depthTopBottomDepthFirst");
+    QTest::newRow("graphics") << QStringLiteral("depthGraphicsTopBottom");
+    QTest::newRow("background") << QStringLiteral("depthBackgroundQuarters");
+}
+
+// Each depth layout, marked, packed into one frame: the left eye is the picture, the right one shows the near square
+// 8 pixels further left than the background around it (parallax -4 against +4 at 128 wide, range 60 at 1920).
+void PictureTest::depthLayouts()
+{
+    QFETCH(QString, mark);
+    const int w = 128, h = 32;
+    const QImage pic = stripes(w, h);
+    const QImage depth = depthOf(w, h, 255, 0);
+    QImage frame;
+    const bool sbs = mark.startsWith(QLatin1String("depthSideBySide")), depthFirst = mark.endsWith(QLatin1String("DepthFirst"));
+    const QImage depthRgba = depth.convertToFormat(QImage::Format_RGBA8888);
+    QImage graphics(w, h, QImage::Format_RGBA8888), graphicsDepth(w, h, QImage::Format_Grayscale8);
+    graphics.fill(QColor(255, 255, 0));
+    graphicsDepth.fill(0);
+    for (int y = 4; y < 8; y++)
+        for (int x = 4; x < 20; x++)
+            graphicsDepth.scanLine(y)[x] = 255; // a bar of graphics in front
+    if (sbs || mark.startsWith(QLatin1String("depthTopBottom"))) {
+        frame = QImage(sbs ? 2 * w : w, sbs ? h : 2 * h, QImage::Format_RGBA8888);
+        QPainter painter(&frame);
+        painter.drawImage(0, 0, depthFirst ? depthRgba : pic);
+        painter.drawImage(sbs ? w : 0, sbs ? 0 : h, depthFirst ? pic : depthRgba);
+    } else if (mark == QLatin1String("depthGraphicsTopBottom")) {
+        frame = QImage(w, 4 * h, QImage::Format_RGBA8888);
+        QPainter painter(&frame);
+        painter.drawImage(0, 0, pic);
+        painter.drawImage(0, h, depthRgba);
+        painter.drawImage(0, 2 * h, graphics);
+        painter.drawImage(0, 3 * h, graphicsDepth.convertToFormat(QImage::Format_RGBA8888));
+    } else {
+        frame = QImage(2 * w, 2 * h, QImage::Format_RGBA8888);
+        QPainter painter(&frame);
+        painter.drawImage(0, 0, pic);
+        painter.drawImage(w, 0, depthRgba);
+        QImage background = pic;
+        background.fill(QColor(0, 0, 255));
+        painter.drawImage(0, h, background); // what the square hides: blue
+        painter.drawImage(w, h, depthOf(w, h, 1, 1).convertToFormat(QImage::Format_RGBA8888)); // all of it far (0 is no background)
+    }
+    frame.setText(QStringLiteral("Stereo3DDepth"), QStringLiteral("nearness range=60"));
+    Picture::Layout layout;
+    Picture::EyeOrder order;
+    {
+        // the mark as a reader reports it
+        QBuffer buffer;
+        buffer.open(QIODevice::WriteOnly);
+        QImage marked = frame;
+        marked.setText(QStringLiteral("Stereo3DLayout"), mark);
+        QVERIFY(marked.save(&buffer, "PNG"));
+        const Picture loaded
+            = Picture::fromImages(QImage::fromData(buffer.data(), "PNG"), {}, mark, "png", buffer.data().left(1024), {}, OutputMode::Stereo);
+        QVERIFY(loaded.isStereo());
+        layout = loaded.layout;
+        order = depthFirst ? Picture::EyeOrder::RightFirst : Picture::EyeOrder::LeftFirst;
+        QVERIFY(layout >= Picture::Layout::DepthSideBySide && layout <= Picture::Layout::DepthBackground);
+    }
+    const Picture views = Picture::fromPackedImage(frame, layout, order);
+    QVERIFY(views.isStereo());
+    QCOMPARE(views.left.size(), QSize(w, h));
+    const int y = 20;
+    // the left eye is the picture (the graphics drawn in it at their place)
+    QCOMPARE(views.left.pixelColor(30, y), pic.pixelColor(30, y));
+    // the right eye: the square's pixel 45 at 41, the background's pixel 70 at 74
+    QCOMPARE(views.right.pixelColor(41, y), pic.pixelColor(45, y));
+    QCOMPARE(views.right.pixelColor(74, y), pic.pixelColor(70, y));
+    if (mark == QLatin1String("depthGraphicsTopBottom")) {
+        QCOMPARE(views.left.pixelColor(10, 5), QColor(255, 255, 0));
+        QCOMPARE(views.right.pixelColor(6, 5), QColor(255, 255, 0)); // graphics in front, 4 left
+        QCOMPARE(views.right.pixelColor(30, 5), pic.pixelColor(26, 5)); // no graphics there
+    }
+    if (mark == QLatin1String("depthBackgroundQuarters")) {
+        // the disocclusion right of the square shows the background layer (blue), not the stripes extended
+        QCOMPARE(views.right.pixelColor(60, y), QColor(0, 0, 255));
+    }
+}
+
+// The depth map as a second image (an HEIF depth item, a Dynamic Depth container item), with a Dynamic Depth range.
+void PictureTest::depthSeparate()
+{
+    const int w = 128, h = 32;
+    const QImage pic = stripes(w, h);
+    // RangeInverse between Near and Far: 0 near, 255 far
+    QImage depth = depthOf(w, h, 0, 255);
+    depth.setText(QStringLiteral("Stereo3DDepth"), QStringLiteral("rangeInverse near=1 far=4 range=60"));
+    const Picture views = Picture::fromImages(pic, depth, QStringLiteral("depthSeparate"), "png", {}, {}, OutputMode::Stereo);
+    QVERIFY(views.isStereo());
+    QCOMPARE(views.layout, Picture::Layout::DepthSeparate);
+    QCOMPARE(views.right.pixelColor(41, 20), pic.pixelColor(45, 20));
+    // a malformed mark draws nothing: the picture stays one picture
+    QImage bad = depth;
+    bad.setText(QStringLiteral("Stereo3DDepth"), QStringLiteral("z near"));
+    QVERIFY(!Picture::fromDepth(pic, bad, bad.text(QStringLiteral("Stereo3DDepth"))).isStereo());
+    // the user swaps the drawn eyes
+    Picture::Options swap;
+    swap.swapEyes = true;
+    const Picture swapped = Picture::fromImages(pic, depth, QStringLiteral("depthSeparate"), "png", {}, swap, OutputMode::Stereo);
+    QCOMPARE(swapped.left.pixelColor(41, 20), pic.pixelColor(45, 20));
 }
 
 QTEST_MAIN(PictureTest)

@@ -10,6 +10,18 @@ namespace Stereo
 {
 enum class OutputMode { Unknown, Mono, Stereo, Anaglyph };
 
+// How the views are drawn from a picture and its depth (libstereo-dibr, stereo-dibr.h): every path a choice. range,
+// zero and shift are for depth whose mark gives none (pixels of a view 1920 wide; zero from 0, the farthest, to 1).
+struct DepthOptions {
+    enum class View { Left, Center } view = View::Left;
+    enum class Warp { Forward, Backward, Layered } warp = Warp::Forward;
+    enum class Fill { Background, DepthAided, Telea, None } fill = Fill::Background;
+    bool smooth = false;
+    double sigmaH = 10.0, sigmaV = 30.0;
+    int radius = 5;
+    double range = 58.0, zero = 0.5, shift = 0.0;
+};
+
 class STEREO_LAYER_EXPORT Picture
 {
 public:
@@ -17,7 +29,27 @@ public:
     // SideBySideQuincunx: side by side, each view quincunx sampled. FrameSequential and BlockLaced alternate views in time or
     // in a stream's blocks: a still never has
     // them, a video frame holds one view of them.
-    enum class Layout { None, SideBySide, TopAndBottom, MultiView, Rows, Columns, Checkerboard, SideBySideQuincunx, FrameSequential, BlockLaced };
+    // The depth layouts (docs/depth-marks.md) hold a picture and its depth map, from which the views are drawn
+    // (fromDepth()): next to each other, one above the other, four rows (picture, depth, graphics, graphics depth: HDMI
+    // 1.4a "L + depth + graphics + graphics-depth"), four quarters (picture, depth, background, background depth), or the
+    // depth map as an image of its own. For them EyeOrder::LeftFirst is the picture first, RightFirst the depth first.
+    enum class Layout {
+        None,
+        SideBySide,
+        TopAndBottom,
+        MultiView,
+        Rows,
+        Columns,
+        Checkerboard,
+        SideBySideQuincunx,
+        FrameSequential,
+        BlockLaced,
+        DepthSideBySide,
+        DepthTopAndBottom,
+        DepthGraphics,
+        DepthBackground,
+        DepthSeparate
+    };
     enum class EyeOrder { LeftFirst, RightFirst };
     enum class AnaglyphColorPair { None, RedCyan, GreenMagenta, AmberBlue };
     enum class Source { None, FileMark, User, Format, Detection, Shape };
@@ -38,6 +70,13 @@ public:
     static Picture fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
         const Options &options, OutputMode output);
     static Picture fromPackedImage(const QImage &image, Layout layout, EyeOrder order);
+    using DepthOptions = Stereo::DepthOptions;
+    // The two views of picture drawn from depth, a gray image of any size (8 or 16 bits), read by depthMark, the
+    // Stereo3DDepth mark of docs/depth-marks.md ("nearness" when empty: larger samples nearer). layer and layerDepth,
+    // when given, are a second layer of the picture's size: the background it hides (layerIsBackground) or graphics over
+    // it. The views have the picture's size; null when the images cannot be read or the mark is malformed.
+    static Picture fromDepth(const QImage &picture, const QImage &depth, const QString &depthMark, const DepthOptions &options = {},
+        const QImage &layer = {}, const QImage &layerDepth = {}, bool layerIsBackground = true);
     static Picture fromAnaglyph(const QImage &image, AnaglyphColorPair pair);
     static AnaglyphColorPair detectAnaglyph(const QImage &image);
     // Whether the two halves of an unmarked picture are views of one scene, by its pixels, on a reduced copy
