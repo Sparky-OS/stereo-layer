@@ -1,0 +1,3 @@
+usr/include/stereo-dibr/*
+usr/lib/*/libstereo-dibr.so
+usr/lib/*/pkgconfig/stereo-dibr.pc

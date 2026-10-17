@@ -47,3 +47,25 @@ Architecture: any
 Depends: libstereo-policy1 (= ${binary:Version}), ${misc:Depends}
 Description: Development files for the shared stereo policy without Qt
  The C header stereo-policy.h and the pkg-config file stereo-policy.pc.
+
+Package: libstereo-dibr1
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Depth-image-based rendering for programs without Qt
+ A picture and its depth map become the two views of full side by side: the
+ depth conventions of H.265 and H.264 (inverse Z, disparity, Z, non-linear
+ disparity), the depth and parallax maps of ISO/IEC 23002-3 and plain
+ 2D-plus-depth; the picture as the left eye or the middle; forward, backward
+ or layered warping; background extension, depth-aided or Telea hole filling;
+ optional asymmetric smoothing of the depth. One core for FFmpeg's dibr filter,
+ players and the desktop, so they all draw the same views.
+ .
+ Sparky Stereo OS, Daniel Ramos's edition of SparkyLinux (by Paweł "pavroo"
+ Pijanowski).
+
+Package: libstereo-dibr-dev
+Section: libdevel
+Architecture: any
+Depends: libstereo-dibr1 (= ${binary:Version}), ${misc:Depends}
+Description: Development files for depth-image-based rendering without Qt
+ The C header stereo-dibr.h and the pkg-config file stereo-dibr.pc.

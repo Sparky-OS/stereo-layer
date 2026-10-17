@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+libdir=@KDE_INSTALL_FULL_LIBDIR@
+includedir=@KDE_INSTALL_FULL_INCLUDEDIR@/stereo-dibr
+
+Name: stereo-dibr
+Description: Depth-image-based rendering of Sparky Stereo OS, without Qt: a picture and its depth map to full side by side
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lstereo-dibr
+Libs.private: -lm
+Cflags: -I${includedir}

@@ -32,6 +32,18 @@ install(FILES src/policy/stereo-policy.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/s
 configure_file(src/policy/stereo-policy.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 
+# Depth-image-based rendering without Qt, for any program that turns a picture and its depth into stereo
+add_library(StereoDibr SHARED src/dibr/stereo-dibr.c src/dibr/stereo-depth.c src/dibr/stereo-dibr.h)
+add_library(Stereo::Dibr ALIAS StereoDibr)
+set_target_properties(StereoDibr PROPERTIES OUTPUT_NAME stereo-dibr VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Dibr
+    C_STANDARD 11 C_VISIBILITY_PRESET hidden)
+target_link_libraries(StereoDibr PRIVATE m)
+target_include_directories(StereoDibr PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/dibr> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-dibr>)
+install(TARGETS StereoDibr EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+install(FILES src/dibr/stereo-dibr.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-dibr)
+configure_file(src/dibr/stereo-dibr.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
+
 add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/mark.cpp src/picture/anaglyph.cpp src/picture/panorama.cpp src/picture/render.cpp
     src/video/video.cpp src/video/video.h
     src/output/screenmode.cpp src/output/screenmode.h
