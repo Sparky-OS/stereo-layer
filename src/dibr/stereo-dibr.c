@@ -935,3 +935,81 @@ int stereo_dibr_render_layer(stereo_dibr *d, const struct stereo_dibr_params *p,
         return -1;
     return render(d, p, table, table_size, picture, depth, role, layer, layer_table, layer_table_size, layer_depth, left, right);
 }
+
+/* the part of frame from (x, y), w by h in the first plane's samples, as a picture of its own */
+static int part(const struct stereo_dibr_picture *frame, int x, int y, int w, int h, struct stereo_dibr_picture *out)
+{
+    *out = *frame;
+    out->width = w;
+    out->height = h;
+    for (int i = 0; i < frame->nb_planes; i++) {
+        const struct stereo_dibr_plane *pl = &frame->plane[i];
+        const int mw = (1 << pl->log2_w) - 1, mh = (1 << pl->log2_h) - 1;
+        if ((x & mw) || (y & mh) || (w & mw) || (h & mh))
+            return -1;
+        out->plane[i].data = (uint8_t *)pl->data + (ptrdiff_t)(y >> pl->log2_h) * pl->stride + (ptrdiff_t)(x >> pl->log2_w) * pl->bytes;
+    }
+    return 0;
+}
+
+static int depth_part(const struct stereo_dibr_picture *frame, int plane, int x, int y, int w, int h, struct stereo_dibr_depth *out)
+{
+    const struct stereo_dibr_plane *pl = &frame->plane[plane];
+    out->data = (const uint8_t *)pl->data + (ptrdiff_t)(y >> pl->log2_h) * pl->stride + (ptrdiff_t)(x >> pl->log2_w) * pl->bytes;
+    out->stride = pl->stride;
+    out->bytes = pl->bytes;
+    out->width = w >> pl->log2_w;
+    out->height = h >> pl->log2_h;
+    return out->width > 0 && out->height > 0 ? 0 : -1;
+}
+
+int stereo_dibr_unpack(const struct stereo_dibr_picture *frame, int packing, int depth_first, int depth_plane, struct stereo_dibr_parts *parts)
+{
+    if (!frame || !parts || frame->nb_planes < 1 || frame->nb_planes > 4 || depth_plane < 0 || depth_plane >= frame->nb_planes)
+        return -1;
+    memset(parts, 0, sizeof(*parts));
+    const int w = frame->width, h = frame->height;
+    /* the picture, its depth, the layer and the layer's depth: x, y, w, h each */
+    int r[4][4] = { { 0 } };
+    switch (packing) {
+    case STEREO_DIBR_PACKING_SIDE_BY_SIDE:
+        r[0][0] = depth_first ? w / 2 : 0;
+        r[1][0] = depth_first ? 0 : w / 2;
+        r[0][2] = r[1][2] = w / 2;
+        r[0][3] = r[1][3] = h;
+        break;
+    case STEREO_DIBR_PACKING_TOP_BOTTOM:
+        r[0][1] = depth_first ? h / 2 : 0;
+        r[1][1] = depth_first ? 0 : h / 2;
+        r[0][2] = r[1][2] = w;
+        r[0][3] = r[1][3] = h / 2;
+        break;
+    case STEREO_DIBR_PACKING_GRAPHICS:
+        for (int i = 0; i < 4; i++) {
+            r[i][1] = i * (h / 4);
+            r[i][2] = w;
+            r[i][3] = h / 4;
+        }
+        parts->layer_role = STEREO_DIBR_LAYER_OVERLAY;
+        break;
+    case STEREO_DIBR_PACKING_BACKGROUND:
+        for (int i = 0; i < 4; i++) {
+            r[i][0] = i % 2 ? w / 2 : 0;
+            r[i][1] = i / 2 ? h / 2 : 0;
+            r[i][2] = w / 2;
+            r[i][3] = h / 2;
+        }
+        parts->layer_role = STEREO_DIBR_LAYER_BACKGROUND;
+        break;
+    default:
+        return -1;
+    }
+    if (r[0][2] <= 0 || r[0][3] <= 0 || part(frame, r[0][0], r[0][1], r[0][2], r[0][3], &parts->picture) < 0 ||
+        depth_part(frame, depth_plane, r[1][0], r[1][1], r[1][2], r[1][3], &parts->depth) < 0)
+        return -1;
+    if (packing >= STEREO_DIBR_PACKING_GRAPHICS &&
+        (part(frame, r[2][0], r[2][1], r[2][2], r[2][3], &parts->layer) < 0 ||
+         depth_part(frame, depth_plane, r[3][0], r[3][1], r[3][2], r[3][3], &parts->layer_depth) < 0))
+        return -1;
+    return 0;
+}

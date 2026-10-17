@@ -131,7 +131,7 @@ These requests are drafted and have not been sent.
 ## Implementations
 
 - [libstereo-policy](../src/policy/stereo-policy.h) reads the layouts (`stereo_policy_read_mark()`, `stereo_policy_is_depth_layout()`).
-- [libstereo-dibr](../src/dibr/stereo-dibr.h) reads `Stereo3DDepth` (`stereo_depth_read_mark()`, `stereo_depth_write_mark()`), gives each sample its parallax (`stereo_depth_parallax_table()`) and draws the views, in C and in GLSL ([stereo-dibr-gl.h](../src/dibr/stereo-dibr-gl.h)).
+- [libstereo-dibr](../src/dibr/stereo-dibr.h) reads `Stereo3DDepth` (`stereo_depth_read_mark()`, `stereo_depth_write_mark()`), gives each sample its parallax (`stereo_depth_parallax_table()`), finds the parts of a frame packed in a depth layout (`stereo_dibr_unpack()`) and draws the views, in C and in GLSL ([stereo-dibr-gl.h](../src/dibr/stereo-dibr-gl.h)).
 - [libstereo-layer](../src/picture/picture.h) draws marked pictures for the edition's viewers (`Picture::fromDepth()`), and loads them from any reader that gives them as above (`Picture::load()`, `Picture::loadPair()`, with the user's `DepthOptions` and `DepthPicture`).
 - The edition's [KImageFormats](https://invent.kde.org/danielcamposramos/kimageformats/-/tree/stereo3d) reads HEIF and AVIF depth items, Dynamic Depth, GDepth and Apple's portrait JPEGs this way, and HEIF and AVIF stereo pair groups ('ster', ISO/IEC 23008-12:2025 6.8.5) as `multiViewLeftFirst` or `multiViewRightFirst`.
 - The edition's FFmpeg exports the SEI messages, the HEIF and MPEG-2 depth signalling and the H.265 depth layer, and its `dibr` filter draws full side by side through libstereo-dibr.

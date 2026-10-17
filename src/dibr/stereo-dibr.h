@@ -227,6 +227,43 @@ STEREO_DIBR_EXPORT int stereo_dibr_render_layer(stereo_dibr *dibr, const struct 
     const float *layer_table, int layer_table_size, const struct stereo_dibr_depth *layer_depth, struct stereo_dibr_picture *left,
     struct stereo_dibr_picture *right);
 
+/*
+ * The packings of a picture with its depth map in one frame: the depth layouts of docs/depth-marks.md (Stereo3DLayout;
+ * libstereo-policy's STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE and on, in the same order).
+ */
+enum stereo_dibr_packing {
+    /* depthSideBySidePictureFirst and DepthFirst: the picture and its depth map in the halves */
+    STEREO_DIBR_PACKING_SIDE_BY_SIDE = 0,
+    /* depthTopBottomPictureFirst and DepthFirst: HDMI 1.4a "L + depth" (3D_Structure 0100, Figure H-5) */
+    STEREO_DIBR_PACKING_TOP_BOTTOM = 1,
+    /* depthGraphicsTopBottom: four rows from the top, the picture, its depth map, graphics and their depth map
+     * (3D_Structure 0101, Figure H-6) */
+    STEREO_DIBR_PACKING_GRAPHICS = 2,
+    /* depthBackgroundQuarters: the picture (top left), its depth map (top right), the background it hides (bottom left),
+     * the background's depth map (bottom right) */
+    STEREO_DIBR_PACKING_BACKGROUND = 3,
+};
+
+/* The parts of a packed frame, as stereo_dibr_unpack() finds them. */
+struct stereo_dibr_parts {
+    struct stereo_dibr_picture picture;
+    struct stereo_dibr_depth depth;
+    /* the second layer, for GRAPHICS (an overlay) and BACKGROUND; width 0 for the others */
+    struct stereo_dibr_picture layer;
+    struct stereo_dibr_depth layer_depth;
+    int layer_role; /* enum stereo_dibr_layer_role */
+};
+
+/*
+ * The parts of frame, packed as packing says (depth_first for the side by side and top and bottom packings with the
+ * depth map first): views of its planes, nothing copied. A depth map is the gray of its part of plane depth_plane (the
+ * luma of a YUV frame; the plane of RGB that holds the gray, all three being equal). Each part is drawn with
+ * stereo_dibr_render() or, with its layer, stereo_dibr_render_layer(), and has the size of the views. Returns 0, or -1
+ * for a bad argument or a frame too small to be cut where its planes' subsampling allows.
+ */
+STEREO_DIBR_EXPORT int stereo_dibr_unpack(
+    const struct stereo_dibr_picture *frame, int packing, int depth_first, int depth_plane, struct stereo_dibr_parts *parts);
+
 #ifdef __cplusplus
 }
 #endif

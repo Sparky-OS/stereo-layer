@@ -661,6 +661,126 @@ static void layers(void)
     image_free(&right);
 }
 
+/* The parts of every packing: each found where docs/depth-marks.md puts it, and the views drawn from a packed frame
+ * equal to those drawn from the same picture and depth apart. */
+static void unpack(void)
+{
+    const int w = 32, h = 16;
+    struct stereo_depth_convention c = { 0 };
+    c.kind = STEREO_DEPTH_NEARNESS;
+    c.bits = 8;
+    c.zero = 0.5;
+    c.range = 58.0 * 1920 / 64;
+    float table[256];
+    CHECK(stereo_depth_parallax_table(&c, w, table) == 0);
+    struct stereo_dibr_params prm;
+    stereo_dibr_params_default(&prm);
+    stereo_dibr *d = stereo_dibr_alloc();
+    for (int packing = 0; packing < 4; packing++)
+        for (int depth_first = 0; depth_first < (packing < 2 ? 2 : 1); depth_first++) {
+            /* the frame: two by one, one by two, four rows or four quarters of w by h */
+            const int fw = packing == STEREO_DIBR_PACKING_TOP_BOTTOM || packing == STEREO_DIBR_PACKING_GRAPHICS ? w : 2 * w;
+            const int fh = packing == STEREO_DIBR_PACKING_SIDE_BY_SIDE ? h : packing == STEREO_DIBR_PACKING_GRAPHICS ? 4 * h : 2 * h;
+            struct image frame, pic, depth, layer, layer_depth, left[2], right[2];
+            image_init(&frame, fw, fh, 1, 1);
+            image_init(&pic, w, h, 1, 1);
+            image_init(&depth, w, h, 1, 0);
+            image_init(&layer, w, h, 1, 1);
+            image_init(&layer_depth, w, h, 1, 0);
+            for (int k = 0; k < 2; k++) {
+                image_init(&left[k], w, h, 1, 1);
+                image_init(&right[k], w, h, 1, 1);
+            }
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++) {
+                    set_px(&pic, 0, x, y, 20 + 5 * x + y);
+                    set_px(&depth, 0, x, y, x >= 10 && x < 20 ? 230 : 40);
+                    set_px(&layer, 0, x, y, 200 - 3 * x);
+                    set_px(&layer_depth, 0, x, y, x >= 4 && x < 8 ? 250 : 0);
+                    if (!(x & 1) && !(y & 1)) {
+                        set_px(&pic, 1, x / 2, y / 2, 60 + x);
+                        set_px(&pic, 2, x / 2, y / 2, 90 + y);
+                        set_px(&layer, 1, x / 2, y / 2, 128);
+                        set_px(&layer, 2, x / 2, y / 2, 128);
+                    }
+                }
+            /* where each part goes, in samples of the first plane */
+            int at[4][2];
+            switch (packing) {
+            case STEREO_DIBR_PACKING_SIDE_BY_SIDE:
+                at[0][0] = depth_first ? w : 0, at[0][1] = 0, at[1][0] = depth_first ? 0 : w, at[1][1] = 0;
+                break;
+            case STEREO_DIBR_PACKING_TOP_BOTTOM:
+                at[0][0] = 0, at[0][1] = depth_first ? h : 0, at[1][0] = 0, at[1][1] = depth_first ? 0 : h;
+                break;
+            case STEREO_DIBR_PACKING_GRAPHICS:
+                for (int i = 0; i < 4; i++)
+                    at[i][0] = 0, at[i][1] = i * h;
+                break;
+            default:
+                for (int i = 0; i < 4; i++)
+                    at[i][0] = i % 2 ? w : 0, at[i][1] = i / 2 ? h : 0;
+            }
+            struct image *src[4] = { &pic, &depth, &layer, &layer_depth };
+            for (int i = 0; i < (packing >= STEREO_DIBR_PACKING_GRAPHICS ? 4 : 2); i++)
+                for (int k = 0; k < 3; k++) {
+                    const int sh = k ? 1 : 0;
+                    for (int y = 0; y < h >> sh; y++)
+                        for (int x = 0; x < w >> sh; x++)
+                            set_px(&frame, k, (at[i][0] >> sh) + x, (at[i][1] >> sh) + y,
+                                   k < src[i]->pic.nb_planes ? px(src[i], k, x, y) : 128);
+                }
+            struct stereo_dibr_parts parts;
+            CHECK(stereo_dibr_unpack(&frame.pic, packing, depth_first, 0, &parts) == 0);
+            CHECK(parts.picture.width == w && parts.picture.height == h && parts.depth.width == w && parts.depth.height == h);
+            CHECK(parts.picture.plane[0].data == frame.buf[0] + at[0][1] * frame.pic.plane[0].stride + at[0][0]);
+            CHECK(parts.picture.plane[1].data == frame.buf[1] + (at[0][1] / 2) * frame.pic.plane[1].stride + at[0][0] / 2);
+            CHECK(parts.depth.data == frame.buf[0] + at[1][1] * frame.pic.plane[0].stride + at[1][0]);
+            float layer_table[256];
+            memcpy(layer_table, table, sizeof(layer_table));
+            layer_table[0] = NAN;
+            if (packing >= STEREO_DIBR_PACKING_GRAPHICS) {
+                CHECK(parts.layer.width == w && parts.layer_depth.height == h);
+                CHECK(parts.layer_role == (packing == STEREO_DIBR_PACKING_GRAPHICS ? STEREO_DIBR_LAYER_OVERLAY : STEREO_DIBR_LAYER_BACKGROUND));
+                CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &parts.picture, &parts.depth, parts.layer_role, &parts.layer, layer_table, 256,
+                                               &parts.layer_depth, &left[0].pic, &right[0].pic) == 0);
+                const struct stereo_dibr_depth dm = { depth.buf[0], depth.pic.plane[0].stride, 1, w, h };
+                const struct stereo_dibr_depth lm = { layer_depth.buf[0], layer_depth.pic.plane[0].stride, 1, w, h };
+                CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, parts.layer_role, &layer.pic, layer_table, 256, &lm, &left[1].pic,
+                                               &right[1].pic) == 0);
+            } else {
+                CHECK(parts.layer.width == 0);
+                CHECK(stereo_dibr_render(d, &prm, table, 256, &parts.picture, &parts.depth, &left[0].pic, &right[0].pic) == 0);
+                const struct stereo_dibr_depth dm = { depth.buf[0], depth.pic.plane[0].stride, 1, w, h };
+                CHECK(stereo_dibr_render(d, &prm, table, 256, &pic.pic, &dm, &left[1].pic, &right[1].pic) == 0);
+            }
+            int differ = 0;
+            for (int k = 0; k < 3; k++)
+                for (int y = 0; y < h >> (k ? 1 : 0); y++)
+                    for (int x = 0; x < w >> (k ? 1 : 0); x++)
+                        differ += px(&left[0], k, x, y) != px(&left[1], k, x, y) || px(&right[0], k, x, y) != px(&right[1], k, x, y);
+            CHECK(differ == 0);
+            image_free(&frame);
+            image_free(&pic);
+            image_free(&depth);
+            image_free(&layer);
+            image_free(&layer_depth);
+            for (int k = 0; k < 2; k++) {
+                image_free(&left[k]);
+                image_free(&right[k]);
+            }
+        }
+    /* bad arguments: an unknown packing, a plane that is not there, a frame too small for its subsampling */
+    struct image odd;
+    image_init(&odd, 6, 2, 1, 1);
+    struct stereo_dibr_parts parts;
+    CHECK(stereo_dibr_unpack(&odd.pic, 7, 0, 0, &parts) == -1);
+    CHECK(stereo_dibr_unpack(&odd.pic, STEREO_DIBR_PACKING_SIDE_BY_SIDE, 0, 3, &parts) == -1);
+    CHECK(stereo_dibr_unpack(&odd.pic, STEREO_DIBR_PACKING_GRAPHICS, 0, 0, &parts) == -1);
+    image_free(&odd);
+    stereo_dibr_free(d);
+}
+
 int main(void)
 {
     conventions();
@@ -680,6 +800,7 @@ int main(void)
     depth_marks();
     invalid_depth();
     layers();
+    unpack();
     if (failures)
         fprintf(stderr, "%d failures\n", failures);
     return failures != 0;
