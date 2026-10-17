@@ -7,3 +7,6 @@ override_dh_auto_configure:
 
 override_dh_auto_test:
 	QT_QPA_PLATFORM=offscreen CTEST_OUTPUT_ON_FAILURE=1 dh_auto_test
+
+override_dh_makeshlibs:
+	dh_makeshlibs -V

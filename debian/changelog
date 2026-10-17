@@ -1,3 +1,15 @@
+stereo-layer (1.9.0-1) unstable; urgency=medium
+
+  * libstereo-dibr: stereo_dibr_unpack() finds the parts of a frame packed
+    in a depth layout (side by side or top and bottom, the picture or the
+    depth first, with graphics, over a background), for the players that
+    draw such frames.
+  * The libraries' dependencies ask for the version they were built
+    against (dh_makeshlibs -V): a program that uses a new function needs
+    the release that has it.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sat, 17 Oct 2026 11:08:09 -0300
+
 stereo-layer (1.8.0-1) unstable; urgency=medium
 
   * Picture::load() and Picture::loadPair() read a depthSeparate picture's
