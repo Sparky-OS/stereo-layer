@@ -67,20 +67,28 @@ enum stereo_depth_kind {
 };
 
 struct stereo_depth_convention {
-    int kind;                       /* an enum stereo_depth_kind */
-    int bits;                       /* bits per depth sample, 1 to 16 */
-    double zero;                    /* NEARNESS and the kinds that read as it: where the screen is, 0 to 1 */
-    double range;                   /* the same: the largest parallax either side of the screen, in pixels of a view
-                                       1920 wide (any value: no limit) */
-    double shift;                   /* every kind: a parallax added to all, pixels of a view 1920 wide (a horizontal
-                                       image translation, which moves the whole scene behind or in front) */
-    int z_present;                  /* Z: ZNear and ZFar given */
+    /* an enum stereo_depth_kind */
+    int kind;
+    /* bits per depth sample, 1 to 16 */
+    int bits;
+    /* NEARNESS and the kinds that read as it: where the screen is, 0 to 1 */
+    double zero;
+    /* the same: the largest parallax either side of the screen, in pixels of a view 1920 wide (any value: no limit) */
+    double range;
+    /* every kind: a parallax added to all, pixels of a view 1920 wide (a horizontal image translation, which moves the
+     * whole scene behind or in front) */
+    double shift;
+    /* Z: ZNear and ZFar given */
+    int z_present;
     double z_near, z_far;
-    int d_present;                  /* DISPARITY, NONLINEAR_DISPARITY: DMin and DMax given */
+    /* DISPARITY, NONLINEAR_DISPARITY: DMin and DMax given, in luma sample widths of a view d_width wide */
+    int d_present;
     double d_min, d_max;
-    int d_width;                    /* the width of the view DMin and DMax are measured in */
-    const uint16_t *lut;            /* NONLINEAR_DISPARITY: DepthLUT[0] to DepthLUT[maxVal] */
-    double parallax_zero;           /* PARALLAX */
+    int d_width;
+    /* NONLINEAR_DISPARITY: DepthLUT[0] to DepthLUT[maxVal] */
+    const uint16_t *lut;
+    /* PARALLAX */
+    double parallax_zero;
     double parallax_scale;
     double wref;
 };
@@ -92,8 +100,8 @@ struct stereo_depth_convention {
 STEREO_DIBR_EXPORT int stereo_depth_parallax_table(const struct stereo_depth_convention *c, int width, float *table);
 
 enum stereo_dibr_view {
-    STEREO_DIBR_VIEW_LEFT = 0,      /* the picture is the left eye */
-    STEREO_DIBR_VIEW_CENTER = 1,    /* the picture is the middle */
+    STEREO_DIBR_VIEW_LEFT = 0, /* the picture is the left eye */
+    STEREO_DIBR_VIEW_CENTER = 1, /* the picture is the middle */
 };
 
 enum stereo_dibr_warp {
@@ -115,12 +123,12 @@ enum stereo_dibr_smooth {
 };
 
 struct stereo_dibr_params {
-    int view;                       /* an enum stereo_dibr_view */
-    int warp;                       /* an enum stereo_dibr_warp */
-    int fill;                       /* an enum stereo_dibr_fill */
-    int smooth;                     /* an enum stereo_dibr_smooth */
-    double sigma_h, sigma_v;        /* the Gaussian's standard deviations, pixels of a view 1920 wide */
-    int radius;                     /* depth-aided and Telea: the neighbourhood, pixels (Telea's epsilon) */
+    int view; /* an enum stereo_dibr_view */
+    int warp; /* an enum stereo_dibr_warp */
+    int fill; /* an enum stereo_dibr_fill */
+    int smooth; /* an enum stereo_dibr_smooth */
+    double sigma_h, sigma_v; /* the Gaussian's standard deviations, pixels of a view 1920 wide */
+    int radius; /* depth-aided and Telea: the neighbourhood, pixels (Telea's epsilon) */
 };
 
 /* The default parameters: left eye, forward warping, background extension, no smoothing; sigma 10 and 30, radius 5. */
@@ -129,15 +137,15 @@ STEREO_DIBR_EXPORT void stereo_dibr_params_default(struct stereo_dibr_params *p)
 /* One plane of a planar picture. The first plane is luma (or green, or the only one); the others may be subsampled. */
 struct stereo_dibr_plane {
     void *data;
-    ptrdiff_t stride;               /* bytes from one row to the next */
-    int bytes;                      /* bytes per sample: 1, or 2 for native-endian 16-bit samples */
-    int log2_w, log2_h;             /* subsampling against the first plane */
-    unsigned hole;                  /* FILL_NONE: the value a hole gets (black) */
+    ptrdiff_t stride; /* bytes from one row to the next */
+    int bytes; /* bytes per sample: 1, or 2 for native-endian 16-bit samples */
+    int log2_w, log2_h; /* subsampling against the first plane */
+    unsigned hole; /* FILL_NONE: the value a hole gets (black) */
 };
 
 struct stereo_dibr_picture {
-    int width, height;              /* of the first plane */
-    int nb_planes;                  /* 1 to 4 */
+    int width, height; /* of the first plane */
+    int nb_planes; /* 1 to 4 */
     struct stereo_dibr_plane plane[4];
 };
 

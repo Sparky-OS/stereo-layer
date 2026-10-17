@@ -190,7 +190,8 @@ void VideoTest::viewsTable_data()
 void VideoTest::viewsTable()
 {
     QFETCH(QList<int>, values);
-    const auto views = Video::views(QSize(values[1], values[2]), QSize(values[3], values[4]), QSize(values[5], values[6]), values[7], Picture::Layout(values[0]));
+    const auto views
+        = Video::views(QSize(values[1], values[2]), QSize(values[3], values[4]), QSize(values[5], values[6]), values[7], Picture::Layout(values[0]));
     QCOMPARE(views.full, values[8] == 1);
     const int source = values[9];
     QCOMPARE(int(views.source), source);

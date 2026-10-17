@@ -341,7 +341,8 @@ void PictureTest::shape()
 // a pair only when its halves are views of one scene. A mark or the user's choice is not asked for pixels.
 void PictureTest::shapeAloneIsNotEnough()
 {
-    const QList<QSize> sizes { QSize(4640 / 4, 2088 / 4), QSize(1484, 720), QSize(400, 200), QSize(2400 / 2, 1000 / 2), QSize(2710, 1000), QSize(3200, 900) };
+    const QList<QSize> sizes { QSize(4640 / 4, 2088 / 4), QSize(1484, 720), QSize(400, 200), QSize(2400 / 2, 1000 / 2), QSize(2710, 1000),
+        QSize(3200, 900) };
     for (const QSize &size : sizes) {
         for (const Content content : { Content::OneScene, Content::Unrelated, Content::Flat }) {
             const QImage image = ::picture(size, content);
@@ -352,12 +353,14 @@ void PictureTest::shapeAloneIsNotEnough()
             // the user's choice and the file's marks still make it a pair
             Picture::Options options;
             options.inputLayout = Picture::Layout::SideBySide;
-            QVERIFY2(Picture::fromImages(image, {}, {}, "jpg", {}, options, OutputMode::Stereo).isStereo(), qPrintable(QStringLiteral("%1x%2 content %3").arg(size.width()).arg(size.height()).arg(int(content))));
+            QVERIFY2(Picture::fromImages(image, {}, {}, "jpg", {}, options, OutputMode::Stereo).isStereo(),
+                qPrintable(QStringLiteral("%1x%2 content %3").arg(size.width()).arg(size.height()).arg(int(content))));
             const auto marked = Picture::fromImages(image, {}, QStringLiteral("sideBySideLeftFirst"), "jpg", {}, {}, OutputMode::Stereo);
             QVERIFY(marked.isStereo());
             QCOMPARE(marked.source, Picture::Source::FileMark);
         }
-        QVERIFY2(Picture::fromImages(::picture(size, Content::Pair), {}, {}, "jpg", {}, {}, OutputMode::Stereo).isStereo() == Picture::pairByContent(::picture(size, Content::Pair)),
+        QVERIFY2(Picture::fromImages(::picture(size, Content::Pair), {}, {}, "jpg", {}, {}, OutputMode::Stereo).isStereo()
+                == Picture::pairByContent(::picture(size, Content::Pair)),
             "the twin and the decision agree");
     }
     QVERIFY(!Picture::pairByContent(QImage()));
@@ -452,18 +455,19 @@ void PictureTest::pairAtEverySize()
             QRgb *row = reinterpret_cast<QRgb *>(image.scanLine(y));
             const QRgb *other = reinterpret_cast<const QRgb *>(unrelated.constScanLine(y));
             for (int x = half; x < size.width(); ++x) {
-                const auto mix = [share](int a, int b) {
-                    return qBound(0, qRound(a * (1 - share) + b * share), 255);
-                };
+                const auto mix = [share](int a, int b) { return qBound(0, qRound(a * (1 - share) + b * share), 255); };
                 row[x] = qRgb(mix(qRed(row[x]), qRed(other[x])), mix(qGreen(row[x]), qGreen(other[x])), mix(qBlue(row[x]), qBlue(other[x])));
             }
         }
         const QString path = dir.filePath(QStringLiteral("phone-%1.jpg").arg(step));
         QVERIFY(image.save(path, "jpg", 90));
         const bool viewer = Picture::load(path, {}, OutputMode::Unknown).isStereo();
-        for (const int bound : {128, 256, 384, 512, 768, 1024, 2048}) {
+        for (const int bound : { 128, 256, 384, 512, 768, 1024, 2048 }) {
             QVERIFY2(Picture::loadPair(path, QSize(bound, bound), {}).isStereo() == viewer,
-                     qPrintable(QStringLiteral("step %1 at %2: not as in a viewer (%3)").arg(step).arg(bound).arg(viewer ? QStringLiteral("pair") : QStringLiteral("one"))));
+                qPrintable(QStringLiteral("step %1 at %2: not as in a viewer (%3)")
+                        .arg(step)
+                        .arg(bound)
+                        .arg(viewer ? QStringLiteral("pair") : QStringLiteral("one"))));
         }
         ++(viewer ? pairs : ones);
     }

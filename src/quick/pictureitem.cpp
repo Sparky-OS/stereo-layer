@@ -18,10 +18,7 @@ namespace Stereo
 namespace
 {
 // Only a screen that shows two eyes takes the pair; any other shows the left view alone, as the file's flat picture.
-bool showsTwoEyes(OutputMode mode)
-{
-    return mode == OutputMode::Stereo || mode == OutputMode::Anaglyph;
-}
+bool showsTwoEyes(OutputMode mode) { return mode == OutputMode::Stereo || mode == OutputMode::Anaglyph; }
 }
 struct PictureItem::Private {
     QUrl source;
@@ -208,8 +205,7 @@ QSGNode *PictureItem::updatePaintNode(QSGNode *node, UpdatePaintNodeData *)
     }
     // Drawn flat (a screen with one eye, or no surface of its own yet), a pair shows its left view, as the file's flat picture.
     const QImage &flat = d->picture.isStereo() ? d->picture.left : d->picture.original;
-    auto *texture = window()->createTextureFromImage(
-        renderMono(flat, QSize(qMax(1, qRound(width())), qMax(1, qRound(height()))), d->zoom, d->pan));
+    auto *texture = window()->createTextureFromImage(renderMono(flat, QSize(qMax(1, qRound(width())), qMax(1, qRound(height()))), d->zoom, d->pan));
     if (!texture)
         return nullptr;
     auto *image = new QSGSimpleTextureNode;

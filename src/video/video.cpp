@@ -21,8 +21,8 @@ Video::Layout Video::layout(QSize displaySize, const QString &mark, const Pictur
     int source = 0;
     const QByteArray value = mark.toUtf8();
     // a frame without a size has no shape to go by, but its mark and the user's choice still count
-    if (stereo_policy_video_layout(qMax(1, displaySize.width()), qMax(1, displaySize.height()), value.constData(), forceMono ? STEREO_POLICY_USER_FORCE_2D : int(options.inputLayout),
-            int(options.inputOrder), options.swapEyes, &layout, &order, &source)
+    if (stereo_policy_video_layout(qMax(1, displaySize.width()), qMax(1, displaySize.height()), value.constData(),
+            forceMono ? STEREO_POLICY_USER_FORCE_2D : int(options.inputLayout), int(options.inputOrder), options.swapEyes, &layout, &order, &source)
         == 0) {
         result.layout = Picture::Layout(layout);
         result.eyeOrder = Picture::EyeOrder(order);
@@ -53,20 +53,24 @@ QSize Video::matroskaPlane(QSize codedSize, QSize sampleAspectRatio, Picture::La
 {
     int width = 0;
     int height = 0;
-    if (stereo_policy_matroska_plane(codedSize.width(), codedSize.height(), sampleAspectRatio.width(), sampleAspectRatio.height(), int(layout), &width, &height) != 0) {
+    if (stereo_policy_matroska_plane(
+            codedSize.width(), codedSize.height(), sampleAspectRatio.width(), sampleAspectRatio.height(), int(layout), &width, &height)
+        != 0) {
         return {};
     }
-    return {width, height};
+    return { width, height };
 }
 
 Video::Views Video::views(QSize codedSize, QSize sampleAspectRatio, QSize planeSize, int upsampledAspectRatio, Picture::Layout layout)
 {
     Views result;
     int decidedBy = 0;
-    const int full = stereo_policy_video_views(codedSize.width(), codedSize.height(), sampleAspectRatio.width(), sampleAspectRatio.height(), planeSize.width(),
-        planeSize.height(), upsampledAspectRatio, int(layout), &decidedBy);
+    const int full = stereo_policy_video_views(codedSize.width(), codedSize.height(), sampleAspectRatio.width(), sampleAspectRatio.height(),
+        planeSize.width(), planeSize.height(), upsampledAspectRatio, int(layout), &decidedBy);
     result.full = full == 1;
-    result.source = decidedBy == STEREO_POLICY_VIEWS_BY_MARK ? ViewsSource::Mark : decidedBy == STEREO_POLICY_VIEWS_BY_SHAPE ? ViewsSource::Shape : ViewsSource::Layout;
+    result.source = decidedBy == STEREO_POLICY_VIEWS_BY_MARK ? ViewsSource::Mark
+        : decidedBy == STEREO_POLICY_VIEWS_BY_SHAPE          ? ViewsSource::Shape
+                                                             : ViewsSource::Layout;
     return result;
 }
 }
