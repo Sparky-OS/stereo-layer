@@ -1,3 +1,24 @@
+stereo-layer (1.7.0-1) unstable; urgency=medium
+
+  * Depth marks (docs/depth-marks.md, version 0.1): the depth layouts of
+    Stereo3DLayout (a picture and its depth side by side or top and bottom
+    either way, HDMI 1.4a's four rows with graphics, four quarters with the
+    background, or the depth map on its own) and Stereo3DDepth, what a depth
+    sample means, each tied to its source.
+  * libstereo-policy reads the depth layouts; libstereo-layer draws marked
+    pictures (Picture::fromDepth(), Stereo::DepthOptions).
+  * libstereo-dibr: Dynamic Depth's RangeLinear and RangeInverse, depth
+    sensors' distances with 0 for no measurement, DepthLUT (H.265 equation
+    G-10), the Stereo3DDepth mark read and written in any locale, a second
+    layer (the background a picture hides, or graphics over it), and the
+    whole DIBR core as GLSL passes run in the caller's OpenGL 3.3 or OpenGL
+    ES 3.0 context (stereo-dibr-gl.h; the shaders in
+    /usr/share/stereo-dibr/glsl), tested against the C code.
+  * The sources formatted as .clang-format asks, so the CI's format job
+    passes.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sat, 17 Oct 2026 07:08:16 -0300
+
 stereo-layer (1.6.0-1) unstable; urgency=medium
 
   * New library libstereo-dibr (packages libstereo-dibr1 and
