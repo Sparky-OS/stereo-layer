@@ -62,15 +62,28 @@ public:
         bool swapEyes = false;
     };
 
+    using DepthOptions = Stereo::DepthOptions;
+    // The picture the views of a picture with its depth map are drawn from, when the file also keeps the picture
+    // before the camera's effects (a reader's third image: Dynamic Depth's Original image, GDepth's GImage): the
+    // picture as the file shows it (the default, what a 2D screen shows), or that original.
+    enum class DepthPicture { Shown, Original };
+
     static Picture load(const QString &path, const Options &options, OutputMode output);
+    // load() with the user's choices for pictures with their depth map (fromDepth()): read from the file's readers,
+    // the depth map is their second image (QImageReader::jumpToImage(1)) when the file's Stereo3DLayout is
+    // "depthSeparate", read by its Stereo3DDepth text.
+    static Picture load(const QString &path, const Options &options, const DepthOptions &depthOptions, DepthPicture depthPicture, OutputMode output);
     // For pictures shown small, such as thumbnails: the policy of load() on an output that is not stereo, each image
     // decoded to fit within bound where the reader can, and the views scaled so that the pair side by side fits bound.
     // A file that cannot be a pair (no mark, no stereo format, no stereo shape) is not decoded: the result is empty.
     static Picture loadPair(const QString &path, const QSize &bound, const Options &options);
+    static Picture loadPair(
+        const QString &path, const QSize &bound, const Options &options, const DepthOptions &depthOptions, DepthPicture depthPicture);
     static Picture fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
         const Options &options, OutputMode output);
+    static Picture fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
+        const Options &options, const DepthOptions &depthOptions, OutputMode output);
     static Picture fromPackedImage(const QImage &image, Layout layout, EyeOrder order);
-    using DepthOptions = Stereo::DepthOptions;
     // The two views of picture drawn from depth, a gray image of any size (8 or 16 bits), read by depthMark, the
     // Stereo3DDepth mark of docs/depth-marks.md ("nearness" when empty: larger samples nearer). layer and layerDepth,
     // when given, are a second layer of the picture's size: the background it hides (layerIsBackground) or graphics over

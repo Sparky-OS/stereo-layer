@@ -221,7 +221,15 @@ QImage pairSample(const QString &path, const QSize &size)
 }
 
 Picture fromImagesComparing(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
-    const Picture::Options &options, OutputMode output, const QImage &sample);
+    const Picture::Options &options, OutputMode output, const QImage &sample, const Picture::DepthOptions &depthOptions = {},
+    const QImage &depthPicture = {});
+
+// Whether a reader's second image is a view of the pair (Multi-Picture Format, multiView marks) or the depth map
+// (depthSeparate), so that load() and loadPair() read it.
+bool hasSecondImage(int imageCount, const QByteArray &format, const QString &metadata)
+{
+    return imageCount >= 2 && (format == "mpo" || metadata.startsWith(QLatin1String("multiView")) || metadata == QLatin1String("depthSeparate"));
+}
 
 Picture unpackPng(const QImage &image, Picture::EyeOrder order)
 {
@@ -259,6 +267,11 @@ bool Picture::canStoreUserSwapEyes(const QString &path) { return stereo_policy_f
 
 Picture Picture::load(const QString &path, const Options &fileOptions, OutputMode output)
 {
+    return load(path, fileOptions, DepthOptions(), DepthPicture::Shown, output);
+}
+
+Picture Picture::load(const QString &path, const Options &fileOptions, const DepthOptions &depthOptions, DepthPicture depthPicture, OutputMode output)
+{
     // the user's correction stored with the file, over its mark
     Options options = fileOptions;
     options.swapEyes = options.swapEyes != userSwapEyes(path);
@@ -272,20 +285,31 @@ Picture Picture::load(const QString &path, const Options &fileOptions, OutputMod
     QString metadata = reader.text(QStringLiteral("Stereo3DLayout"));
     const QByteArray detectedFormat = reader.format();
     const QByteArray format = extension == "jps" || extension == "mpo" || extension == "pns" ? extension : detectedFormat;
-    const bool multiView = reader.imageCount() >= 2 && (format == "mpo" || metadata.startsWith(QLatin1String("multiView")));
+    const int imageCount = reader.imageCount();
     const QImage image = reader.read();
     if (metadata.isEmpty()) {
         metadata = image.text(QStringLiteral("Stereo3DLayout"));
     }
     QImage second;
-    if (multiView && reader.jumpToImage(1)) {
+    if (hasSecondImage(imageCount, format, metadata) && reader.jumpToImage(1)) {
         second = reader.read();
     }
+    QImage original;
+    if (metadata == QLatin1String("depthSeparate") && depthPicture == DepthPicture::Original && imageCount >= 3 && reader.jumpToImage(2)) {
+        original = reader.read();
+    }
     const bool pixels = decide(metadata, format, header, !second.isNull(), options).pixels;
-    return fromImagesComparing(image, second, metadata, format, header, options, output, pixels ? pairSample(path, image.size()) : QImage());
+    return fromImagesComparing(
+        image, second, metadata, format, header, options, output, pixels ? pairSample(path, image.size()) : QImage(), depthOptions, original);
 }
 
 Picture Picture::loadPair(const QString &path, const QSize &bound, const Options &fileOptions)
+{
+    return loadPair(path, bound, fileOptions, DepthOptions(), DepthPicture::Shown);
+}
+
+Picture Picture::loadPair(
+    const QString &path, const QSize &bound, const Options &fileOptions, const DepthOptions &depthOptions, DepthPicture depthPicture)
 {
     Options options = fileOptions;
     options.swapEyes = options.swapEyes != userSwapEyes(path);
@@ -298,7 +322,8 @@ Picture Picture::loadPair(const QString &path, const QSize &bound, const Options
     QImageReader reader(&file, extension == "jps" || extension == "mpo" ? extension : QByteArray());
     QString metadata = reader.text(QStringLiteral("Stereo3DLayout"));
     const QByteArray format = extension == "jps" || extension == "mpo" || extension == "pns" ? extension : reader.format();
-    const bool multiView = reader.imageCount() >= 2 && (format == "mpo" || metadata.startsWith(QLatin1String("multiView")));
+    const int imageCount = reader.imageCount();
+    const bool multiView = hasSecondImage(imageCount, format, metadata);
     const QSize size = reader.size();
     const Decision decision = decide(metadata, format, header, multiView, options);
     if (decision.pixels ? decision.panorama || (size.isValid() && !pairByShape(size)) : decision.packing == Layout::None) {
@@ -326,8 +351,12 @@ Picture Picture::loadPair(const QString &path, const QSize &bound, const Options
     if (multiView && reader.jumpToImage(1)) {
         second = read(reader.size());
     }
+    QImage original;
+    if (metadata == QLatin1String("depthSeparate") && depthPicture == DepthPicture::Original && imageCount >= 3 && reader.jumpToImage(2)) {
+        original = read(reader.size());
+    }
     const QImage sample = decision.pixels ? pairSample(path, size) : QImage();
-    Picture result = fromImagesComparing(image, second, metadata, format, header, options, OutputMode::Unknown, sample);
+    Picture result = fromImagesComparing(image, second, metadata, format, header, options, OutputMode::Unknown, sample, depthOptions, original);
     if (!result.isStereo()) {
         return {};
     }
@@ -344,7 +373,7 @@ namespace
 // fromImages(), with the halves of the picture compared on sample, the file's pixels at the size of the comparison
 // (pairSample())
 Picture fromImagesComparing(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
-    const Picture::Options &options, OutputMode output, const QImage &sample)
+    const Picture::Options &options, OutputMode output, const QImage &sample, const Picture::DepthOptions &depthOptions, const QImage &depthPicture)
 {
     using Layout = Picture::Layout;
     using EyeOrder = Picture::EyeOrder;
@@ -388,7 +417,10 @@ Picture fromImagesComparing(const QImage &image, const QImage &second, const QSt
         // the depth map is the file's second image
         const QString depthMark = image.text(QStringLiteral("Stereo3DDepth")).isEmpty() ? second.text(QStringLiteral("Stereo3DDepth"))
                                                                                         : image.text(QStringLiteral("Stereo3DDepth"));
-        result = second.isNull() ? Picture() : Picture::fromDepth(image, second, depthMark);
+        // the views drawn from the picture the user chose (the shown picture, or the original before the camera's
+        // effects), the 2D picture staying the shown one
+        const QImage source = depthPicture.isNull() ? image : depthPicture.scaled(image.size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        result = second.isNull() ? Picture() : Picture::fromDepth(source, second, depthMark, depthOptions);
         result.layout = result.isStereo() ? packing : Layout::None;
     } else if (packing == Layout::MultiView) {
         result.left = image;
@@ -420,6 +452,12 @@ Picture Picture::fromImages(const QImage &image, const QImage &second, const QSt
     const Options &options, OutputMode output)
 {
     return fromImagesComparing(image, second, metadata, format, header, options, output, image);
+}
+
+Picture Picture::fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
+    const Options &options, const DepthOptions &depthOptions, OutputMode output)
+{
+    return fromImagesComparing(image, second, metadata, format, header, options, output, image, depthOptions);
 }
 
 namespace

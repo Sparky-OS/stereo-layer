@@ -3,6 +3,7 @@
 #include "picture.h"
 #include "render.h"
 #include <QBuffer>
+#include <QDataStream>
 #include <QDir>
 #include <QFile>
 #include <QImageReader>
@@ -48,6 +49,9 @@ private Q_SLOTS:
     void depthLayouts_data();
     void depthLayouts();
     void depthSeparate();
+    void depthReaders();
+    void depthReaderControls_data();
+    void depthReaderControls();
 };
 // A scene of smooth texture, sums of waves, one set per seed (the same as policytest.c).
 static double scene(double x, double y, int seed)
@@ -928,6 +932,99 @@ void PictureTest::depthSeparate()
     swap.swapEyes = true;
     const Picture swapped = Picture::fromImages(pic, depth, QStringLiteral("depthSeparate"), "png", {}, swap, OutputMode::Stereo);
     QCOMPARE(swapped.left.pixelColor(41, 20), pic.pixelColor(45, 20));
+}
+
+// A file of autotests/depthreader, read as the edition's readers give pictures with their depth map.
+static QString depthFile(const QTemporaryDir &dir, const QString &name, const QString &layout, const QString &mark, const QList<QImage> &images)
+{
+    const QString path = dir.filePath(name + QStringLiteral(".sldt"));
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly))
+        return {};
+    file.write("SLDT");
+    QDataStream out(&file);
+    out << layout << mark << qint32(images.size());
+    for (const QImage &image : images)
+        out << image;
+    return path;
+}
+
+void PictureTest::depthReaders()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const int w = 128, h = 32;
+    const QImage pic = stripes(w, h);
+    const QImage depth = depthOf(w, h, 0, 255);
+    QImage original = pic;
+    original.invertPixels(QImage::InvertRgb);
+    const QString mark = QStringLiteral("rangeInverse near=1 far=4 range=60");
+    const QString path = depthFile(dir, QStringLiteral("depth"), QStringLiteral("depthSeparate"), mark, { pic, depth, original });
+    QVERIFY(!path.isEmpty());
+
+    // the depth map is the reader's second image
+    const Picture views = Picture::load(path, {}, OutputMode::Stereo);
+    QVERIFY(views.isStereo());
+    QCOMPARE(views.layout, Picture::Layout::DepthSeparate);
+    QCOMPARE(views.source, Picture::Source::FileMark);
+    QCOMPARE(views.original.convertToFormat(pic.format()), pic);
+    QCOMPARE(views.left.pixelColor(10, 20), pic.pixelColor(10, 20));
+    QCOMPARE(views.right.pixelColor(41, 20), pic.pixelColor(45, 20));
+
+    // the user's choice of the picture before the camera's effects, the 2D picture staying the shown one
+    const Picture fromOriginal = Picture::load(path, {}, Picture::DepthOptions(), Picture::DepthPicture::Original, OutputMode::Stereo);
+    QVERIFY(fromOriginal.isStereo());
+    QCOMPARE(fromOriginal.original.convertToFormat(pic.format()), pic);
+    QCOMPARE(fromOriginal.left.pixelColor(10, 20), original.pixelColor(10, 20));
+    QCOMPARE(fromOriginal.right.pixelColor(41, 20), original.pixelColor(45, 20));
+
+    // every option of the drawing reaches it: the picture as the middle view moves both eyes
+    Picture::DepthOptions middle;
+    middle.view = Picture::DepthOptions::View::Center;
+    const Picture centred = Picture::load(path, {}, middle, Picture::DepthPicture::Shown, OutputMode::Stereo);
+    QVERIFY(centred.isStereo());
+    QVERIFY(centred.left != views.left);
+    QVERIFY(centred.right != views.right);
+
+    // thumbnails
+    const Picture pair = Picture::loadPair(path, QSize(256, 64), {});
+    QVERIFY(pair.isStereo());
+    QCOMPARE(pair.layout, Picture::Layout::DepthSeparate);
+
+    // the other view of a stereo pair, as HEIF's 'ster' groups give it
+    QImage other = pic;
+    other.fill(Qt::blue);
+    const QString stereo = depthFile(dir, QStringLiteral("pair"), QStringLiteral("multiViewLeftFirst"), {}, { pic, other });
+    const Picture views2 = Picture::load(stereo, {}, OutputMode::Stereo);
+    QVERIFY(views2.isStereo());
+    QCOMPARE(views2.layout, Picture::Layout::MultiView);
+    QCOMPARE(views2.right.convertToFormat(other.format()), other);
+}
+
+// The controls: without the mark, without the depth map or with a malformed mark, the file is one picture.
+void PictureTest::depthReaderControls_data()
+{
+    QTest::addColumn<QString>("layout");
+    QTest::addColumn<QString>("mark");
+    QTest::addColumn<int>("images");
+    QTest::newRow("no mark") << QString() << QStringLiteral("nearness") << 2;
+    QTest::newRow("no depth map") << QStringLiteral("depthSeparate") << QStringLiteral("nearness") << 1;
+    QTest::newRow("malformed mark") << QStringLiteral("depthSeparate") << QStringLiteral("z near") << 2;
+}
+
+void PictureTest::depthReaderControls()
+{
+    QFETCH(QString, layout);
+    QFETCH(QString, mark);
+    QFETCH(int, images);
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QImage pic = stripes(128, 32);
+    const QList<QImage> all { pic, depthOf(64, 16, 0, 255) };
+    const QString path = depthFile(dir, QStringLiteral("control"), layout, mark, all.mid(0, images));
+    const Picture picture = Picture::load(path, {}, OutputMode::Stereo);
+    QVERIFY(!picture.isStereo());
+    QCOMPARE(picture.original.convertToFormat(pic.format()), pic);
 }
 
 QTEST_MAIN(PictureTest)

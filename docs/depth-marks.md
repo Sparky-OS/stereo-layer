@@ -4,7 +4,7 @@ A picture and its depth map are a stereo format.
 A program that understands them draws the two views from the picture and the depth (depth-image-based rendering), and every other program shows the picture exactly as before.
 These marks say that a file or a stream holds a picture with its depth, how the two are packed, and what a depth sample means.
 
-Status: proposal, version 0.1, 17 October 2026.
+Status: proposal, version 0.2, 17 October 2026 (0.1 the same day; 0.2 adds the readers' images and the phones' formats).
 Editor: Daniel Ramos, for [Sparky Stereo OS](https://github.com/Sparky-OS/sparky-stereo-os).
 Comments and objections are welcome in this repository's issues.
 
@@ -29,6 +29,10 @@ The values sit beside the stereo layouts of [SVGStereo](https://github.com/Spark
 
 The depth map of a packed frame holds gray: a reader takes the first plane of a YUV frame (Y) and the gray level of an RGB one.
 Its samples are read through `Stereo3DDepth`.
+
+A picture reader that gives a `depthSeparate` picture's depth map as an image of its own gives it as its second image (`QImageReader::jumpToImage(1)`), one gray channel, 8 or 16 bits (samples of other depths spread over 16 bits).
+When the file also keeps the picture before the camera's effects (Dynamic Depth's Image with `ItemSemantic` Original, GDepth's `GImage`), the reader gives it as its third image.
+The first image is the picture exactly as the file shows it.
 
 Philips' white paper "3D Interface Specifications" is not available to us: the positions of the WOWvx and Declipse planes come from second-hand descriptions and are unverified.
 The marks themselves are exact: a file marked `depthBackgroundQuarters` has its planes where the table says.
@@ -85,12 +89,22 @@ Readers turn each format's own signalling into these marks, so a player needs on
 |---|---|---|
 | H.264 or H.265 depth representation information SEI (H.264 H.13.2.3, payload 50; H.265 G.14.3.4, payload 177) | as the stream is packed | the type (0 to 3) and its ZNear, ZFar, DMin, DMax and model |
 | H.265 depth auxiliary layer, AuxId 2 (Table F.2) | `depthSeparate` | from its depth representation information, else `nearness` |
-| HEIF depth item: `auxC` "urn:mpeg:hevc:2015:auxid:2", "urn:mpeg:avc:2015:auxid:2" or "urn:mpeg:mpegB:cicp:systems:auxiliary:depth", `auxl` reference (ISO/IEC 23008-12) | `depthSeparate` | from the `aux_subtype`'s depth representation information |
+| HEIF or AVIF depth item: `auxC` "urn:mpeg:hevc:2015:auxid:2", "urn:mpeg:avc:2015:auxid:2" or "urn:mpeg:mpegB:cicp:systems:auxiliary:depth", `auxl` reference (ISO/IEC 23008-12) | `depthSeparate` | Apple's depth description when the depth item has one (below); else the depth representation information SEI message of the `aux_subtype` (a 32-bit length, then NAL units each with a 32-bit length, as libheif reads it); else `nearness` |
+| Apple's depth data description, XMP namespace `http://ns.apple.com/pixeldatainfo/1.0/` on the depth image (HEIF depth item, or a Multi-Picture Format image of a JPEG whose `AuxiliaryImageType` is `disparity` or `depth`) | `depthSeparate` | `NativeFormat` "hdis" or "fdis" (`kCVPixelFormatType_DisparityFloat16` and `Float32`, 1/m): `inverseZ` with `near` and `far` the inverses of the disparities at the largest sample and at 0; "hdep" or "fdep" (metres): `rangeLinear`; the stored samples `IntMinValue` to `IntMaxValue` stand for `FloatMinValue` to `FloatMaxValue`, linearly |
+| Dynamic Depth 1.0 JPEG: the `Device`'s `Container` items after the picture, the `DepthMap` of the Depth Photo profile's camera (else the first camera with one), its item by `DepthURI` | `depthSeparate` | `rangeLinear` or `rangeInverse` with its `Near` and `Far` |
+| GDepth (Google Camera's Lens Blur): `GDepth:Data`, the depth map in base64, usually in the extended XMP (XMP Specification Part 3, 1.1.3.1) | `depthSeparate` | `rangeLinear` or `rangeInverse` with `GDepth:Near` and `GDepth:Far` |
 | MPEG-2 transport or program stream: auxiliary video stream, stream type 0x1E (ISO/IEC 13818-1 2.16, 2.6.74) | `depthSeparate` | a depth map: `nearness` with `zero` = kfar / (kfar + knear); a parallax map: `parallax` (both from si_rbsp, our reading) |
-| Dynamic Depth 1.0 or GDepth (XMP) | `depthSeparate` | `rangeLinear` or `rangeInverse` with Near and Far |
 | Intel RealSense Z16 (a sample times the depth scale is metres) | `depthSeparate` | `metric` |
 | ROS REP 118 16UC1 depth image (millimetres) | `depthSeparate` | `metric` |
 | Android DEPTH16 (13 bits of range in millimetres, 3 bits of confidence) | `depthSeparate` | `metric`, the range bits only |
+
+Apple writes a depth representation information SEI message in its HEIF depth items too, of type 1 (uniform disparity), with the 1/m values of its description in DMin and DMax.
+H.265 G.14.3.4 counts DMin and DMax in luma samples of the view, so Apple's description is read first: read as the SEI message, the whole depth of an iPhone 13 Pro portrait spans 1.4 pixels of parallax in a view 1920 wide, where Apple's description spreads it over the user's range (116 pixels by default).
+
+Some auxiliary images look like depth and are not: Apple's portrait effects matte (`urn:com:apple:photo:2018:aux:portraiteffectsmatte`, "not intended to faithfully preserve all gradations of depth in the scene": a people segmentation), its semantic segmentation mattes and HDR gain maps, and a Dynamic Depth `DepthMap` whose `ItemSemantic` is `Segmentation`.
+Readers never take them for a depth map.
+
+A depth map measured along each pixel's ray (Dynamic Depth's and GDepth's `MeasureType` "OpticRay") rather than along the optical axis is drawn as if it were along the axis; the difference grows towards the corners of the picture.
 
 ## Where the marks are kept
 
@@ -105,7 +119,7 @@ Until they are, and for the meaning of the samples, a Matroska file carries the 
 2. Never take a picture for a picture with its depth by its shape or its colours: only a mark says so.
 3. Draw the two views from the picture and its depth, each at the picture's size, and hand them on as any other stereo pair: on Sparky Stereo OS, full side by side, the left eye first.
 4. On a screen that shows one picture, show the picture unchanged.
-5. Every way of drawing that gives a different picture is the user's choice: the picture as the left eye (the default) or the middle, forward (the default), backward or layered warping, the fill of the disocclusions (background extension by default, depth-aided, Telea's inpainting, none), the smoothing of the depth (off by default), the range, the screen and the shift.
+5. Every way of drawing that gives a different picture is the user's choice: the picture as the left eye (the default) or the middle, forward (the default), backward or layered warping, the fill of the disocclusions (background extension by default, depth-aided, Telea's inpainting, none), the smoothing of the depth (off by default), the range, the screen and the shift, and, when the file keeps both, the picture the views are drawn from (the picture as shown by default, or the original before the camera's effects).
 
 ## Registrations
 
@@ -118,10 +132,11 @@ These requests are drafted and have not been sent.
 
 - [libstereo-policy](../src/policy/stereo-policy.h) reads the layouts (`stereo_policy_read_mark()`, `stereo_policy_is_depth_layout()`).
 - [libstereo-dibr](../src/dibr/stereo-dibr.h) reads `Stereo3DDepth` (`stereo_depth_read_mark()`, `stereo_depth_write_mark()`), gives each sample its parallax (`stereo_depth_parallax_table()`) and draws the views, in C and in GLSL ([stereo-dibr-gl.h](../src/dibr/stereo-dibr-gl.h)).
-- [libstereo-layer](../src/picture/picture.h) draws marked pictures for the edition's viewers (`Picture::fromDepth()`).
+- [libstereo-layer](../src/picture/picture.h) draws marked pictures for the edition's viewers (`Picture::fromDepth()`), and loads them from any reader that gives them as above (`Picture::load()`, `Picture::loadPair()`, with the user's `DepthOptions` and `DepthPicture`).
+- The edition's [KImageFormats](https://invent.kde.org/danielcamposramos/kimageformats/-/tree/stereo3d) reads HEIF and AVIF depth items, Dynamic Depth, GDepth and Apple's portrait JPEGs this way, and HEIF and AVIF stereo pair groups ('ster', ISO/IEC 23008-12:2025 6.8.5) as `multiViewLeftFirst` or `multiViewRightFirst`.
 - The edition's FFmpeg exports the SEI messages, the HEIF and MPEG-2 depth signalling and the H.265 depth layer, and its `dibr` filter draws full side by side through libstereo-dibr.
 
 ## Credits
 
-The depth conventions are those of ITU-T H.264 and H.265 (depth representation information) and of Google's Dynamic Depth 1.0 (CC BY 4.0).
+The depth conventions are those of ITU-T H.264 and H.265 (depth representation information), of Google's Dynamic Depth 1.0 (CC BY 4.0) and depthmap metadata (GDepth, CC BY 4.0), and of Apple's AVDepthData documentation.
 The rendering follows Fehn 2004 (doi:10.1117/12.524762), Zhang and Tam 2005 (doi:10.1109/TBC.2005.846190), Zitnick et al. 2004 (doi:10.1145/1015706.1015766), Shade et al. 1998 (doi:10.1145/280814.280882), Daribo and Saito 2010 (doi:10.1109/TBC.2010.2044296) and Telea 2004 (doi:10.1080/10867651.2004.10487596).
