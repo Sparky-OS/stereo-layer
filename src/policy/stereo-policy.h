@@ -31,7 +31,26 @@ enum stereo_policy_layout {
     STEREO_POLICY_LAYOUT_SIDE_BY_SIDE_QUINCUNX = 7,
     STEREO_POLICY_LAYOUT_FRAME_SEQUENTIAL = 8,
     STEREO_POLICY_LAYOUT_BLOCK_LACED = 9,
+    /* A picture and its depth map in one frame (docs/depth-marks.md): next to each other; one above the other (HDMI
+     * 1.4a's "L + depth", 3D_Structure 0100, Figure H-5, picture first); four rows, picture, depth, graphics and
+     * graphics depth (HDMI 1.4a's 0101, Figure H-6); four quarters, picture, depth, background and background depth.
+     * The libstereo-dibr core draws the two views from them. */
+    STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE = 10,
+    STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM = 11,
+    STEREO_POLICY_LAYOUT_DEPTH_GRAPHICS = 12,
+    STEREO_POLICY_LAYOUT_DEPTH_BACKGROUND = 13,
+    /* A picture whose depth map is an image or a track of its own (an HEIF auxiliary depth item, an MPEG-C Part 3
+     * auxiliary video stream, an H.265 depth layer, a Dynamic Depth container item). */
+    STEREO_POLICY_LAYOUT_DEPTH_SEPARATE = 14,
 };
+
+/* For the side by side and top and bottom depth layouts, which comes first: the picture (the value of LEFT_FIRST) or
+ * the depth map (RIGHT_FIRST). */
+#define STEREO_POLICY_PICTURE_FIRST 0
+#define STEREO_POLICY_DEPTH_FIRST 1
+
+/* Whether a layout holds a picture and its depth rather than two views: 1, else 0. */
+STEREO_POLICY_EXPORT int stereo_policy_is_depth_layout(int layout);
 
 /* A value of user_layout for stereo_policy_video_layout(): the user says the video is not 3D, whatever its mark says. */
 #define STEREO_POLICY_USER_FORCE_2D (-1)
@@ -65,7 +84,9 @@ enum stereo_policy_source {
  * Reads a Stereo3DLayout value exactly: "mono"; sideBySide, sideBySideQuincunx, topBottom, checkerboard,
  * rowInterleaved, columnInterleaved, frameSequential, blockLaced and multiView, each followed by LeftFirst or
  * RightFirst; anaglyphCyanRed and anaglyphGreenMagenta (the red, or the green, view is the left eye's); JPS's
- * anaglyphRedLeft and anaglyphRedRight. Returns 1 for a value of the set, 0 for any other value (one picture: layout
+ * anaglyphRedLeft and anaglyphRedRight; the depth layouts of docs/depth-marks.md, depthSideBySide and depthTopBottom
+ * followed by PictureFirst or DepthFirst (the order PICTURE_FIRST or DEPTH_FIRST), depthGraphicsTopBottom,
+ * depthBackgroundQuarters and depthSeparate. Returns 1 for a value of the set, 0 for any other value (one picture: layout
  * NONE, order LEFT_FIRST, anaglyph NONE), -1 for a bad argument. An output pointer may be null.
  */
 STEREO_POLICY_EXPORT int stereo_policy_read_mark(const char *value, int *layout, int *order, int *anaglyph);

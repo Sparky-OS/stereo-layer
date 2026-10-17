@@ -34,6 +34,19 @@ int stereo_policy_read_mark(const char *value, int *layout, int *order, int *ana
         { "blockLaced", STEREO_POLICY_LAYOUT_BLOCK_LACED },
         { "multiView", STEREO_POLICY_LAYOUT_MULTI_VIEW },
     };
+    static const struct {
+        const char *name;
+        int layout;
+        int order;
+    } depths[] = {
+        { "depthSideBySidePictureFirst", STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE, STEREO_POLICY_PICTURE_FIRST },
+        { "depthSideBySideDepthFirst", STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE, STEREO_POLICY_DEPTH_FIRST },
+        { "depthTopBottomPictureFirst", STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM, STEREO_POLICY_PICTURE_FIRST },
+        { "depthTopBottomDepthFirst", STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM, STEREO_POLICY_DEPTH_FIRST },
+        { "depthGraphicsTopBottom", STEREO_POLICY_LAYOUT_DEPTH_GRAPHICS, STEREO_POLICY_PICTURE_FIRST },
+        { "depthBackgroundQuarters", STEREO_POLICY_LAYOUT_DEPTH_BACKGROUND, STEREO_POLICY_PICTURE_FIRST },
+        { "depthSeparate", STEREO_POLICY_LAYOUT_DEPTH_SEPARATE, STEREO_POLICY_PICTURE_FIRST },
+    };
     set(layout, STEREO_POLICY_LAYOUT_NONE);
     set(order, STEREO_POLICY_LEFT_FIRST);
     set(anaglyph, STEREO_POLICY_ANAGLYPH_NONE);
@@ -41,6 +54,13 @@ int stereo_policy_read_mark(const char *value, int *layout, int *order, int *ana
         return -1;
     if (strcmp(value, "mono") == 0)
         return 1;
+    for (size_t i = 0; i < sizeof(depths) / sizeof(depths[0]); ++i) {
+        if (strcmp(value, depths[i].name) == 0) {
+            set(layout, depths[i].layout);
+            set(order, depths[i].order);
+            return 1;
+        }
+    }
     for (size_t i = 0; i < sizeof(packings) / sizeof(packings[0]); ++i) {
         const size_t length = strlen(packings[i].name);
         if (strncmp(value, packings[i].name, length) != 0)
@@ -66,6 +86,8 @@ int stereo_policy_read_mark(const char *value, int *layout, int *order, int *ana
     return 0;
 }
 
+int stereo_policy_is_depth_layout(int layout) { return layout >= STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE && layout <= STEREO_POLICY_LAYOUT_DEPTH_SEPARATE; }
+
 int stereo_policy_video_side_by_side_by_shape(int width, int height) { return width > 0 && height > 0 && (long long)width >= (long long)height * 3; }
 
 int stereo_policy_picture_pair_by_shape(int width, int height)
@@ -76,8 +98,9 @@ int stereo_policy_picture_pair_by_shape(int width, int height)
 int stereo_policy_video_layout(
     int width, int height, const char *mark, int user_layout, int user_order, int swap_eyes, int *layout, int *order, int *source)
 {
+    /* the user may choose any packing of a frame, the depth ones included; a separate depth map is not one */
     if (width <= 0 || height <= 0 || !layout || !order || !source || user_layout < STEREO_POLICY_USER_FORCE_2D
-        || user_layout > STEREO_POLICY_LAYOUT_BLOCK_LACED)
+        || user_layout > STEREO_POLICY_LAYOUT_DEPTH_BACKGROUND)
         return -1;
     *layout = STEREO_POLICY_LAYOUT_NONE;
     *order = STEREO_POLICY_LEFT_FIRST;
@@ -102,7 +125,9 @@ int stereo_policy_video_layout(
         *layout = STEREO_POLICY_LAYOUT_SIDE_BY_SIDE;
         *source = STEREO_POLICY_SOURCE_SHAPE;
     }
-    if (swap_eyes && *layout != STEREO_POLICY_LAYOUT_NONE)
+    /* the user's swap reverses the eyes; in a depth layout the order is where the picture is, and the swap is the
+     * drawn views' */
+    if (swap_eyes && *layout != STEREO_POLICY_LAYOUT_NONE && !stereo_policy_is_depth_layout(*layout))
         *order = *order == STEREO_POLICY_LEFT_FIRST ? STEREO_POLICY_RIGHT_FIRST : STEREO_POLICY_LEFT_FIRST;
     return 0;
 }
@@ -298,11 +323,21 @@ int stereo_policy_video_views_by_shape(int width, int height, int layout)
         return -1;
     switch (layout) {
     case STEREO_POLICY_LAYOUT_SIDE_BY_SIDE:
+    case STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE:
         /* wider than a single picture can be: two pictures next to each other */
         return (long long)width * STEREO_POLICY_SINGLE_PICTURE_WIDEST_DEN > (long long)height * STEREO_POLICY_SINGLE_PICTURE_WIDEST_NUM;
     case STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM:
+    case STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM:
         /* narrower than a single picture can be: two pictures on top of each other */
         return (long long)width * STEREO_POLICY_SINGLE_PICTURE_NARROWEST_DEN < (long long)height * STEREO_POLICY_SINGLE_PICTURE_NARROWEST_NUM;
+    case STEREO_POLICY_LAYOUT_DEPTH_GRAPHICS:
+        /* narrower than two single pictures on top of each other can be: four pictures */
+        return (long long)width * STEREO_POLICY_SINGLE_PICTURE_NARROWEST_DEN * 2 < (long long)height * STEREO_POLICY_SINGLE_PICTURE_NARROWEST_NUM;
+    case STEREO_POLICY_LAYOUT_DEPTH_BACKGROUND:
+        /* each quarter has the frame's shape: shown at the frame's size */
+        return 0;
+    case STEREO_POLICY_LAYOUT_DEPTH_SEPARATE:
+        return 1;
     case STEREO_POLICY_LAYOUT_ROWS:
     case STEREO_POLICY_LAYOUT_COLUMNS:
     case STEREO_POLICY_LAYOUT_CHECKERBOARD:
@@ -337,10 +372,10 @@ int stereo_policy_matroska_plane(int coded_width, int coded_height, int sar_num,
      * the frame as shown holds both planes: undo it. */
     const long long shown_width = ((long long)coded_width * sar_num + sar_den / 2) / sar_den;
     const long long shown_height = ((long long)coded_height * sar_den + sar_num / 2) / sar_num;
-    if (layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) {
+    if (layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE || layout == STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE) {
         *plane_width = (int)(shown_width / 2);
         *plane_height = coded_height;
-    } else if (layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) {
+    } else if (layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM || layout == STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM) {
         *plane_width = coded_width;
         *plane_height = (int)(shown_height / 2);
     } else {
@@ -359,10 +394,10 @@ int stereo_policy_video_views(int coded_width, int coded_height, int sar_num, in
         sar_den = 1;
     }
     set(decided_by, STEREO_POLICY_VIEWS_BY_LAYOUT);
-    const int packed = layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE || layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM;
+    const int side_by_side = layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE || layout == STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE;
+    const int packed = side_by_side || layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM || layout == STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM;
     if (!packed)
         return stereo_policy_video_views_by_shape(coded_width, coded_height, layout);
-    const int side_by_side = layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE;
 
     /* The container's mark: a Matroska plane size (DisplayWidth and DisplayHeight, RFC 9559 section 18.10, elements
      * 5.1.4.1.28.12 and .13) is the size of one plane, so it says how much of the frame one view is. A plane as large as the frame is

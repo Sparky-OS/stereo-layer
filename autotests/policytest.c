@@ -418,9 +418,65 @@ static void contents(void)
     free(flat);
 }
 
+
+/* The depth layouts of docs/depth-marks.md: their words, the order (where the picture is), the user's choice and swap,
+ * full or half by shape, never by shape alone. */
+static void depthLayouts(void)
+{
+    static const struct {
+        const char *name;
+        int layout;
+        int order;
+    } depths[] = {
+        { "depthSideBySidePictureFirst", STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE, STEREO_POLICY_PICTURE_FIRST },
+        { "depthSideBySideDepthFirst", STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE, STEREO_POLICY_DEPTH_FIRST },
+        { "depthTopBottomPictureFirst", STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM, STEREO_POLICY_PICTURE_FIRST },
+        { "depthTopBottomDepthFirst", STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM, STEREO_POLICY_DEPTH_FIRST },
+        { "depthGraphicsTopBottom", STEREO_POLICY_LAYOUT_DEPTH_GRAPHICS, STEREO_POLICY_PICTURE_FIRST },
+        { "depthBackgroundQuarters", STEREO_POLICY_LAYOUT_DEPTH_BACKGROUND, STEREO_POLICY_PICTURE_FIRST },
+        { "depthSeparate", STEREO_POLICY_LAYOUT_DEPTH_SEPARATE, STEREO_POLICY_PICTURE_FIRST },
+    };
+    int layout, order, anaglyph, source;
+    for (size_t i = 0; i < sizeof(depths) / sizeof(depths[0]); ++i) {
+        CHECK(stereo_policy_read_mark(depths[i].name, &layout, &order, &anaglyph) == 1);
+        CHECK(layout == depths[i].layout && order == depths[i].order && anaglyph == STEREO_POLICY_ANAGLYPH_NONE);
+        CHECK(stereo_policy_is_depth_layout(layout) == 1);
+    }
+    const char *unknown[] = { "depthSideBySide", "depthSideBySideLeftFirst", "depthTopBottom", "depth", "depthSeparateX", "DepthSeparate" };
+    for (size_t i = 0; i < sizeof(unknown) / sizeof(unknown[0]); ++i)
+        CHECK(stereo_policy_read_mark(unknown[i], &layout, &order, &anaglyph) == 0 && layout == STEREO_POLICY_LAYOUT_NONE);
+    CHECK(stereo_policy_is_depth_layout(STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 0 && stereo_policy_is_depth_layout(STEREO_POLICY_LAYOUT_NONE) == 0);
+
+    /* a video marked as a depth layout keeps it, and the user's swap does not move the picture */
+    CHECK(stereo_policy_video_layout(3840, 1080, "depthSideBySideDepthFirst", STEREO_POLICY_LAYOUT_NONE, 0, 1, &layout, &order, &source) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE && order == STEREO_POLICY_DEPTH_FIRST && source == STEREO_POLICY_SOURCE_FILE_MARK);
+    /* the user may choose a depth packing for a frame, not a separate depth map */
+    CHECK(stereo_policy_video_layout(1920, 1080, NULL, STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM, STEREO_POLICY_PICTURE_FIRST, 0, &layout, &order,
+              &source)
+        == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM && source == STEREO_POLICY_SOURCE_USER);
+    CHECK(stereo_policy_video_layout(1920, 1080, NULL, STEREO_POLICY_LAYOUT_DEPTH_SEPARATE, 0, 0, &layout, &order, &source) == -1);
+    /* an unmarked frame twice as wide as a picture is side by side by shape, never a picture and its depth */
+    CHECK(stereo_policy_video_layout(3840, 1080, NULL, STEREO_POLICY_LAYOUT_NONE, 0, 0, &layout, &order, &source) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE);
+
+    /* full or half: as side by side and top and bottom; four rows of full pictures are narrower than two pictures;
+     * quarters are shown at the frame's size; a separate depth map leaves the picture whole */
+    CHECK(stereo_policy_video_full_views(3840, 1080, STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE) == 1);
+    CHECK(stereo_policy_video_full_views(1920, 1080, STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE) == 0);
+    CHECK(stereo_policy_video_full_views(1920, 2160, STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM) == 1);
+    CHECK(stereo_policy_video_full_views(1280, 2880, STEREO_POLICY_LAYOUT_DEPTH_GRAPHICS) == 1);
+    CHECK(stereo_policy_video_full_views(1920, 1080, STEREO_POLICY_LAYOUT_DEPTH_GRAPHICS) == 0);
+    CHECK(stereo_policy_video_full_views(1920, 1080, STEREO_POLICY_LAYOUT_DEPTH_BACKGROUND) == 0);
+    CHECK(stereo_policy_video_full_views(1920, 1080, STEREO_POLICY_LAYOUT_DEPTH_SEPARATE) == 1);
+    int plane_w = 0, plane_h = 0;
+    CHECK(stereo_policy_matroska_plane(1920, 1080, 2, 1, STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE, &plane_w, &plane_h) == 0 && plane_w == 1920);
+}
+
 int main(void)
 {
     marks();
+    depthLayouts();
     fileCorrection();
     videoLayout();
     fullViews();
