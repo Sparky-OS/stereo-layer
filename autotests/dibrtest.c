@@ -7,6 +7,7 @@
 
 #include "stereo-dibr.h"
 
+#include <locale.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -415,6 +416,250 @@ static void smoothing_shrinks_holes(void)
     image_free(&right);
 }
 
+
+/* The kinds of Dynamic Depth 1.0 (RangeLinear, RangeInverse) and of depth sensors (metric, 0 for no measurement). */
+static void source_conventions(void)
+{
+    float t[65536];
+    struct stereo_depth_convention c;
+
+    memset(&c, 0, sizeof(c));
+    c.bits = 8;
+    c.zero = 0.5;
+    c.range = 60.0;
+    /* RangeLinear between Near 1 and Far 4: v = 0 is Near (in front), v = 1 Far (behind); v = 1/3 is d = 2, 1/d = 0.5,
+     * a third of the way from 1/Far to 1/Near, so 60 (0.5 - 1/3) / 0.5 = 20 behind */
+    c.kind = STEREO_DEPTH_RANGE_LINEAR;
+    c.z_present = 1;
+    c.z_near = 1.0;
+    c.z_far = 4.0;
+    CHECK(stereo_depth_parallax_table(&c, 1920, t) == 0);
+    CHECK(NEAR(t[0], -60.0) && NEAR(t[255], 60.0));
+    {
+        const double d = 1.0 + (85.0 / 255.0) * 3.0, near = (1.0 / d - 0.25) / 0.75;
+        CHECK(NEAR(t[85], 60.0 * (0.5 - near) / 0.5));
+    }
+    /* RangeInverse: uniform in 1/d, so farness */
+    c.kind = STEREO_DEPTH_RANGE_INVERSE;
+    CHECK(stereo_depth_parallax_table(&c, 1920, t) == 0);
+    CHECK(NEAR(t[0], -60.0) && NEAR(t[255], 60.0) && fabs(t[128]) < 0.3);
+    /* a sensor in millimetres from 500 to 4000: 0 is no measurement, 500 in front, 4000 behind, 2000 a third */
+    c.kind = STEREO_DEPTH_METRIC;
+    c.bits = 16;
+    c.z_near = 500.0;
+    c.z_far = 4000.0;
+    CHECK(stereo_depth_parallax_table(&c, 1920, t) == 0);
+    CHECK(isnan(t[0]));
+    CHECK(NEAR(t[500], -60.0) && NEAR(t[4000], 60.0));
+    {
+        const double near = (1.0 / 2000 - 1.0 / 4000) / (1.0 / 500 - 1.0 / 4000);
+        CHECK(NEAR(t[2000], 60.0 * (0.5 - near) / 0.5));
+    }
+    /* nearer than Near goes on in front: the range has no limit */
+    CHECK(t[250] < -60.0);
+
+    /* DepthLUT (H.265 equation G-10): no deviation is the identity; a deviation of 20 at the middle node of 8-bit
+     * samples puts (127 - 20, 127 + 20) on the curve */
+    {
+        uint16_t model[3] = { 0, 0, 0 }, lut[256];
+        CHECK(stereo_depth_nonlinear_lut(model, 3, 8, lut) == 0);
+        int identity = 1;
+        for (int i = 0; i < 256; i++)
+            identity &= lut[i] == i;
+        CHECK(identity);
+        model[1] = 20;
+        CHECK(stereo_depth_nonlinear_lut(model, 3, 8, lut) == 0);
+        CHECK(lut[107] == 147 && lut[0] == 0 && lut[255] == 255);
+        CHECK(lut[53] == (uint16_t)floor(53.0 * 147 / 107 + 0.5));
+        CHECK(stereo_depth_nonlinear_lut(model, 2, 8, lut) == -1);
+    }
+}
+
+/* The Stereo3DDepth mark, read and written back, in any locale. */
+static void depth_marks(void)
+{
+    struct stereo_depth_convention c, back;
+    uint16_t model[65];
+    int nb = 0;
+    char buf[512];
+
+    memset(&c, 0, sizeof(c));
+    c.bits = 10;
+    CHECK(stereo_depth_read_mark("inverseZ near=0.25 far=10 zero=0.6 range=40 shift=-3", &c, model, &nb) == 1);
+    CHECK(c.kind == STEREO_DEPTH_INVERSE_Z && c.bits == 10 && c.z_present && NEAR(c.z_near, 0.25) && NEAR(c.z_far, 10));
+    CHECK(NEAR(c.zero, 0.6) && NEAR(c.range, 40) && NEAR(c.shift, -3));
+    CHECK(stereo_depth_write_mark(&c, NULL, 0, buf, sizeof(buf)) > 0);
+    CHECK(strcmp(buf, "inverseZ near=0.25 far=10 zero=0.6 range=40 shift=-3") == 0);
+
+    CHECK(stereo_depth_read_mark("nonlinearDisparity min=-2.5 max=40 width=1920 model=0,20,7,0", &c, model, &nb) == 1);
+    CHECK(c.kind == STEREO_DEPTH_NONLINEAR_DISPARITY && c.d_present && NEAR(c.d_min, -2.5) && c.d_width == 1920);
+    CHECK(nb == 4 && model[1] == 20 && model[2] == 7);
+    CHECK(stereo_depth_write_mark(&c, model, nb, buf, sizeof(buf)) > 0);
+    memset(&back, 0, sizeof(back));
+    CHECK(stereo_depth_read_mark(buf, &back, model, &nb) == 1);
+    CHECK(back.kind == c.kind && NEAR(back.d_min, c.d_min) && NEAR(back.d_max, c.d_max) && back.d_width == c.d_width && nb == 4);
+
+    CHECK(stereo_depth_read_mark("parallax parallaxZero=128 parallaxScale=64 wref=100", &c, NULL, NULL) == 1);
+    CHECK(c.kind == STEREO_DEPTH_PARALLAX && NEAR(c.parallax_scale, 64) && NEAR(c.wref, 100));
+    CHECK(stereo_depth_read_mark("metric near=300 far=5000", &c, NULL, NULL) == 1 && c.kind == STEREO_DEPTH_METRIC && c.z_present);
+    /* one end alone is no range */
+    CHECK(stereo_depth_read_mark("rangeLinear near=1", &c, NULL, NULL) == 1 && !c.z_present);
+    /* unknown kinds leave the convention alone; malformed pairs are refused; unknown keys are skipped */
+    c.kind = STEREO_DEPTH_FARNESS;
+    CHECK(stereo_depth_read_mark("holographic near=1", &c, NULL, NULL) == 0 && c.kind == STEREO_DEPTH_FARNESS);
+    CHECK(stereo_depth_read_mark("z near=1,5 far=3", &c, NULL, NULL) == -1);
+    CHECK(stereo_depth_read_mark("z near", &c, NULL, NULL) == -1);
+    CHECK(stereo_depth_read_mark("nearness confidence=0.9", &c, NULL, NULL) == 1 && c.kind == STEREO_DEPTH_NEARNESS);
+    CHECK(stereo_depth_read_mark(NULL, &c, NULL, NULL) == -1);
+    c.kind = 42;
+    CHECK(stereo_depth_write_mark(&c, NULL, 0, buf, sizeof(buf)) == -1);
+    c.kind = STEREO_DEPTH_NEARNESS;
+    CHECK(stereo_depth_write_mark(&c, NULL, 0, buf, 4) == -1);
+
+    /* a locale with a decimal comma writes and reads the same mark */
+    if (setlocale(LC_NUMERIC, "pt_BR.UTF-8") || setlocale(LC_NUMERIC, "de_DE.UTF-8")) {
+        c.kind = STEREO_DEPTH_Z;
+        c.z_present = 1;
+        c.z_near = 0.5;
+        c.z_far = 7.25;
+        c.zero = 0.5;
+        c.range = 58;
+        c.shift = 0;
+        CHECK(stereo_depth_write_mark(&c, NULL, 0, buf, sizeof(buf)) > 0);
+        CHECK(strcmp(buf, "z near=0.5 far=7.25 zero=0.5 range=58") == 0);
+        CHECK(stereo_depth_read_mark(buf, &back, NULL, NULL) == 1 && NEAR(back.z_far, 7.25));
+        setlocale(LC_NUMERIC, "C");
+    }
+}
+
+/* A sensor's depth with no measurement in a column: the column takes the farther neighbour (the background), so the
+ * near square's edge does not tear and the hole stays the background's. */
+static void invalid_depth(void)
+{
+    struct image pic, left, right, ref_left, ref_right;
+    uint16_t depth[W * H], ref[W * H];
+    static float table[65536];
+    struct stereo_depth_convention c;
+    struct stereo_dibr_params prm;
+    struct stereo_dibr_depth dm = { depth, W * 2, 2, W, H }, rm = { ref, W * 2, 2, W, H };
+    stereo_dibr *d = stereo_dibr_alloc();
+
+    image_init(&pic, W, H, 1, 0);
+    image_init(&left, W, H, 1, 0);
+    image_init(&right, W, H, 1, 0);
+    image_init(&ref_left, W, H, 1, 0);
+    image_init(&ref_right, W, H, 1, 0);
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) {
+            const int in = x >= 24 && x < 40;
+            set_px(&pic, 0, x, y, in ? 200 : 50 + x);
+            depth[y * W + x] = ref[y * W + x] = in ? 800 : 3000;
+            if (x == 44 || x == 45)
+                depth[y * W + x] = 0; /* no measurement, in the background */
+            if (x == 30)
+                depth[y * W + x] = 0; /* no measurement, inside the square */
+        }
+    memset(&c, 0, sizeof(c));
+    c.kind = STEREO_DEPTH_METRIC;
+    c.bits = 16;
+    c.z_present = 1;
+    c.z_near = 800;
+    c.z_far = 3000;
+    c.zero = 0.5;
+    c.range = 180; /* 6 pixels either way at 64 */
+    CHECK(stereo_depth_parallax_table(&c, W, table) == 0);
+    stereo_dibr_params_default(&prm);
+    CHECK(stereo_dibr_render(d, &prm, table, 65536, &pic.pic, &dm, &left.pic, &right.pic) == 0);
+    CHECK(stereo_dibr_render(d, &prm, table, 65536, &pic.pic, &rm, &ref_left.pic, &ref_right.pic) == 0);
+    /* the background columns with no measurement take the background's parallax; inside the square, the farther
+     * neighbour is the square too: the same views as with every sample measured */
+    int diff = 0;
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++)
+            diff += px(&right, 0, x, y) != px(&ref_right, 0, x, y);
+    CHECK(diff == 0);
+    if (diff)
+        fprintf(stderr, "  invalid depth: %d pixels differ\n", diff);
+    stereo_dibr_free(d);
+    image_free(&pic);
+    image_free(&left);
+    image_free(&right);
+    image_free(&ref_left);
+    image_free(&ref_right);
+}
+
+/* A second layer: the background the square hides fills its disocclusion; graphics are drawn over the views at their
+ * own depth and are transparent where their depth holds none. */
+static void layers(void)
+{
+    struct image pic, bg, gfx, left, right;
+    uint8_t depth[W * H], bg_depth[W * H], gfx_depth[W * H];
+    float table[256];
+    struct stereo_dibr_params prm;
+    struct stereo_dibr_depth dm = { depth, W, 1, W, H }, bm = { bg_depth, W, 1, W, H }, gm = { gfx_depth, W, 1, W, H };
+    stereo_dibr *d = stereo_dibr_alloc();
+
+    image_init(&pic, W, H, 1, 0);
+    image_init(&bg, W, H, 1, 0);
+    image_init(&gfx, W, H, 1, 0);
+    image_init(&left, W, H, 1, 0);
+    image_init(&right, W, H, 1, 0);
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) {
+            const int in = x >= 24 && x < 40;
+            set_px(&pic, 0, x, y, in ? 200 : 50);
+            depth[y * W + x] = in ? 255 : 1;
+            /* the background behind the square: 120, at the background's depth */
+            set_px(&bg, 0, x, y, in ? 120 : 50);
+            bg_depth[y * W + x] = 1;
+            /* graphics: a bar at x 4..11, in front; elsewhere no graphics (depth 0) */
+            set_px(&gfx, 0, x, y, 230);
+            gfx_depth[y * W + x] = x >= 4 && x < 12 ? 255 : 0;
+        }
+    for (int i = 0; i < 256; i++)
+        table[i] = 6.0f - 12.0f * i / 255.0f;
+    table[0] = NAN; /* no depth: no graphics, no background */
+    stereo_dibr_params_default(&prm);
+    prm.fill = STEREO_DIBR_FILL_NONE;
+
+    /* the background layer: the 12 columns the square uncovers (34 to 45) show the hidden background's 120 where it
+     * lands (its x 28..39 move 6 right, to 34..45) */
+    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, STEREO_DIBR_LAYER_BACKGROUND, &bg.pic, &bm, &left.pic, &right.pic)
+        == 0);
+    int bad = 0;
+    for (int y = 0; y < H; y++)
+        for (int x = 35; x < 45; x++)
+            bad += px(&right, 0, x, y) != 120;
+    CHECK(bad == 0);
+    if (bad)
+        fprintf(stderr, "  background layer: %d\n", bad);
+
+    /* the overlay: the bar at -6 moves 6 left in the right eye (x -2..5, so 0..5 shown), stays in the left eye */
+    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, STEREO_DIBR_LAYER_OVERLAY, &gfx.pic, &gm, &left.pic, &right.pic) == 0);
+    bad = 0;
+    for (int y = 0; y < H; y++) {
+        for (int x = 4; x < 12; x++)
+            bad += px(&left, 0, x, y) != 230;
+        for (int x = 0; x < 6; x++)
+            bad += px(&right, 0, x, y) != 230;
+        for (int x = 7; x < 18; x++)
+            bad += px(&right, 0, x, y) == 230; /* transparent there: the picture's own pixels */
+        bad += px(&left, 0, 20, y) != 50;
+    }
+    CHECK(bad == 0);
+    if (bad)
+        fprintf(stderr, "  overlay layer: %d\n", bad);
+    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, 7, &gfx.pic, &gm, &left.pic, &right.pic) == -1);
+    CHECK(stereo_dibr_render_layer(d, &prm, table, 256, &pic.pic, &dm, STEREO_DIBR_LAYER_OVERLAY, NULL, &gm, &left.pic, &right.pic) == -1);
+
+    stereo_dibr_free(d);
+    image_free(&pic);
+    image_free(&bg);
+    image_free(&gfx);
+    image_free(&left);
+    image_free(&right);
+}
+
 int main(void)
 {
     conventions();
@@ -430,6 +675,10 @@ int main(void)
             }
     scaled_depth();
     smoothing_shrinks_holes();
+    source_conventions();
+    depth_marks();
+    invalid_depth();
+    layers();
     if (failures)
         fprintf(stderr, "%d failures\n", failures);
     return failures != 0;

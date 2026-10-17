@@ -41,6 +41,8 @@ struct stereo_dibr {
     float *dpar;                /* the parallax at the depth map's size */
     float *val, *vz, *bval, *next, *tt, *bgz;
     uint8_t *hole, *state;
+    float *lpar, *lmap, *lzt, *lval; /* the second layer: its parallax, its view, its samples */
+    uint8_t *lhole;
     int *heap, *heap_pos, *list;
 };
 
@@ -81,6 +83,11 @@ void stereo_dibr_free(stereo_dibr *d)
     free(d->heap);
     free(d->heap_pos);
     free(d->list);
+    free(d->lpar);
+    free(d->lmap);
+    free(d->lzt);
+    free(d->lval);
+    free(d->lhole);
     free(d);
 }
 
@@ -101,7 +108,7 @@ static int buffers(stereo_dibr *d, size_t size, size_t row, size_t depth, size_t
 
     if (size > d->size) {
         if (RESERVE(par, size) || RESERVE(tmp, size) || RESERVE(map, size) || RESERVE(zt, size) || RESERVE(bmap, size)
-            || RESERVE(bzt, size) || RESERVE(balpha, size))
+            || RESERVE(bzt, size) || RESERVE(balpha, size) || RESERVE(lpar, size) || RESERVE(lmap, size) || RESERVE(lzt, size))
             return -1;
         d->size = size;
     }
@@ -119,7 +126,7 @@ static int buffers(stereo_dibr *d, size_t size, size_t row, size_t depth, size_t
     if (plane > d->plane_size) {
         if (RESERVE(val, plane) || RESERVE(vz, plane) || RESERVE(bval, plane) || RESERVE(next, plane) || RESERVE(tt, plane) || RESERVE(bgz, plane)
             || RESERVE(hole, plane) || RESERVE(state, plane) || RESERVE(heap, plane) || RESERVE(heap_pos, plane)
-            || RESERVE(list, plane))
+            || RESERVE(list, plane) || RESERVE(lval, plane) || RESERVE(lhole, plane))
             return -1;
         d->plane_size = plane;
     }
@@ -146,9 +153,50 @@ static inline int clampi(int v, int lo, int hi)
     return v < lo ? lo : v > hi ? hi : v;
 }
 
-/* The parallax of every picture pixel: the table read at the depth map's size, then scaled bilinearly. */
-static void depth_to_parallax(stereo_dibr *d, const float *table, int table_size, const struct stereo_dibr_depth *depth,
-    int w, int h)
+/* A sample with no depth (NaN in the table) takes the farther of its nearest valid neighbours along the row, the
+ * background it most likely belongs to; a row with none takes the nearest row above with depth, else below, else the
+ * screen (glsl/fill_row.frag and fill_column.frag). */
+static void fill_invalid(float *par, int w, int h)
+{
+    for (int y = 0; y < h; y++) {
+        float *row = par + y * w;
+        for (int x = 0; x < w;) {
+            if (!isnan(row[x])) {
+                x++;
+                continue;
+            }
+            const int a = x;
+            while (x < w && isnan(row[x]))
+                x++;
+            const int l = a - 1, r = x;
+            if (l < 0 && r >= w)
+                continue;
+            const float z = l < 0 ? row[r] : r >= w ? row[l] : fmaxf(row[l], row[r]);
+            for (int t = a; t < x; t++)
+                row[t] = z;
+        }
+    }
+    for (int y = 0; y < h; y++) {
+        float *row = par + y * w;
+        if (!isnan(row[0]))
+            continue;
+        int from = -1;
+        for (int k = y - 1; k >= 0 && from < 0; k--)
+            if (!isnan(par[k * w]))
+                from = k;
+        for (int k = y + 1; k < h && from < 0; k++)
+            if (!isnan(par[k * w]))
+                from = k;
+        for (int x = 0; x < w; x++)
+            row[x] = from < 0 ? 0.0f : par[from * w + x];
+    }
+}
+
+/* The parallax of every picture pixel into out: the table read at the depth map's size, then scaled bilinearly (the
+ * nearest sample where a neighbour holds no depth). Samples with no depth are filled when fill is set, and stay NaN
+ * otherwise. */
+static void depth_to_parallax(stereo_dibr *d, const float *table, int table_size, const struct stereo_dibr_depth *depth, int w, int h,
+    float *out, int fill)
 {
     const int dw = depth->width, dh = depth->height;
 
@@ -159,9 +207,11 @@ static void depth_to_parallax(stereo_dibr *d, const float *table, int table_size
             d->dpar[y * dw + x] = table[s < (unsigned)table_size ? s : (unsigned)table_size - 1];
         }
     }
+    if (fill)
+        fill_invalid(d->dpar, dw, dh);
 
     if (dw == w && dh == h) {
-        memcpy(d->par, d->dpar, sizeof(float) * w * h);
+        memcpy(out, d->dpar, sizeof(float) * w * h);
         return;
     }
     for (int y = 0; y < h; y++) {
@@ -174,9 +224,13 @@ static void depth_to_parallax(stereo_dibr *d, const float *table, int table_size
             int x0 = (int)floorf(fx);
             float wx = fx - x0;
             int xa = clampi(x0, 0, dw - 1), xb = clampi(x0 + 1, 0, dw - 1);
-            float top = d->dpar[ya * dw + xa] * (1.0f - wx) + d->dpar[ya * dw + xb] * wx;
-            float bottom = d->dpar[yb * dw + xa] * (1.0f - wx) + d->dpar[yb * dw + xb] * wx;
-            d->par[y * w + x] = top * (1.0f - wy) + bottom * wy;
+            const float aa = d->dpar[ya * dw + xa], ab = d->dpar[ya * dw + xb], ba = d->dpar[yb * dw + xa], bb = d->dpar[yb * dw + xb];
+            if (isnan(aa) || isnan(ab) || isnan(ba) || isnan(bb)) {
+                out[y * w + x] = d->dpar[(wy < 0.5f ? ya : yb) * dw + (wx < 0.5f ? xa : xb)];
+                continue;
+            }
+            const float top = aa * (1.0f - wx) + ab * wx, bottom = ba * (1.0f - wx) + bb * wx;
+            out[y * w + x] = top * (1.0f - wy) + bottom * wy;
         }
     }
 }
@@ -228,9 +282,9 @@ static void splat_row(float max_stretch, int w, float s, const float *p, const f
         zt[t] = FLT_MAX;
     }
     for (int x = 0; x < w; x++) {
-        if (take && !take[x])
+        if ((take && !take[x]) || isnan(p[x]))
             continue;
-        const float pn = x + 1 < w && (!take || take[x + 1]) ? p[x + 1] : p[x];
+        const float pn = x + 1 < w && (!take || take[x + 1]) && !isnan(p[x + 1]) ? p[x + 1] : p[x];
         const float a = x + s * p[x], b = x + 1 + s * pn;
         const float u0 = s0 ? s0[x] : (float)x, u1 = s1 ? s1[x] : (float)(x + 1);
 
@@ -719,21 +773,44 @@ static int check_picture(const struct stereo_dibr_picture *p, const struct stere
     return 0;
 }
 
-int stereo_dibr_render(stereo_dibr *d, const struct stereo_dibr_params *p, const float *table, int table_size,
-    const struct stereo_dibr_picture *picture, const struct stereo_dibr_depth *depth, struct stereo_dibr_picture *left,
-    struct stereo_dibr_picture *right)
+static void warp_view(stereo_dibr *d, const struct stereo_dibr_params *p, int w, int h, float sv, const float *par, float *map, float *zt,
+    int allow_layered)
+{
+    const int layered = allow_layered && p->warp == STEREO_DIBR_WARP_LAYERED;
+
+    for (int y = 0; y < h; y++) {
+        const float *pr = par + y * w;
+        if (layered)
+            warp_layered_row(d, w, sv, pr, map + y * w, zt + y * w, d->bmap + y * w, d->bzt + y * w, d->balpha + y * w);
+        else if (p->warp == STEREO_DIBR_WARP_BACKWARD)
+            warp_backward_row(d, w, sv, pr, map + y * w, zt + y * w);
+        else
+            warp_forward_row(d, w, sv, pr, map + y * w, zt + y * w);
+    }
+}
+
+static int render(stereo_dibr *d, const struct stereo_dibr_params *p, const float *table, int table_size,
+    const struct stereo_dibr_picture *picture, const struct stereo_dibr_depth *depth, int role, const struct stereo_dibr_picture *layer,
+    const struct stereo_dibr_depth *layer_depth, struct stereo_dibr_picture *left, struct stereo_dibr_picture *right)
 {
     if (!d || !p || !table || table_size < 1 || !depth || !depth->data || depth->width <= 0 || depth->height <= 0
         || (depth->bytes != 1 && depth->bytes != 2))
         return -1;
     if (check_picture(picture, NULL) || check_picture(left, picture) || check_picture(right, picture))
         return -1;
+    if (layer
+        && (check_picture(layer, picture) || !layer_depth || !layer_depth->data || layer_depth->width <= 0 || layer_depth->height <= 0
+            || (layer_depth->bytes != 1 && layer_depth->bytes != 2) || (role != STEREO_DIBR_LAYER_BACKGROUND && role != STEREO_DIBR_LAYER_OVERLAY)))
+        return -1;
 
     const int w = picture->width, h = picture->height;
-    if (buffers(d, (size_t)w * h, (size_t)w + 1, (size_t)depth->width * depth->height, (size_t)w * h))
+    size_t depth_size = (size_t)depth->width * depth->height;
+    if (layer && (size_t)layer_depth->width * layer_depth->height > depth_size)
+        depth_size = (size_t)layer_depth->width * layer_depth->height;
+    if (buffers(d, (size_t)w * h, (size_t)w + 1, depth_size, (size_t)w * h))
         return -2;
 
-    depth_to_parallax(d, table, table_size, depth, w, h);
+    depth_to_parallax(d, table, table_size, depth, w, h, d->par, 1);
     /* a smoothed depth is a rubber sheet: the picture stretches over every gap (Zhang and Tam 2005); otherwise a
      * pixel spread over more than two is a disocclusion */
     d->max_stretch = p->smooth == STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN ? FLT_MAX : 2.0f;
@@ -742,25 +819,26 @@ int stereo_dibr_render(stereo_dibr *d, const struct stereo_dibr_params *p, const
         gaussian_pass(d->par, d->tmp, w, h, p->sigma_h * per_1920, 1);
         gaussian_pass(d->tmp, d->par, w, h, p->sigma_v * per_1920, 0);
     }
+    /* the second layer keeps its places with no depth: a background with nothing there, graphics that are not there */
+    if (layer)
+        depth_to_parallax(d, table, table_size, layer_depth, w, h, d->lpar, 0);
 
     for (int eye = 0; eye < 2; eye++) {
         struct stereo_dibr_picture *out = eye ? right : left;
-        if (!eye && p->view == STEREO_DIBR_VIEW_LEFT) {
+        if (!eye && p->view == STEREO_DIBR_VIEW_LEFT && (!layer || role == STEREO_DIBR_LAYER_BACKGROUND)) {
             copy_picture(picture, left);
             continue;
         }
-        const float s = p->view == STEREO_DIBR_VIEW_LEFT ? 1.0f : eye ? 0.5f : -0.5f;
+        const float sv = p->view == STEREO_DIBR_VIEW_LEFT ? (eye ? 1.0f : 0.0f) : eye ? 0.5f : -0.5f;
         const int layered = p->warp == STEREO_DIBR_WARP_LAYERED;
 
-        for (int y = 0; y < h; y++) {
-            const float *pr = d->par + y * w;
-            float *map = d->map + y * w, *zt = d->zt + y * w;
-            if (layered)
-                warp_layered_row(d, w, s, pr, map, zt, d->bmap + y * w, d->bzt + y * w, d->balpha + y * w);
-            else if (p->warp == STEREO_DIBR_WARP_BACKWARD)
-                warp_backward_row(d, w, s, pr, map, zt);
-            else
-                warp_forward_row(d, w, s, pr, map, zt);
+        warp_view(d, p, w, h, sv, d->par, d->map, d->zt, 1);
+        if (layer) {
+            /* the layer is splatted as the picture is, without the layered warp's boundary layer */
+            const float stretch = d->max_stretch;
+            d->max_stretch = 2.0f;
+            warp_view(d, p, w, h, sv, d->lpar, d->lmap, d->lzt, 0);
+            d->max_stretch = stretch;
         }
 
         for (int k = 0; k < picture->nb_planes; k++) {
@@ -769,6 +847,22 @@ int stereo_dibr_render(stereo_dibr *d, const struct stereo_dibr_params *p, const
             const int ph = (h + (1 << src->log2_h) - 1) >> src->log2_h;
 
             sample_plane(src, pw, ph, w, h, d->map, d->zt, d->val, d->vz, d->hole);
+            if (layer) {
+                sample_plane(&layer->plane[k], pw, ph, w, h, d->lmap, d->lzt, d->lval, NULL, d->lhole);
+                if (role == STEREO_DIBR_LAYER_BACKGROUND) {
+                    /* what the picture uncovers, the background layer shows */
+                    for (int yp = 0; yp < ph; yp++)
+                        for (int i = 0; i < pw; i++) {
+                            const int o = yp * pw + i;
+                            const int lo = clampi(yp << src->log2_h, 0, h - 1) * w + clampi(i << src->log2_w, 0, w - 1);
+                            if (d->hole[o] && !d->lhole[o]) {
+                                d->val[o] = d->lval[o];
+                                d->vz[o] = d->lzt[lo];
+                                d->hole[o] = 0;
+                            }
+                        }
+                }
+            }
 
             switch (p->fill) {
             case STEREO_DIBR_FILL_DEPTH_AIDED:
@@ -806,6 +900,13 @@ int stereo_dibr_render(stereo_dibr *d, const struct stereo_dibr_params *p, const
                     }
             }
 
+            if (layer && role == STEREO_DIBR_LAYER_OVERLAY) {
+                /* the graphics over the picture, where they are */
+                for (int o = 0; o < pw * ph; o++)
+                    if (!d->lhole[o])
+                        d->val[o] = d->lval[o];
+            }
+
             for (int yp = 0; yp < ph; yp++) {
                 uint8_t *row = (uint8_t *)out->plane[k].data + yp * out->plane[k].stride;
                 for (int i = 0; i < pw; i++)
@@ -814,4 +915,20 @@ int stereo_dibr_render(stereo_dibr *d, const struct stereo_dibr_params *p, const
         }
     }
     return 0;
+}
+
+int stereo_dibr_render(stereo_dibr *d, const struct stereo_dibr_params *p, const float *table, int table_size,
+    const struct stereo_dibr_picture *picture, const struct stereo_dibr_depth *depth, struct stereo_dibr_picture *left,
+    struct stereo_dibr_picture *right)
+{
+    return render(d, p, table, table_size, picture, depth, 0, NULL, NULL, left, right);
+}
+
+int stereo_dibr_render_layer(stereo_dibr *d, const struct stereo_dibr_params *p, const float *table, int table_size,
+    const struct stereo_dibr_picture *picture, const struct stereo_dibr_depth *depth, int role, const struct stereo_dibr_picture *layer,
+    const struct stereo_dibr_depth *layer_depth, struct stereo_dibr_picture *left, struct stereo_dibr_picture *right)
+{
+    if (!layer)
+        return -1;
+    return render(d, p, table, table_size, picture, depth, role, layer, layer_depth, left, right);
 }

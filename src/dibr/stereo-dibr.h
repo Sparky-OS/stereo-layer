@@ -64,6 +64,17 @@ enum stereo_depth_kind {
      * (m - parallax_zero) / parallax_scale centimetres on a reference screen wref centimetres wide. Our reading of a
      * standard that is not freely available: UNVERIFIED. */
     STEREO_DEPTH_PARALLAX = 6,
+    /* Google's Dynamic Depth 1.0 (Depth Map, Format "RangeLinear") and GDepth: v uniform in distance, 0 for Near and
+     * 1 for Far (z_near, z_far); 1/distance then reads as NEARNESS. Without Near and Far it reads as FARNESS. */
+    STEREO_DEPTH_RANGE_LINEAR = 7,
+    /* Dynamic Depth 1.0 and GDepth, Format "RangeInverse": v uniform in 1/distance, 0 for Near and 1 for Far, so
+     * uniform in parallax: it reads as FARNESS. */
+    STEREO_DEPTH_RANGE_INVERSE = 8,
+    /* A depth sensor's distances: a sample is the distance itself, in the sensor's unit (RealSense Z16 with its depth
+     * scale, ROS REP 118 16UC1 in millimetres, a 13-bit Android DEPTH16 range), and 0 is no measurement. z_near and
+     * z_far, in the same unit, are the distances 1/distance is spread between as NEARNESS; without them the samples
+     * read as FARNESS. A sample of 0 gets no parallax (NaN in the table): the render takes the farther neighbour's. */
+    STEREO_DEPTH_METRIC = 9,
 };
 
 struct stereo_depth_convention {
@@ -95,9 +106,31 @@ struct stereo_depth_convention {
 
 /*
  * Fills table[0] to table[(1 << c->bits) - 1] with the parallax of each sample value in pixels of a view width pixels
- * wide, positive behind the screen. Returns 0, or -1 for a bad argument.
+ * wide, positive behind the screen; NaN for a sample that holds no depth. Returns 0, or -1 for a bad argument.
  */
 STEREO_DIBR_EXPORT int stereo_depth_parallax_table(const struct stereo_depth_convention *c, int width, float *table);
+
+/*
+ * DepthLUT of a non-linear disparity depth map (H.265 equation G-10; H.264 H.13.2.3 for 8 bits): model holds
+ * depth_nonlinear_representation_model[0] to [depth_nonlinear_representation_num_minus1 + 2], nb_model values (3 to
+ * 65), the first and the last 0; lut receives (1 << bits) values. Returns 0, or -1 for a bad argument.
+ */
+STEREO_DIBR_EXPORT int stereo_depth_nonlinear_lut(const uint16_t *model, int nb_model, int bits, uint16_t *lut);
+
+/*
+ * The depth mark of the edition (docs/depth-marks.md, "Stereo3DDepth"): a word for the kind, then key=value pairs,
+ * separated by spaces, numbers in the C locale's notation:
+ *   nearness | farness [zero= range=]              inverseZ | z [near= far= zero= range=]
+ *   disparity | nonlinearDisparity [min= max= width= model=m0,m1,...,mN zero= range=]
+ *   parallax [parallaxZero= parallaxScale= wref=]  rangeLinear | rangeInverse | metric [near= far= zero= range=]
+ * and shift= on any of them. stereo_depth_read_mark() fills c (bits stay as they were: the depth map's own) and, when
+ * model is not null, the model of a non-linear disparity into model (up to 65 values) and nb_model; it returns 1 for
+ * a mark it reads, 0 for an unknown kind (c is then left as it was), -1 for a bad argument or a malformed pair.
+ * stereo_depth_write_mark() writes c (and the model) as a mark into buf; it returns the length of the mark, or -1
+ * when buf is too small or c is not a kind of the set.
+ */
+STEREO_DIBR_EXPORT int stereo_depth_read_mark(const char *mark, struct stereo_depth_convention *c, uint16_t *model, int *nb_model);
+STEREO_DIBR_EXPORT int stereo_depth_write_mark(const struct stereo_depth_convention *c, const uint16_t *model, int nb_model, char *buf, size_t size);
 
 enum stereo_dibr_view {
     STEREO_DIBR_VIEW_LEFT = 0, /* the picture is the left eye */
@@ -171,6 +204,27 @@ STEREO_DIBR_EXPORT void stereo_dibr_free(stereo_dibr *dibr);
 STEREO_DIBR_EXPORT int stereo_dibr_render(stereo_dibr *dibr, const struct stereo_dibr_params *p, const float *table, int table_size,
     const struct stereo_dibr_picture *picture, const struct stereo_dibr_depth *depth, struct stereo_dibr_picture *left,
     struct stereo_dibr_picture *right);
+
+/* What the second layer of a picture is for stereo_dibr_render_layer(). */
+enum stereo_dibr_layer_role {
+    /* What the picture hides: the background behind its foreground, with its own depth, which fills the places the
+     * picture does not show before any other fill (a layered depth picture, Shade et al. 1998). */
+    STEREO_DIBR_LAYER_BACKGROUND = 0,
+    /* Drawn over the picture, with its own depth: graphics such as HDMI 1.4a's "L + depth + graphics +
+     * graphics-depth" (3D_Structure 0101, Figure H-6). Where the layer's depth holds no depth (NaN in the table) the
+     * layer is transparent. */
+    STEREO_DIBR_LAYER_OVERLAY = 1,
+};
+
+/*
+ * stereo_dibr_render() with a second layer, layer with layer_depth, read with the same table: the background behind
+ * the picture or graphics over it (an enum stereo_dibr_layer_role). layer has the picture's size and planes. The
+ * layer is warped as the picture is (forward warping when the warp is layered), and nothing fills its own holes.
+ * Returns as stereo_dibr_render().
+ */
+STEREO_DIBR_EXPORT int stereo_dibr_render_layer(stereo_dibr *dibr, const struct stereo_dibr_params *p, const float *table, int table_size,
+    const struct stereo_dibr_picture *picture, const struct stereo_dibr_depth *depth, int role, const struct stereo_dibr_picture *layer,
+    const struct stereo_dibr_depth *layer_depth, struct stereo_dibr_picture *left, struct stereo_dibr_picture *right);
 
 #ifdef __cplusplus
 }
