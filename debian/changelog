@@ -1,3 +1,17 @@
+stereo-layer (1.6.0-1) unstable; urgency=medium
+
+  * New library libstereo-dibr (packages libstereo-dibr1 and
+    libstereo-dibr-dev): depth-image-based rendering without Qt. A picture
+    and its depth map become the two views of full side by side, from the
+    depth conventions of H.265 Table G.3 and H.264 Table H-1, the parallax
+    map of ISO/IEC 23002-3 as we read it (unverified) and 2D-plus-depth;
+    the picture as the left eye or the middle; forward, backward or layered
+    warping; background extension, depth-aided, Telea or no hole filling;
+    the depth smoothed by an asymmetric Gaussian or not. FFmpeg's dibr
+    filter is built on it.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sat, 17 Oct 2026 05:41:50 -0300
+
 stereo-layer (1.5.1-1) unstable; urgency=medium
 
   * Picture::load() and Picture::loadPair() compare the halves of an unmarked
