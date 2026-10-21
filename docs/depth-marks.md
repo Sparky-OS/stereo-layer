@@ -110,8 +110,10 @@ A depth map measured along each pixel's ray (Dynamic Depth's and GDepth's `Measu
 
 In pictures, the marks are text: the `Stereo3DLayout` and `Stereo3DDepth` keys of a PNG `tEXt` chunk, and the same names in the metadata the edition's readers report (`QImageReader::text()`, KFileMetaData's `stereo3dLayout`).
 
-In Matroska, the layouts that pack one frame are `StereoMode` values and a depth track is a plane of `TrackCombinePlanes`; both are being registered (below).
-Until they are, and for the meaning of the samples, a Matroska file carries the marks as simple tags of the track: `STEREO3D_LAYOUT` and `STEREO3D_DEPTH`, with the values above.
+In Matroska, separate depth tracks have registered `TrackPlaneType` values in `TrackCombinePlanes` (below).
+The layouts that pack one frame are still proposed `StereoMode` values, pending expert review.
+Until those packed-frame values are assigned, the edition carries their layout as the track's simple tag `STEREO3D_LAYOUT`.
+The meaning of depth samples remains in `STEREO3D_DEPTH`, with the values above; a registered plane type does not replace that information.
 
 ## Rules for readers
 
@@ -123,10 +125,28 @@ Until they are, and for the meaning of the samples, a Matroska file carries the 
 
 ## Registrations
 
-These requests are drafted and have not been sent.
+The requests were submitted on 17 October 2026. Status verified against the live registry on 21 October 2026.
 
-- IANA "Matroska Stereo Modes" registry ([RFC 9559](https://www.rfc-editor.org/rfc/rfc9559) section 27.7, "Specification Required", values from 15): one value for each depth layout that packs one frame, this page as the reference.
-- IANA "Matroska Track Plane Types" registry (section 27.17, "First Come First Served", values from 3): the depth of the left eye plane, of the right eye plane and of the background plane, for a picture and its depth in separate tracks combined with `TrackCombinePlanes` (section 18.8).
+### Assigned: separate depth tracks
+
+IANA registered these [Matroska Track Plane Types](https://www.iana.org/assignments/matroska#matroska-track-plane-types) on **20 October 2026**, under the First Come First Served procedure of [RFC 9559 section 27.17](https://www.rfc-editor.org/rfc/rfc9559#section-27.17).
+
+| TrackPlaneType | Meaning |
+| --- | --- |
+| 3 | depth of the left eye plane |
+| 4 | depth of the right eye plane |
+| 5 | depth of the background plane |
+
+The change controller is Daniel Ramos, and IANA cites the [immutable v1.9.0 version of this specification](https://github.com/Sparky-OS/stereo-layer/blob/v1.9.0/docs/depth-marks.md).
+These planes combine with their picture tracks through `TrackCombinePlanes` ([section 18.8](https://www.rfc-editor.org/rfc/rfc9559#section-18.8)).
+For one picture and its depth map, the picture uses the left-eye plane (0) and its depth uses plane type 3.
+This registration assigns identifiers; it does not establish support in every muxer, demuxer or player.
+
+### Pending: packed picture-and-depth layouts
+
+The separate request for six [Matroska Stereo Modes](https://www.iana.org/assignments/matroska#matroska-stereo-modes) remains under designated-expert review under RFC 9559 section 27.7, Specification Required.
+The requested numbers 15–20 are **proposed, not assigned**; the registry still lists values from 15 as unassigned.
+The request covers picture/depth side by side and top/bottom in either order, four rows with graphics and graphics depth, and four quarters with background and background depth.
 
 ## Implementations
 
