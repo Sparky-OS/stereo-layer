@@ -13,8 +13,9 @@ STEREO_LAYER_EXPORT QImage renderEyes(const Picture &picture, const QSize &eyePi
 // each eye that shows, copied side by side at the resolution the eye has, left eye first, never scaled, and the
 // rectangle of the area (in its pixels) the compositor resizes it to, once. A half packing stays half: the rows of a
 // row-interleaved picture are its eyes' rows, its columns their columns (Picture::original's samples); the rectangle
-// gives them the shape of a view (Picture::left's size). Null when the picture is not a pair, its views differ in
-// size, or nothing of it shows.
+// gives them the shape of a view (Picture::left's size). Wider than 16384 samples (a compositor's largest texture),
+// the eyes are drawn at the area's size instead (renderEyes()). Null when the picture is not a pair, its views differ
+// in size, or nothing of it shows.
 struct STEREO_LAYER_EXPORT EyeCrop {
     QImage packed;
     QRectF shown;

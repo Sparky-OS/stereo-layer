@@ -424,6 +424,15 @@ void PictureTest::cropEyesZoomed()
     const EyeCrop beyond = cropEyes(picture, QSize(100, 50), 2, QPointF(-100, 0));
     QCOMPARE(beyond.shown, QRectF(0, 0, 50, 50));
     QCOMPARE(wrongSamples(beyond.packed, QSize(50, 50), QPoint(150, 25)), 0);
+    // more than a compositor's texture holds: drawn at the area's size
+    Picture wide;
+    wide.left = QImage(9000, 10, QImage::Format_RGB32);
+    wide.left.fill(Qt::red);
+    wide.right = wide.left;
+    wide.layout = Picture::Layout::SideBySide;
+    const EyeCrop drawn = cropEyes(wide, QSize(900, 1));
+    QCOMPARE(drawn.packed.size(), QSize(1800, 1));
+    QCOMPARE(drawn.shown, QRectF(0, 0, 900, 1));
     // nothing shows, nothing is handed over
     QVERIFY(cropEyes(picture, QSize(100, 50), 1, QPointF(1000, 0)).packed.isNull());
     QVERIFY(cropEyes(picture, QSize(100000, 50)).packed.isNull());

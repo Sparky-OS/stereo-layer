@@ -121,6 +121,9 @@ QImage renderEyes(const Picture &picture, const QSize &eyePixels, qreal zoom, co
         (zoom == 1 ? picture.right.scaled(rect.size().toSize(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation) : picture.right));
     return image;
 }
+// The largest texture a compositor takes on current GPUs (GL_MAX_TEXTURE_SIZE of Mesa's radeonsi, iris, llvmpipe and of
+// NVIDIA's driver)
+constexpr int maxSamples = 16384;
 EyeCrop cropEyes(const Picture &picture, const QSize &eyePixels, qreal zoom, const QPointF &pan)
 {
     if (!picture.isStereo() || !valid(eyePixels, zoom, pan) || picture.left.size() != picture.right.size())
@@ -142,8 +145,14 @@ EyeCrop cropEyes(const Picture &picture, const QSize &eyePixels, qreal zoom, con
     if (x1 <= x0 || y1 <= y0)
         return {};
     const QRect source(x0, y0, x1 - x0, y1 - y0);
-    const bool alpha = left.hasAlphaChannel() || right.hasAlphaChannel();
     EyeCrop result;
+    if (2 * source.width() > maxSamples || source.height() > maxSamples) {
+        // more than a compositor's texture holds: the eyes drawn at the area's size, the one resize the program's
+        result.packed = renderEyes(picture, eyePixels, zoom, pan);
+        result.shown = QRectF(QPointF(), QSizeF(eyePixels));
+        return result;
+    }
+    const bool alpha = left.hasAlphaChannel() || right.hasAlphaChannel();
     result.packed = QImage(source.width() * 2, source.height(), alpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32);
     QPainter painter(&result.packed);
     painter.setCompositionMode(QPainter::CompositionMode_Source);
