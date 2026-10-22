@@ -27,6 +27,9 @@ private Q_SLOTS:
     void detectorSingleColour_data();
     void detectorSingleColour();
     void geometry();
+    void cropEyesCopies_data();
+    void cropEyesCopies();
+    void cropEyesZoomed();
     void panorama();
     void shape_data();
     void shape();
@@ -300,6 +303,130 @@ void PictureTest::geometry()
     }
     QVERIFY(renderEyes(picture, QSize(100000, 10)).isNull());
     QVERIFY(renderEyes(picture, QSize(20, 10), -1).isNull());
+}
+namespace
+{
+// The address of a sample of a view: its view, column and row (as fsbs_ids.py writes them)
+QRgb address(int view, int x, int y)
+{
+    return qRgb(x & 0xff, y & 0xff, view << 7 | ((x >> 8) & 0xf) << 3 | ((y >> 8) & 0x7));
+}
+// A packed frame of width x height whose views carry their samples' addresses, and its views' size
+QImage addressedFrame(Picture::Layout layout, int width, int height, QSize *view)
+{
+    QImage frame(width, height, QImage::Format_RGB32);
+    frame.fill(Qt::black);
+    using L = Picture::Layout;
+    *view = layout == L::TopAndBottom || layout == L::Rows ? QSize(width, height / 2) : QSize(width / 2, height);
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int v = 0, vx = x, vy = y;
+            switch (layout) {
+            case L::SideBySide:
+            case L::SideBySideQuincunx:
+                v = x >= width / 2;
+                vx = x - v * width / 2;
+                break;
+            case L::TopAndBottom:
+                v = y >= height / 2;
+                vy = y - v * height / 2;
+                break;
+            case L::Rows:
+                v = y % 2;
+                vy = y / 2;
+                break;
+            case L::Columns:
+                v = x % 2;
+                vx = x / 2;
+                break;
+            case L::Checkerboard:
+                v = (x + y) % 2;
+                vx = x / 2;
+                break;
+            default:
+                break;
+            }
+            frame.setPixel(x, y, address(v, vx, vy));
+        }
+    }
+    return frame;
+}
+// The samples of packed that are not the addresses of their places, each view being view big
+int wrongSamples(const QImage &packed, const QSize &view, QPoint offset = {})
+{
+    if (packed.size() != QSize(view.width() * 2, view.height()))
+        return -1;
+    int wrong = 0;
+    for (int y = 0; y < packed.height(); ++y) {
+        for (int x = 0; x < packed.width(); ++x) {
+            const int v = x >= view.width();
+            wrong += (packed.pixel(x, y) & 0xffffff) != (address(v, x - v * view.width() + offset.x(), y + offset.y()) & 0xffffff);
+        }
+    }
+    return wrong;
+}
+}
+void PictureTest::cropEyesCopies_data()
+{
+    QTest::addColumn<int>("layout");
+    QTest::addColumn<QSize>("frame");
+    QTest::addColumn<QSize>("area");
+    using L = Picture::Layout;
+    // every packing of Table D-8 a picture can carry (H.264 V15, 08/2024): types 3 and 4 as the picture's halves,
+    // 0 to 2 and 3 with quincunx sampling as the eyes' own rows and columns
+    QTest::newRow("side by side") << int(L::SideBySide) << QSize(384, 108) << QSize(160, 90);
+    QTest::newRow("side by side into a larger area") << int(L::SideBySide) << QSize(384, 108) << QSize(640, 360);
+    QTest::newRow("top and bottom") << int(L::TopAndBottom) << QSize(192, 216) << QSize(160, 90);
+    QTest::newRow("rows") << int(L::Rows) << QSize(192, 108) << QSize(160, 90);
+    QTest::newRow("columns") << int(L::Columns) << QSize(192, 108) << QSize(160, 90);
+    QTest::newRow("checkerboard") << int(L::Checkerboard) << QSize(192, 108) << QSize(160, 90);
+    QTest::newRow("quincunx") << int(L::SideBySideQuincunx) << QSize(192, 108) << QSize(160, 90);
+}
+void PictureTest::cropEyesCopies()
+{
+    QFETCH(int, layout);
+    QFETCH(QSize, frame);
+    QFETCH(QSize, area);
+    QSize view;
+    const QImage image = addressedFrame(Picture::Layout(layout), frame.width(), frame.height(), &view);
+    for (const auto order : {Picture::EyeOrder::LeftFirst, Picture::EyeOrder::RightFirst}) {
+        Picture picture = Picture::fromPackedImage(image, Picture::Layout(layout), order);
+        // the stream's right eye first: its first view is the right eye, swapped back to read the addresses
+        if (order == Picture::EyeOrder::RightFirst)
+            picture = picture.swapped();
+        QVERIFY(picture.isStereo());
+        const EyeCrop crop = cropEyes(picture, area);
+        // each eye at the resolution the picture carries it, every sample its own
+        QCOMPARE(wrongSamples(crop.packed, view), 0);
+        // shown with the shape of a view, fitted in the area: one resize, the compositor's
+        const QSizeF shape = QSizeF(picture.left.size()).scaled(QSizeF(area), Qt::KeepAspectRatio);
+        QVERIFY(qAbs(crop.shown.width() - shape.width()) < 1e-6);
+        QVERIFY(qAbs(crop.shown.height() - shape.height()) < 1e-6);
+        QVERIFY(qAbs(crop.shown.center().x() - area.width() / 2.0) < 1e-6);
+        QVERIFY(qAbs(crop.shown.center().y() - area.height() / 2.0) < 1e-6);
+    }
+}
+void PictureTest::cropEyesZoomed()
+{
+    QSize view;
+    const Picture picture = Picture::fromPackedImage(addressedFrame(Picture::Layout::SideBySide, 400, 100, &view), Picture::Layout::SideBySide,
+                                                     Picture::EyeOrder::LeftFirst);
+    // twice the fit, in an area of the view's shape: the middle half of each eye shows, copied, and fills the area
+    const EyeCrop crop = cropEyes(picture, QSize(100, 50), 2);
+    QCOMPARE(crop.packed.size(), QSize(200, 50));
+    QCOMPARE(wrongSamples(crop.packed, QSize(100, 50), QPoint(50, 25)), 0);
+    QCOMPARE(crop.shown, QRectF(0, 0, 100, 50));
+    // panned to the right edge: the samples that show, and no more
+    const EyeCrop panned = cropEyes(picture, QSize(100, 50), 2, QPointF(-50, 0));
+    QCOMPARE(panned.shown, QRectF(0, 0, 100, 50));
+    QCOMPARE(wrongSamples(panned.packed, QSize(100, 50), QPoint(100, 25)), 0);
+    // further: the eye's edge in the middle of the area, the area's other half the window's
+    const EyeCrop beyond = cropEyes(picture, QSize(100, 50), 2, QPointF(-100, 0));
+    QCOMPARE(beyond.shown, QRectF(0, 0, 50, 50));
+    QCOMPARE(wrongSamples(beyond.packed, QSize(50, 50), QPoint(150, 25)), 0);
+    // nothing shows, nothing is handed over
+    QVERIFY(cropEyes(picture, QSize(100, 50), 1, QPointF(1000, 0)).packed.isNull());
+    QVERIFY(cropEyes(picture, QSize(100000, 50)).packed.isNull());
 }
 void PictureTest::panorama()
 {
