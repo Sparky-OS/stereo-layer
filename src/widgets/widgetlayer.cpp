@@ -56,6 +56,7 @@ struct WidgetLayer::Private {
     bool paintArea = true;
     bool keepTransparency = false;
     QImage packed;
+    QRect shown; // where the picture shows in the area, the rest of it the window's own
     QSize pixels;
     bool dirty = true;
 };
@@ -148,8 +149,10 @@ void WidgetLayer::paint(QPainter *painter)
     if (!d->area)
         return;
     if (d->active) {
+        // the picture's surface lies below the window: a hole where it shows, its background around it
         painter->setCompositionMode(QPainter::CompositionMode_Source);
-        painter->fillRect(d->area->rect(), Qt::transparent);
+        painter->fillRect(d->area->rect(), d->keepTransparency ? Qt::transparent : Qt::black);
+        painter->fillRect(d->shown, Qt::transparent);
     } else {
         const QSize pixels = d->area->size();
         painter->drawImage(d->area->rect(), renderMono(d->picture.original, pixels, d->zoom, d->pan));
@@ -185,22 +188,28 @@ void WidgetLayer::update()
         const qreal ratio = d->area->devicePixelRatioF();
         const QSize pixels(qRound(d->area->width() * ratio), qRound(d->area->height() * ratio));
         if (d->dirty || pixels != d->pixels) {
-            d->packed = renderEyes(d->picture, pixels, d->zoom, d->pan * ratio);
-            if (d->keepTransparency && d->zoom == 1 && d->pan.isNull() && (d->picture.left.hasAlphaChannel() || d->picture.right.hasAlphaChannel())) {
-                // Each eye as it is, clear parts included, at the area's size
-                QImage packed(pixels.width() * 2, pixels.height(), QImage::Format_ARGB32_Premultiplied);
-                packed.fill(Qt::transparent);
-                QPainter painter(&packed);
-                painter.setRenderHint(QPainter::SmoothPixmapTransform);
-                painter.setCompositionMode(QPainter::CompositionMode_Source);
-                painter.drawImage(QRect(QPoint(), pixels), d->picture.left);
-                painter.drawImage(QRect(QPoint(pixels.width(), 0), pixels), d->picture.right);
-                d->packed = packed;
+            // each eye's samples that show, at the resolution they have; the compositor resizes them once
+            const EyeCrop crop = cropEyes(d->picture, pixels, d->zoom, d->pan * ratio);
+            d->packed = crop.packed;
+            if (!d->keepTransparency && d->packed.hasAlphaChannel()) {
+                // the clear parts of the picture black, as around it
+                QImage opaque(d->packed.size(), QImage::Format_RGB32);
+                opaque.fill(Qt::black);
+                QPainter painter(&opaque);
+                painter.drawImage(QPoint(0, 0), d->packed);
+                painter.end();
+                d->packed = opaque;
+            }
+            const QRect shown(QPoint(qRound(crop.shown.left() / ratio), qRound(crop.shown.top() / ratio)),
+                              QPoint(qRound(crop.shown.right() / ratio) - 1, qRound(crop.shown.bottom() / ratio) - 1));
+            if (shown != d->shown) {
+                d->shown = shown;
+                d->area->update();
             }
             d->pixels = pixels;
             d->dirty = false;
         }
-        active = d->surface.show(d->area->window()->windowHandle(), QRect(d->area->mapTo(d->area->window(), QPoint()), d->area->size()), d->packed);
+        active = d->surface.show(d->area->window()->windowHandle(), d->shown.translated(d->area->mapTo(d->area->window(), QPoint())), d->packed);
     } else if (!visible) {
         d->surface.reset();
     } else {

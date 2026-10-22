@@ -4,6 +4,7 @@
 #include "render.h"
 #include "screenmode.h"
 #include "surface_p.h"
+#include <QPainter>
 #include <QPointer>
 #include <QQmlContext>
 #include <QQuickWindow>
@@ -27,6 +28,7 @@ struct PictureItem::Private {
     ScreenMode output;
     Surface surface;
     QImage packed;
+    QRectF shown; // where the picture shows in the item, the rest of it black
     QSize pixels;
     bool dirty = true;
     QPointer<QQuickWindow> window;
@@ -182,11 +184,28 @@ void PictureItem::updatePolish()
         const qreal ratio = window()->devicePixelRatio();
         const QSize pixels(qRound(mapped.width() * ratio), qRound(mapped.height() * ratio));
         if (d->dirty || d->pixels != pixels) {
-            d->packed = renderEyes(d->picture, pixels, d->zoom, d->pan * ratio);
+            // each eye's samples that show, at the resolution they have; the compositor resizes them once
+            const EyeCrop crop = cropEyes(d->picture, pixels, d->zoom, d->pan * ratio);
+            d->packed = crop.packed;
+            if (d->packed.hasAlphaChannel()) {
+                // the clear parts of the picture black, as around it
+                QImage opaque(d->packed.size(), QImage::Format_RGB32);
+                opaque.fill(Qt::black);
+                QPainter painter(&opaque);
+                painter.drawImage(QPoint(0, 0), d->packed);
+                painter.end();
+                d->packed = opaque;
+            }
+            const QRectF shown(QPointF(std::round(crop.shown.left() / ratio), std::round(crop.shown.top() / ratio)),
+                               QPointF(std::round(crop.shown.right() / ratio), std::round(crop.shown.bottom() / ratio)));
+            if (shown != d->shown) {
+                d->shown = shown;
+                update();
+            }
             d->pixels = pixels;
             d->dirty = false;
         }
-        active = d->surface.show(window(), mapped.toAlignedRect(), d->packed);
+        active = d->surface.show(window(), d->shown.translated(mapped.topLeft()).toAlignedRect(), d->packed);
     } else {
         d->surface.reset();
     }
@@ -202,9 +221,12 @@ QSGNode *PictureItem::updatePaintNode(QSGNode *node, UpdatePaintNodeData *)
     if (!window() || boundingRect().isEmpty())
         return nullptr;
     if (d->active) {
-        auto *hole = new QSGSimpleRectNode(boundingRect(), Qt::transparent);
+        // the picture's surface lies below the window: black around it, a hole where it shows
+        auto *background = new QSGSimpleRectNode(boundingRect(), Qt::black);
+        auto *hole = new QSGSimpleRectNode(d->shown, Qt::transparent);
         hole->material()->setFlag(QSGMaterial::Blending, false);
-        return hole;
+        background->appendChildNode(hole);
+        return background;
     }
     // Drawn flat (a screen with one eye, or no surface of its own yet), a pair shows its left view, as the file's flat picture.
     const QImage &flat = d->picture.isStereo() ? d->picture.left : d->picture.original;
