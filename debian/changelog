@@ -1,3 +1,17 @@
+stereo-layer (1.10.0-1) unstable; urgency=medium
+
+  * New: cropEyes() (render.h) hands a picture's eyes over at the
+    resolution they have (a half top-and-bottom 1920x1080 picture gives
+    3840x540), for a stereo surface that declares full side by side and
+    lets the compositor resize once. The ABI is unchanged apart from the
+    addition.
+  * The widget and the QML item (WidgetLayer, PictureItem) use it: they no
+    longer fit each eye to the area's pixels before the compositor does the
+    same, and an eye wider than a compositor's texture is still drawn at the
+    area's size.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 22 Oct 2026 12:48:27 -0300
+
 stereo-layer (1.9.0-1) unstable; urgency=medium
 
   * libstereo-dibr: stereo_dibr_unpack() finds the parts of a frame packed

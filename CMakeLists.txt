@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.25)
-project(StereoLayer VERSION 1.9.0 LANGUAGES C CXX)
+project(StereoLayer VERSION 1.10.0 LANGUAGES C CXX)
 find_package(ECM 6.0 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 include(KDEInstallDirs6)
