@@ -307,10 +307,7 @@ void PictureTest::geometry()
 namespace
 {
 // The address of a sample of a view: its view, column and row (as fsbs_ids.py writes them)
-QRgb address(int view, int x, int y)
-{
-    return qRgb(x & 0xff, y & 0xff, view << 7 | ((x >> 8) & 0xf) << 3 | ((y >> 8) & 0x7));
-}
+QRgb address(int view, int x, int y) { return qRgb(x & 0xff, y & 0xff, view << 7 | ((x >> 8) & 0xf) << 3 | ((y >> 8) & 0x7)); }
 // A packed frame of width x height whose views carry their samples' addresses, and its views' size
 QImage addressedFrame(Picture::Layout layout, int width, int height, QSize *view)
 {
@@ -389,7 +386,7 @@ void PictureTest::cropEyesCopies()
     QFETCH(QSize, area);
     QSize view;
     const QImage image = addressedFrame(Picture::Layout(layout), frame.width(), frame.height(), &view);
-    for (const auto order : {Picture::EyeOrder::LeftFirst, Picture::EyeOrder::RightFirst}) {
+    for (const auto order : { Picture::EyeOrder::LeftFirst, Picture::EyeOrder::RightFirst }) {
         Picture picture = Picture::fromPackedImage(image, Picture::Layout(layout), order);
         // the stream's right eye first: its first view is the right eye, swapped back to read the addresses
         if (order == Picture::EyeOrder::RightFirst)
@@ -409,8 +406,8 @@ void PictureTest::cropEyesCopies()
 void PictureTest::cropEyesZoomed()
 {
     QSize view;
-    const Picture picture = Picture::fromPackedImage(addressedFrame(Picture::Layout::SideBySide, 400, 100, &view), Picture::Layout::SideBySide,
-                                                     Picture::EyeOrder::LeftFirst);
+    const Picture picture = Picture::fromPackedImage(
+        addressedFrame(Picture::Layout::SideBySide, 400, 100, &view), Picture::Layout::SideBySide, Picture::EyeOrder::LeftFirst);
     // twice the fit, in an area of the view's shape: the middle half of each eye shows, copied, and fills the area
     const EyeCrop crop = cropEyes(picture, QSize(100, 50), 2);
     QCOMPARE(crop.packed.size(), QSize(200, 50));

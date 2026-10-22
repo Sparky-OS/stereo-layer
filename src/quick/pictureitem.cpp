@@ -197,7 +197,7 @@ void PictureItem::updatePolish()
                 d->packed = opaque;
             }
             const QRectF shown(QPointF(std::round(crop.shown.left() / ratio), std::round(crop.shown.top() / ratio)),
-                               QPointF(std::round(crop.shown.right() / ratio), std::round(crop.shown.bottom() / ratio)));
+                QPointF(std::round(crop.shown.right() / ratio), std::round(crop.shown.bottom() / ratio)));
             if (shown != d->shown) {
                 d->shown = shown;
                 update();

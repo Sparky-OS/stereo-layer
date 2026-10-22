@@ -83,7 +83,7 @@ void storedEyes(const Picture &picture, QImage *left, QImage *right)
         || (layout != Picture::Layout::Rows && layout != Picture::Layout::Columns && layout != Picture::Layout::Checkerboard
             && layout != Picture::Layout::SideBySideQuincunx))
         return;
-    int phases[2] = {-1, -1};
+    int phases[2] = { -1, -1 };
     for (int eye = 0; eye < 2; ++eye) {
         for (int phase = 0; phase < 2 && phases[eye] < 0; ++phase) {
             if (keepsPhase(eye ? picture.right : picture.left, picture.original, layout, phase))

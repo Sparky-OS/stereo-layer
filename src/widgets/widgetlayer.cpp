@@ -201,7 +201,7 @@ void WidgetLayer::update()
                 d->packed = opaque;
             }
             const QRect shown(QPoint(qRound(crop.shown.left() / ratio), qRound(crop.shown.top() / ratio)),
-                              QPoint(qRound(crop.shown.right() / ratio) - 1, qRound(crop.shown.bottom() / ratio) - 1));
+                QPoint(qRound(crop.shown.right() / ratio) - 1, qRound(crop.shown.bottom() / ratio) - 1));
             if (shown != d->shown) {
                 d->shown = shown;
                 d->area->update();
