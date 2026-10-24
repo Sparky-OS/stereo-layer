@@ -1,0 +1,5 @@
+SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
+SPDX-License-Identifier: CC0-1.0
+
+Synthetic labelled HEVC views and a separate green monoscopic fallback.
+The generation script is retained with ORDER 41 evidence.

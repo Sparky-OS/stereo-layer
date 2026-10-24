@@ -68,6 +68,8 @@ public:
     // picture as the file shows it (the default, what a 2D screen shows), or that original.
     enum class DepthPicture { Shown, Original };
 
+    // HEIF stem can keep a separate monoscopic primary. Stereo3DViewIndices names the two reader
+    // images used for stereo, while original keeps the primary for the ordinary 2D view.
     static Picture load(const QString &path, const Options &options, OutputMode output);
     // load() with the user's choices for pictures with their depth map (fromDepth()): read from the file's readers,
     // the depth map is their second image (QImageReader::jumpToImage(1)) when the file's Stereo3DLayout is

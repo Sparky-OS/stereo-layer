@@ -15,6 +15,7 @@
 #include <QXmlStreamReader>
 #include <QtEndian>
 #include <algorithm>
+#include <optional>
 #include <vector>
 #include <zlib.h>
 
@@ -224,6 +225,22 @@ Picture fromImagesComparing(const QImage &image, const QImage &second, const QSt
     const Picture::Options &options, OutputMode output, const QImage &sample, const Picture::DepthOptions &depthOptions = {},
     const QImage &depthPicture = {});
 
+// A HEIF stem group may keep a separate monoscopic primary at image zero.
+// The reader names the actual stereo view image numbers without changing that primary.
+std::optional<QPair<int, int>> stereoViewIndices(QImageReader &reader)
+{
+    const QStringList fields = reader.text(QStringLiteral("Stereo3DViewIndices")).split(QLatin1Char(','));
+    if (fields.size() != 2) {
+        return std::nullopt;
+    }
+    bool firstOk = false, secondOk = false;
+    const int first = fields[0].toInt(&firstOk), second = fields[1].toInt(&secondOk);
+    if (!firstOk || !secondOk || first < 0 || second < 0 || first == second || first >= reader.imageCount() || second >= reader.imageCount()) {
+        return std::nullopt;
+    }
+    return QPair(first, second);
+}
+
 // Whether a reader's second image is a view of the pair (Multi-Picture Format, multiView marks) or the depth map
 // (depthSeparate), so that load() and loadPair() read it.
 bool hasSecondImage(int imageCount, const QByteArray &format, const QString &metadata)
@@ -286,12 +303,26 @@ Picture Picture::load(const QString &path, const Options &fileOptions, const Dep
     const QByteArray detectedFormat = reader.format();
     const QByteArray format = extension == "jps" || extension == "mpo" || extension == "pns" ? extension : detectedFormat;
     const int imageCount = reader.imageCount();
-    const QImage image = reader.read();
+    QImage image = reader.read();
+    const QImage shown = image;
     if (metadata.isEmpty()) {
         metadata = image.text(QStringLiteral("Stereo3DLayout"));
     }
     QImage second;
-    if (hasSecondImage(imageCount, format, metadata) && reader.jumpToImage(1)) {
+    const bool indexed = metadata.startsWith(QLatin1String("multiView")) && !reader.text(QStringLiteral("Stereo3DViewIndices")).isEmpty()
+        && options.view != View::Mono;
+    if (indexed) {
+        const auto indices = stereoViewIndices(reader);
+        if (!indices || !reader.jumpToImage(indices->first)) {
+            Picture result;
+            result.original = shown;
+            return result;
+        }
+        image = reader.read();
+        if (reader.jumpToImage(indices->second)) {
+            second = reader.read();
+        }
+    } else if (hasSecondImage(imageCount, format, metadata) && reader.jumpToImage(1)) {
         second = reader.read();
     }
     QImage original;
@@ -299,8 +330,12 @@ Picture Picture::load(const QString &path, const Options &fileOptions, const Dep
         original = reader.read();
     }
     const bool pixels = decide(metadata, format, header, !second.isNull(), options).pixels;
-    return fromImagesComparing(
+    Picture result = fromImagesComparing(
         image, second, metadata, format, header, options, output, pixels ? pairSample(path, image.size()) : QImage(), depthOptions, original);
+    if (indexed && options.view == View::Stereo) {
+        result.original = shown;
+    }
+    return result;
 }
 
 Picture Picture::loadPair(const QString &path, const QSize &bound, const Options &fileOptions)
@@ -343,12 +378,23 @@ Picture Picture::loadPair(
         }
         return reader.read();
     };
-    const QImage image = read(size);
+    QImage image = read(size);
+    const QImage shown = image;
     if (metadata.isEmpty()) {
         metadata = image.text(QStringLiteral("Stereo3DLayout"));
     }
     QImage second;
-    if (multiView && reader.jumpToImage(1)) {
+    const bool indexed = metadata.startsWith(QLatin1String("multiView")) && !reader.text(QStringLiteral("Stereo3DViewIndices")).isEmpty();
+    if (indexed) {
+        const auto indices = stereoViewIndices(reader);
+        if (!indices || !reader.jumpToImage(indices->first)) {
+            return {};
+        }
+        image = read(reader.size());
+        if (reader.jumpToImage(indices->second)) {
+            second = read(reader.size());
+        }
+    } else if (multiView && reader.jumpToImage(1)) {
         second = read(reader.size());
     }
     QImage original;
@@ -357,6 +403,9 @@ Picture Picture::loadPair(
     }
     const QImage sample = decision.pixels ? pairSample(path, size) : QImage();
     Picture result = fromImagesComparing(image, second, metadata, format, header, options, OutputMode::Unknown, sample, depthOptions, original);
+    if (indexed && options.view == View::Stereo) {
+        result.original = shown;
+    }
     if (!result.isStereo()) {
         return {};
     }

@@ -53,6 +53,7 @@ private Q_SLOTS:
     void depthLayouts();
     void depthSeparate();
     void depthReaders();
+    void heifMonoscopicFallback();
     void depthReaderControls_data();
     void depthReaderControls();
 };
@@ -1158,6 +1159,42 @@ void PictureTest::depthReaderControls()
     const Picture picture = Picture::load(path, {}, OutputMode::Stereo);
     QVERIFY(!picture.isStereo());
     QCOMPARE(picture.original.convertToFormat(pic.format()), pic);
+}
+
+void PictureTest::heifMonoscopicFallback()
+{
+    const QString path = QFINDTESTDATA("readers/stem-primary-2.heic");
+    QVERIFY(!path.isEmpty());
+    QImageReader reference(path);
+    QCOMPARE(reference.text(QStringLiteral("Stereo3DLayout")), QStringLiteral("multiViewLeftFirst"));
+    QCOMPARE(reference.text(QStringLiteral("Stereo3DViewIndices")), QStringLiteral("1,2"));
+    const QImage primary = reference.read();
+    QVERIFY(reference.jumpToImage(1));
+    const QImage left = reference.read();
+    QVERIFY(reference.jumpToImage(2));
+    const QImage right = reference.read();
+    QVERIFY(primary != left);
+    QVERIFY(primary != right);
+    const auto pair = Picture::load(path, {}, OutputMode::Stereo);
+    QVERIFY(pair.isStereo());
+    QCOMPARE(pair.original, primary);
+    QCOMPARE(pair.left, left);
+    QCOMPARE(pair.right, right);
+    Picture::Options options;
+    options.swapEyes = true;
+    const auto swapped = Picture::load(path, options, OutputMode::Stereo);
+    QCOMPARE(swapped.left, right);
+    QCOMPARE(swapped.right, left);
+    options = {};
+    options.view = Picture::View::Mono;
+    QCOMPARE(Picture::load(path, options, OutputMode::Mono).original, primary);
+    options.view = Picture::View::LeftOnly;
+    QCOMPARE(Picture::load(path, options, OutputMode::Stereo).original, left);
+    options.view = Picture::View::RightOnly;
+    QCOMPARE(Picture::load(path, options, OutputMode::Stereo).original, right);
+    const auto thumb = Picture::loadPair(path, QSize(2000, 1000), {});
+    QCOMPARE(thumb.left, left);
+    QCOMPARE(thumb.right, right);
 }
 
 QTEST_MAIN(PictureTest)
