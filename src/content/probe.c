@@ -28,8 +28,9 @@ int main(int argc, char **argv)
         fprintf(stderr, "Inspection failed: %d\n", error);
         return 1;
     }
-    printf("{\"stereo\":%d,\"layout\":%d,\"order\":%d,\"anaglyph\":%d,\"projection\":%d,\"coverage\":%d,"
+    printf("{\"width\":%d,\"height\":%d,\"sar_num\":%d,\"sar_den\":%d,\"stereo\":%d,\"layout\":%d,\"order\":%d,\"anaglyph\":%d,\"projection\":%d,\"coverage\":%d,"
            "\"status\":%d,\"evidence\":%u,\"conflicts\":%u,\"stream\":%d,\"bytes\":%llu,\"packets\":%u,\"elapsed_us\":%lld}\n",
+           result.width, result.height, result.sar_num, result.sar_den,
            result.stereo, result.layout, result.order, result.anaglyph, result.projection, result.coverage,
            result.status, result.evidence, result.conflicts, result.stream_index,
            (unsigned long long)result.bytes, result.packets, (long long)result.elapsed_us);

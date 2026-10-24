@@ -19,6 +19,7 @@ typedef struct StereoContentRequest {
     uint64_t max_bytes;
     unsigned max_packets;
     char base_mime[128];
+    unsigned video_track_plus_one; /* Zero selects content; otherwise the one-based video track. */
 } StereoContentRequest;
 typedef struct StereoContentResult {
     size_t size;
@@ -33,6 +34,8 @@ typedef struct StereoContentResult {
     uint32_t bounds[4];           /* left, top, right, bottom, unsigned 0.32. */
     unsigned evidence;
     unsigned conflicts;
+    int width, height;           /* Stored samples, never display dimensions. */
+    int sar_num, sar_den;        /* Width/height of a sample; 1/1 when absent. */
     int stream_index;
     uint64_t bytes;
     unsigned packets;

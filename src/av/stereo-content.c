@@ -271,9 +271,13 @@ int stereo_content_inspect(const StereoContentRequest *request, StereoContentRes
         goto close;
     }
     int video = -1;
+    unsigned video_track = 0;
     for (unsigned i = 0; i < format->nb_streams; ++i) {
         AVStream *stream = format->streams[i];
         if (stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO || stream->disposition & AV_DISPOSITION_ATTACHED_PIC)
+            continue;
+        ++video_track;
+        if (request->video_track_plus_one && video_track != request->video_track_plus_one)
             continue;
         StereoContentResult candidate = *out;
         container_data(&candidate, stream->codecpar);
@@ -287,6 +291,13 @@ int stereo_content_inspect(const StereoContentRequest *request, StereoContentRes
     if (video < 0)
         goto close;
     const AVCodecParameters *par = format->streams[video]->codecpar;
+    out->width = par->width;
+    out->height = par->height;
+    AVRational sar = format->streams[video]->sample_aspect_ratio;
+    if (sar.num <= 0 || sar.den <= 0)
+        sar = par->sample_aspect_ratio;
+    out->sar_num = sar.num > 0 && sar.den > 0 ? sar.num : 1;
+    out->sar_den = sar.num > 0 && sar.den > 0 ? sar.den : 1;
     const AVCodec *codec = avcodec_find_decoder(par->codec_id);
     decoder = codec ? avcodec_alloc_context3(codec) : NULL;
     if (!decoder || avcodec_parameters_to_context(decoder, par) < 0)
