@@ -16,7 +16,7 @@ for row in json.loads((a.fixtures/'manifest.json').read_text()):
     if a.probe:
         result = subprocess.run([a.probe, '--base', row['base'], '--json', str(path)], capture_output=True, text=True)
         actual = json.loads(result.stdout) if result.returncode == 0 else {'error': result.stderr}
-        expected = {k: row[k] for k in ['stereo', 'layout', 'order', 'coverage', 'projection'] if k in row}
+        expected = {k: row[k] for k in ['stereo', 'layout', 'order', 'coverage', 'projection', 'status'] if k in row}
         matched = all(actual.get(k) == v for k, v in expected.items())
     else:
         result = subprocess.run(['gio', 'info', '-a', 'standard::content-type', str(path)], capture_output=True, text=True)

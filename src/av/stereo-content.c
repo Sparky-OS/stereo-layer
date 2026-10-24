@@ -211,13 +211,7 @@ static void refine_type(StereoContentResult *out)
 {
     const char *stem = NULL;
     const struct { const char *base, *stem; } types[] = {
-        {"video/x-matroska", "video/x-matroska"}, {"video/matroska", "video/x-matroska"},
-        {"video/x-matroska-3d", "video/x-matroska"}, {"video/matroska-3d", "video/x-matroska"},
-        {"video/mp4", "video/x-mp4"}, {"video/webm", "video/x-webm"},
-        {"video/quicktime", "video/x-quicktime"}, {"video/mpeg", "video/x-mpeg"},
-        {"video/mp2t", "video/x-mp2t"}, {"video/x-msvideo", "video/x-avi"},
-        {"video/vnd.avi", "video/x-avi"}, {"video/ogg", "video/x-ogg"},
-        {"image/png", "image/x-png"}, {"image/jpeg", "image/x-jpeg"},
+#include "content-mime-map.inc"
     };
     for (size_t i = 0; i < sizeof(types)/sizeof(types[0]); ++i)
         if (!strcmp(out->base_mime, types[i].base))

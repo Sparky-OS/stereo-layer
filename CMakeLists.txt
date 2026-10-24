@@ -32,9 +32,19 @@ install(FILES src/policy/stereo-policy.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/s
 configure_file(src/policy/stereo-policy.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/content/content-mime-map.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/content/stereo-content.xml ${CMAKE_CURRENT_BINARY_DIR}/content/mime-lists.json
+    COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/tools/content-mime.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/content/catalogue.json ${CMAKE_CURRENT_BINARY_DIR}/content
+    DEPENDS tools/content-mime.py data/content/catalogue.json VERBATIM)
+add_custom_target(stereo-content-catalogue DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/content/content-mime-map.inc)
+
 # FFmpeg consumers share native multiview pairing without pulling in Qt.
 pkg_check_modules(STEREO_AV REQUIRED IMPORTED_TARGET libavcodec>=63 libavutil>=61 libavformat>=63)
 add_library(StereoAv SHARED src/av/stereo-av.c src/av/stereo-content.c)
+add_dependencies(StereoAv stereo-content-catalogue)
+target_include_directories(StereoAv PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/content)
 set_target_properties(StereoAv PROPERTIES OUTPUT_NAME stereo-av VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Av)
 target_link_libraries(StereoAv PRIVATE PkgConfig::STEREO_AV ZLIB::ZLIB)
 target_include_directories(StereoAv PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/av> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-av>)
