@@ -87,3 +87,9 @@ Test vectors: `autotests/vectors/name-tags.tsv`.
 `stereo_policy_halves_test()` is the call for a bare `3D` tag when a player can hand over one decoded frame (its brightness plane): it compares the halves left and right against above and below, allowing a small shift, and returns `STEREO_POLICY_HALVES_*` for `stereo_policy_video_layout_named()`; a flat or ordinary picture gives `UNKNOWN` and the video stays 2D.
 A Matroska half pair whose DisplayWidth equals its pixel width reads through FFmpeg's doubled sample ratio as full, and each view still shows at its true display shape, so the picture is right even when the label says full (vector in `autotests/vectors/video-views.tsv`).
 
+
+## Native X11 child placement
+
+The proposed [support-version-8 child placement contract](docs/x11-child-place.md) registers `_KDE_NET_WM_STEREO_CONTENT_CHILD_PLACE`.
+It gives a listed child's source-sized buffer an independent destination rectangle and optional placement below the ordinary parent surface.
+The existing full-SBS declaration still describes the video; ordinary overlays declare no stereo layout.
