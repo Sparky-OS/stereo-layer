@@ -41,7 +41,7 @@ typedef struct StereoContentResult {
     char refined_mime[128];
 } StereoContentResult;
 /* No path/URL is opened and no media bytes or attributes are written. */
-int stereo_content_inspect(const StereoContentRequest *request, StereoContentResult *result);
+__attribute__((visibility("default"))) int stereo_content_inspect(const StereoContentRequest *request, StereoContentResult *result);
 #ifdef __cplusplus
 }
 #endif

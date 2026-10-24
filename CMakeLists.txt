@@ -98,3 +98,23 @@ endif()
 add_executable(stereo-content-probe src/content/probe.c)
 target_link_libraries(stereo-content-probe PRIVATE StereoAv)
 install(TARGETS stereo-content-probe RUNTIME DESTINATION ${KDE_INSTALL_BINDIR})
+
+# Application selection clients stay independent of FFmpeg and Qt.
+pkg_check_modules(CONTENT_GIO REQUIRED IMPORTED_TARGET gio-unix-2.0)
+add_library(StereoContentClient SHARED src/content/client.c)
+set_target_properties(StereoContentClient PROPERTIES OUTPUT_NAME stereo-content-client
+    VERSION ${PROJECT_VERSION} SOVERSION 1 C_STANDARD 11 C_VISIBILITY_PRESET hidden)
+target_link_libraries(StereoContentClient PRIVATE PkgConfig::CONTENT_GIO)
+target_include_directories(StereoContentClient PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/content>
+    $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-content>)
+install(TARGETS StereoContentClient LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR})
+install(FILES src/content/client.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-content)
+add_executable(stereo-content-worker src/content/worker.c)
+target_link_libraries(stereo-content-worker PRIVATE StereoAv)
+add_executable(stereo-contentd src/content/service.c)
+target_include_directories(stereo-contentd PRIVATE src/av)
+target_link_libraries(stereo-contentd PRIVATE PkgConfig::CONTENT_GIO)
+target_compile_definitions(stereo-contentd PRIVATE STEREO_CONTENT_WORKER="${KDE_INSTALL_FULL_LIBEXECDIR}/stereo-content-worker")
+install(TARGETS stereo-content-worker stereo-contentd RUNTIME DESTINATION ${KDE_INSTALL_LIBEXECDIR})
+configure_file(src/content/org.stereo.Content1.service.in org.stereo.Content1.service @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/org.stereo.Content1.service DESTINATION ${KDE_INSTALL_DATADIR}/dbus-1/services)

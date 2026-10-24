@@ -85,7 +85,7 @@ static int deny_open(AVFormatContext *s, AVIOContext **pb, const char *url, int 
 static void stereo_data(StereoContentResult *out, const AVStereo3D *s, unsigned evidence)
 {
     /* AVStereo3D is extensible: the caller checks the minimum fields it reads. */
-    static const int layouts[] = {0, 1, 2, 8, 6, 7, 4, 5, 3};
+    static const int layouts[] = {0, 1, 2, 8, 6, 7, 4, 5, -1};
     if (s->type < 0 || (unsigned)s->type >= sizeof(layouts)/sizeof(layouts[0]))
         return;
     int stereo = s->type != AV_STEREO3D_2D;
@@ -223,7 +223,7 @@ static void refine_type(StereoContentResult *out)
         if (!strcmp(out->base_mime, types[i].base))
             stem = types[i].stem;
     snprintf(out->refined_mime, sizeof(out->refined_mime), "%s", out->base_mime);
-    if (!stem || out->status == STEREO_CONTENT_INVALID)
+    if (!stem || out->status != STEREO_CONTENT_OK)
         return;
     const char *suffix = out->projection < 0 ? "" : out->coverage == 180 ? "-180" : out->coverage == 360 ? "-360" : "-spherical";
     if (out->stereo == 1 || *suffix)
@@ -319,7 +319,7 @@ int stereo_content_inspect(const StereoContentRequest *request, StereoContentRes
             frame_data(out, frame);
             av_frame_unref(frame);
         }
-    if (stereo_av_decoder_multiview(decoder)) {
+    if (out->stereo == 1 && stereo_av_decoder_multiview(decoder)) {
         out->stereo = 1;
         out->layout = 3;
         out->evidence |= STEREO_CONTENT_FRAME;

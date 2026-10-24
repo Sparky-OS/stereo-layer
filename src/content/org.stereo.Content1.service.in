@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.stereo.Content1
+Exec=@KDE_INSTALL_FULL_LIBEXECDIR@/stereo-contentd
