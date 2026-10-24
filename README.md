@@ -93,3 +93,4 @@ A Matroska half pair whose DisplayWidth equals its pixel width reads through FFm
 The proposed [support-version-8 child placement contract](docs/x11-child-place.md) registers `_KDE_NET_WM_STEREO_CONTENT_CHILD_PLACE`.
 It gives a listed child's source-sized buffer an independent destination rectangle and optional placement below the ordinary parent surface.
 The existing full-SBS declaration still describes the video; ordinary overlays declare no stereo layout.
+A child that holds both views at full width declares the size of one view in its own `_KDE_NET_WM_STEREO_CONTENT_ONE_VIEW_SIZE` (same version 8); the declared place wins over it.

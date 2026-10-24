@@ -24,3 +24,14 @@ A client using a placement different from its native child geometry must make th
 Parent visibility, lifetime and clipping still constrain the child.
 The client must test support version 8 before writing this property.
 Older compositors continue to use the existing native child contract.
+
+## The size of one view on a child (version 8)
+
+A listed child may also carry `_KDE_NET_WM_STEREO_CONTENT_ONE_VIEW_SIZE`, declared as for an X11 window: type CARDINAL, format 32, exactly two values, the width and the height one view is shown at, each 1 through 32767; anything else counts as absent.
+It serves a child that holds both views at full width, an X11 window twice as wide as the place it is shown at: the compositor shows each view at the declared size, at the child's own position, and keeps the child's native raster.
+It is read only while the child declares stereo content in `_KDE_NET_WM_STEREO_CONTENT`.
+Support version 8 announces both properties; a client tests it before writing either, and older compositors use the child's own X11 rectangle.
+
+**Precedence:** the child's `_KDE_NET_WM_STEREO_CONTENT_CHILD_PLACE`; otherwise its position at the size of its `_KDE_NET_WM_STEREO_CONTENT_ONE_VIEW_SIZE`; otherwise its X11 rectangle.
+Stacking below the parent comes only from `CHILD_PLACE`.
+libstereo-declare 1.7.0 writes them with `stereo_declare_x11_child()` (the size of one view, and the listing in the parent) and `stereo_declare_x11_child_place()` (the place and the stacking).
