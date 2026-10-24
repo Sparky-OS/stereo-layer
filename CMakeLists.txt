@@ -33,13 +33,13 @@ configure_file(src/policy/stereo-policy.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 
 # FFmpeg consumers share native multiview pairing without pulling in Qt.
-pkg_check_modules(STEREO_AV REQUIRED IMPORTED_TARGET libavcodec>=63 libavutil>=61)
-add_library(StereoAv SHARED src/av/stereo-av.c)
+pkg_check_modules(STEREO_AV REQUIRED IMPORTED_TARGET libavcodec>=63 libavutil>=61 libavformat>=63)
+add_library(StereoAv SHARED src/av/stereo-av.c src/av/stereo-content.c)
 set_target_properties(StereoAv PROPERTIES OUTPUT_NAME stereo-av VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Av)
-target_link_libraries(StereoAv PRIVATE PkgConfig::STEREO_AV)
+target_link_libraries(StereoAv PRIVATE PkgConfig::STEREO_AV ZLIB::ZLIB)
 target_include_directories(StereoAv PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/av> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-av>)
 install(TARGETS StereoAv EXPORT StereoLayerTargets LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR})
-install(FILES src/av/stereo-av.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-av)
+install(FILES src/av/stereo-av.h src/av/stereo-content.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-av)
 configure_file(src/av/stereo-av.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-av.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-av.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 
@@ -94,3 +94,7 @@ option(BUILD_EXAMPLES "Build the widget and QML example client" OFF)
 if(BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
+
+add_executable(stereo-content-probe src/content/probe.c)
+target_link_libraries(stereo-content-probe PRIVATE StereoAv)
+install(TARGETS stereo-content-probe RUNTIME DESTINATION ${KDE_INSTALL_BINDIR})

@@ -21,7 +21,7 @@ for row in json.loads((a.fixtures/'manifest.json').read_text()):
     else:
         result = subprocess.run(['gio', 'info', '-a', 'standard::content-type', str(path)], capture_output=True, text=True)
         actual = result.stdout.split('standard::content-type: ')[-1].strip()
-        expected = ('video/x-matroska-3d' if row['base'].startswith('video/') else 'image/x-png-3d') if row['stereo'] else row['base']
+        expected = ('video/x-matroska-3d' if row['base'].startswith('video/') else 'image/x-png-3d') if row['stereo'] == 1 else row['base']
         matched = actual == expected
     print(('PASS' if matched else 'FAIL'), row['file'], 'expected', expected, 'actual', actual)
     failures += not matched

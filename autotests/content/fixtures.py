@@ -26,7 +26,7 @@ def generate(root):
     plain = root / 'plain.mkv'
     run(['ffmpeg', '-nostdin', '-v', 'error', '-f', 'lavfi', '-i',
          'testsrc2=size=64x32:rate=4', '-frames:v', '2', '-c:v', 'ffv1', '-threads', '1', '-y', str(plain)])
-    records = [dict(file=plain.name, base='video/x-matroska', stereo=0, layout=0, order=0)]
+    records = [dict(file=plain.name, base='video/x-matroska', stereo=-1, layout=0, order=0)]
     for value, (name, layout, order) in enumerate(MODES):
         target = root / f'matroska-{value:02}.mkv'
         run(['ffmpeg', '-nostdin', '-v', 'error', '-i', str(plain), '-map', '0:v',
@@ -35,17 +35,17 @@ def generate(root):
                             layout=layout, order=order, signal='matroska-stereomode', value=value))
     # A 3D-looking filename is not a mark.
     (root/'holiday-3D-SBS.mkv').write_bytes(plain.read_bytes())
-    records.append(dict(file='holiday-3D-SBS.mkv', base='video/x-matroska', stereo=0, layout=0, order=0))
+    records.append(dict(file='holiday-3D-SBS.mkv', base='video/x-matroska', stereo=-1, layout=0, order=0))
     def chunk(name, data):
         return struct.pack('>I', len(data)) + name + data + struct.pack('>I', zlib.crc32(name+data))
     ihdr = chunk(b'IHDR', struct.pack('>IIBBBBB', 8, 2, 8, 2, 0, 0, 0))
     pixels = chunk(b'IDAT', zlib.compress((b'\0' + bytes(range(24))) * 2))
-    for name, extra, stereo, order in [('plain.png', b'', 0, 0),
+    for name, extra, stereo, order in [('plain.png', b'', -1, 0),
                                       ('ster-0.png', chunk(b'sTER', b'\0'), 1, 1),
                                       ('ster-1.png', chunk(b'sTER', b'\1'), 1, 0),
-                                      ('ster-decoy.png', chunk(b'tEXt', b'comment\0sTER\1'), 0, 0)]:
+                                      ('ster-decoy.png', chunk(b'tEXt', b'comment\0sTER\1'), -1, 0)]:
         (root/name).write_bytes(b'\x89PNG\r\n\x1a\n' + ihdr + extra + pixels + chunk(b'IEND', b''))
-        records.append(dict(file=name, base='image/png', stereo=stereo, layout=stereo, order=order))
+        records.append(dict(file=name, base='image/png', stereo=stereo, layout=int(stereo == 1), order=order))
     for r in records:
         r['sha256'] = hashlib.sha256((root/r['file']).read_bytes()).hexdigest()
     (root/'manifest.json').write_text(json.dumps(records, indent=2)+'\n')
