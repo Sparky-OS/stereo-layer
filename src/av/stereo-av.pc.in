@@ -1,0 +1,9 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+libdir=${prefix}/@KDE_INSTALL_LIBDIR@
+includedir=${prefix}/@KDE_INSTALL_INCLUDEDIR@/stereo-av
+
+Name: stereo-av
+Description: Native FFmpeg multiview frame assembly for Stereo KWin consumers
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lstereo-av
+Cflags: -I${includedir}

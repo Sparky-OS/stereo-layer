@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.25)
-project(StereoLayer VERSION 1.11.0 LANGUAGES C CXX)
+project(StereoLayer VERSION 1.12.0 LANGUAGES C CXX)
 find_package(ECM 6.0 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 include(KDEInstallDirs6)
@@ -31,6 +31,17 @@ install(TARGETS StereoPolicy EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEF
 install(FILES src/policy/stereo-policy.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-policy)
 configure_file(src/policy/stereo-policy.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
+
+# FFmpeg consumers share native multiview pairing without pulling in Qt.
+pkg_check_modules(STEREO_AV REQUIRED IMPORTED_TARGET libavcodec>=63 libavutil>=61)
+add_library(StereoAv SHARED src/av/stereo-av.c)
+set_target_properties(StereoAv PROPERTIES OUTPUT_NAME stereo-av VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Av)
+target_link_libraries(StereoAv PRIVATE PkgConfig::STEREO_AV)
+target_include_directories(StereoAv PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/av> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-av>)
+install(TARGETS StereoAv EXPORT StereoLayerTargets LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR})
+install(FILES src/av/stereo-av.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-av)
+configure_file(src/av/stereo-av.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-av.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-av.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 
 # Depth-image-based rendering without Qt, for any program that turns a picture and its depth into stereo
 # The GLSL passes of the DIBR core, built into the library as byte arrays and installed for other programs

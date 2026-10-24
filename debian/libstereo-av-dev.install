@@ -1,0 +1,3 @@
+usr/lib/*/libstereo-av.so
+usr/lib/*/pkgconfig/stereo-av.pc
+usr/include/stereo-av/
