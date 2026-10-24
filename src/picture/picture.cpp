@@ -497,6 +497,34 @@ Picture fromImagesComparing(const QImage &image, const QImage &second, const QSt
 }
 }
 
+Picture Picture::fromReader(QImageReader &reader, const QImage &primary, const QString &metadata, const QByteArray &format,
+    const QByteArray &header, const Options &options, OutputMode output)
+{
+    QImage first = primary;
+    QImage second;
+    const bool indexed = metadata.startsWith(QLatin1String("multiView")) && !reader.text(QStringLiteral("Stereo3DViewIndices")).isEmpty()
+        && options.view != View::Mono;
+    if (indexed) {
+        const auto indices = stereoViewIndices(reader);
+        if (!indices || !reader.jumpToImage(indices->first)) {
+            Picture result;
+            result.original = primary;
+            return result;
+        }
+        first = reader.read();
+        if (reader.jumpToImage(indices->second)) {
+            second = reader.read();
+        }
+    } else if (hasSecondImage(reader.imageCount(), format, metadata) && reader.jumpToImage(1)) {
+        second = reader.read();
+    }
+    Picture result = fromImages(first, second, metadata, format, header, options, output);
+    if (indexed && options.view == View::Stereo) {
+        result.original = primary;
+    }
+    return result;
+}
+
 Picture Picture::fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
     const Options &options, OutputMode output)
 {

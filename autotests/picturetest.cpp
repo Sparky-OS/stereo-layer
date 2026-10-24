@@ -1192,6 +1192,12 @@ void PictureTest::heifMonoscopicFallback()
     QCOMPARE(Picture::load(path, options, OutputMode::Stereo).original, left);
     options.view = Picture::View::RightOnly;
     QCOMPARE(Picture::load(path, options, OutputMode::Stereo).original, right);
+    QVERIFY(reference.jumpToImage(0));
+    const QImage firstRead = reference.read();
+    const auto buffered = Picture::fromReader(reference, firstRead, reference.text(QStringLiteral("Stereo3DLayout")), "heif", {}, {}, OutputMode::Stereo);
+    QCOMPARE(buffered.original, primary);
+    QCOMPARE(buffered.left, left);
+    QCOMPARE(buffered.right, right);
     const auto thumb = Picture::loadPair(path, QSize(2000, 1000), {});
     QCOMPARE(thumb.left, left);
     QCOMPARE(thumb.right, right);

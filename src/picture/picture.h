@@ -6,6 +6,8 @@
 #include <QString>
 #include <stereo_layer_export.h>
 
+class QImageReader;
+
 namespace Stereo
 {
 enum class OutputMode { Unknown, Mono, Stereo, Anaglyph };
@@ -81,6 +83,9 @@ public:
     static Picture loadPair(const QString &path, const QSize &bound, const Options &options);
     static Picture loadPair(
         const QString &path, const QSize &bound, const Options &options, const DepthOptions &depthOptions, DepthPicture depthPicture);
+    // Continue a reader whose primary image was already decoded, including an in-memory edited document.
+    static Picture fromReader(QImageReader &reader, const QImage &primary, const QString &metadata, const QByteArray &format,
+        const QByteArray &header, const Options &options, OutputMode output);
     static Picture fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
         const Options &options, OutputMode output);
     static Picture fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
