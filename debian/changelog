@@ -1,3 +1,15 @@
+stereo-layer (1.12.0-1) unstable; urgency=medium
+
+  * Add the Qt-free stereo-av library for FFmpeg consumers: pair signalled
+    MV-HEVC views at matching timestamps, copy native planes without scaling,
+    preserve presentation metadata and select the VPS base view for 2D.
+  * Reset incomplete pairs on seek and decoder replacement, and reject
+    duplicate eyes, timestamp disagreement and incompatible image descriptions.
+  * Retain the indexed HEIF ster/stem reader and in-memory document selection
+    from the accepted 1.11.0 candidate.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sat, 24 Oct 2026 07:00:00 +0000
+
 stereo-layer (1.10.0-1) unstable; urgency=medium
 
   * New: cropEyes() (render.h) hands a picture's eyes over at the

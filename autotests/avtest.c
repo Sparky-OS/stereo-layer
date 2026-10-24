@@ -116,6 +116,46 @@ int main(void)
     bad->color_range = first[0]->color_range == AVCOL_RANGE_MPEG ? AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG;
     assert(stereo_av_pair_frame(pair, ctx, bad, 1) < 0);
     av_frame_free(&bad);
+    AVFrame *wide[2];
+    for (int eye = 0; eye < 2; eye++) {
+        wide[eye] = av_frame_alloc();
+        wide[eye]->format = AV_PIX_FMT_YUV420P10LE;
+        wide[eye]->width = 320;
+        wide[eye]->height = 240;
+        assert(av_frame_get_buffer(wide[eye], 32) >= 0);
+        assert(av_frame_copy_props(wide[eye], first[eye]) >= 0);
+        for (int p = 0; p < 3; p++) {
+            int width = p ? 160 : 320, height = p ? 120 : 240;
+            for (int y = 0; y < height; y++) {
+                uint16_t *row = (uint16_t *)(wide[eye]->data[p] + y * wide[eye]->linesize[p]);
+                for (int x = 0; x < width; x++) row[x] = (eye * 319 + x + y * 3) % 1024;
+            }
+        }
+    }
+    wide[0]->opaque = (void *)1; /* a decoded direct-rendering picture is not the assembled buffer */
+    stereo_av_pair_reset(pair);
+    assert(push(pair, ctx, wide[0], 1) == 0);
+    AVFrame *joined = av_frame_clone(wide[1]);
+    assert(stereo_av_pair_frame(pair, ctx, joined, 1) == 2);
+    assert(joined->format == AV_PIX_FMT_YUV420P10LE && joined->opaque == NULL);
+    equal_eye(joined, wide[0], 0);
+    equal_eye(joined, wide[1], 1);
+    assert(stereo_av_pair_base_eye(pair) == AV_STEREO3D_VIEW_LEFT);
+    av_frame_free(&joined);
+    for (int eye = 0; eye < 2; eye++) {
+        av_frame_remove_side_data(wide[eye], AV_FRAME_DATA_STEREO3D);
+        AVStereo3D *side = av_stereo3d_create_side_data(wide[eye]);
+        side->type = AV_STEREO3D_FRAMESEQUENCE;
+        side->view = eye == 0 ? AV_STEREO3D_VIEW_RIGHT : AV_STEREO3D_VIEW_LEFT;
+    }
+    assert(push(pair, ctx, wide[0], 1) == 0);
+    joined = av_frame_clone(wide[1]);
+    assert(stereo_av_pair_frame(pair, ctx, joined, 1) == 2);
+    equal_eye(joined, wide[1], 0);
+    equal_eye(joined, wide[0], 1);
+    assert(stereo_av_pair_base_eye(pair) == AV_STEREO3D_VIEW_RIGHT);
+    av_frame_free(&joined);
+    av_frame_free(&wide[0]); av_frame_free(&wide[1]);
     printf("192 decoded views, 96 sample-exact pairs, presentation metadata and reset/duplicate/timestamp/format controls passed\n");
     for (int i = 0; i < 2; i++) { av_frame_free(&first[i]); av_frame_free(&eyes[i]); }
     stereo_av_pair_free(&pair);

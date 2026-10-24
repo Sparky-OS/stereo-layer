@@ -17,6 +17,8 @@ struct StereoAVPair {
     int pending_id;
     unsigned ids[2];
     int configured;
+    int base_eye;
+    int single_view;
 };
 
 StereoAVPair *stereo_av_pair_alloc(void)
@@ -59,21 +61,42 @@ static int view_ids(const AVCodecContext *decoder, unsigned ids[2])
     return ids[0] != ids[1];
 }
 
+static int single_view(const AVCodecContext *decoder)
+{
+    unsigned count = 0;
+    int requested = -1;
+    if (av_opt_get_array_size((void *)decoder, "view_ids", AV_OPT_SEARCH_CHILDREN, &count) < 0)
+        return 0;
+    if (!count)
+        return 1;
+    return count == 1
+        && av_opt_get_array((void *)decoder, "view_ids", AV_OPT_SEARCH_CHILDREN, 0, 1, AV_OPT_TYPE_INT, &requested) >= 0
+        && requested >= 0;
+}
+
 void stereo_av_pair_configure(StereoAVPair *pair, const AVCodecContext *decoder)
 {
     unsigned ids[2];
     int valid = view_ids(decoder, ids);
+    pair->single_view = single_view(decoder);
     if (valid != pair->configured || (valid && memcmp(ids, pair->ids, sizeof(ids))))
         stereo_av_pair_reset(pair);
+    if (valid != pair->configured || (valid && memcmp(ids, pair->ids, sizeof(ids))))
+        pair->base_eye = AV_STEREO3D_VIEW_UNSPEC;
     pair->configured = valid;
     if (valid)
         memcpy(pair->ids, ids, sizeof(ids));
 }
 
+int stereo_av_pair_base_eye(const StereoAVPair *pair)
+{
+    return pair->base_eye;
+}
+
 int stereo_av_decoder_multiview(const AVCodecContext *decoder)
 {
     unsigned ids[2];
-    return decoder->codec_id == AV_CODEC_ID_HEVC && view_ids(decoder, ids);
+    return decoder->codec_id == AV_CODEC_ID_HEVC && view_ids(decoder, ids) && !single_view(decoder);
 }
 
 static void make_mono(AVFrame *frame)
@@ -118,6 +141,7 @@ static int join_views(AVFrame *out, const AVFrame *left, const AVFrame *right,
     if ((ret = av_frame_get_buffer(out, 32)) < 0 || (ret = av_frame_copy_props(out, l)) < 0)
         goto done;
     out->crop_left = out->crop_right = out->crop_top = out->crop_bottom = 0;
+    out->opaque = NULL;
     int rowsize[4];
     ptrdiff_t strides[4];
     size_t sizes[4];
@@ -140,6 +164,9 @@ static int join_views(AVFrame *out, const AVFrame *left, const AVFrame *right,
         ret = AVERROR(ENOMEM);
         goto done;
     }
+    const AVFrameSideData *source_stereo = av_frame_get_side_data(l, AV_FRAME_DATA_STEREO3D);
+    if (source_stereo && source_stereo->size >= sizeof(*stereo))
+        *stereo = *(const AVStereo3D *)source_stereo->data;
     /* MOV vexu's presentation fields complement the codec's view identities. */
     const AVPacketSideData *presentation = av_packet_side_data_get(decoder->coded_side_data,
                                                     decoder->nb_coded_side_data, AV_PKT_DATA_STEREO3D);
@@ -164,6 +191,11 @@ int stereo_av_pair_frame(StereoAVPair *pair, const AVCodecContext *decoder,
         stereo_av_pair_reset(pair);
         return 1;
     }
+    if (pair->single_view) {
+        stereo_av_pair_reset(pair);
+        make_mono(frame);
+        return 1;
+    }
     int view;
     memcpy(&view, id->data, sizeof(view));
     if ((unsigned)view != ids[0] && (unsigned)view != ids[1]) {
@@ -174,6 +206,8 @@ int stereo_av_pair_frame(StereoAVPair *pair, const AVCodecContext *decoder,
     const AVFrameSideData *sd = av_frame_get_side_data(frame, AV_FRAME_DATA_STEREO3D);
     const AVStereo3D *stereo = sd && sd->size >= sizeof(*stereo) ? (const AVStereo3D *)sd->data : NULL;
     int eye = stereo ? stereo->view : AV_STEREO3D_VIEW_UNSPEC;
+    if ((unsigned)view == ids[0])
+        pair->base_eye = eye;
     if (!enabled || frame->pts == AV_NOPTS_VALUE
         || (eye != AV_STEREO3D_VIEW_LEFT && eye != AV_STEREO3D_VIEW_RIGHT)) {
         stereo_av_pair_reset(pair);

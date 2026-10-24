@@ -20,6 +20,8 @@ STEREO_AV_EXPORT void stereo_av_pair_free(StereoAVPair **pair);
 STEREO_AV_EXPORT int stereo_av_decoder_views(struct AVCodecContext *decoder);
 /* Valid in get_format, where FFmpeg exports the active VPS. */
 STEREO_AV_EXPORT void stereo_av_pair_configure(StereoAVPair *pair, const struct AVCodecContext *decoder);
+/* AVStereo3DView of the signalled VPS base eye, or UNSPEC when unknown. */
+STEREO_AV_EXPORT int stereo_av_pair_base_eye(const StereoAVPair *pair);
 STEREO_AV_EXPORT int stereo_av_decoder_multiview(const struct AVCodecContext *decoder);
 
 /* Consume frame in place. Return 0 while waiting, 1 for an ordinary/base
