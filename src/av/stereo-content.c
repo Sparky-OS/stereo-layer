@@ -96,6 +96,9 @@ static void stereo_data(StereoContentResult *out, const AVStereo3D *s, unsigned 
     out->stereo = stereo;
     out->layout = layout;
     out->order = order;
+    /* A codec/container AVStereo3D declaration replaces the packing as a whole.
+     * Anaglyph is a Matroska representation, not a modifier of this packing. */
+    out->anaglyph = 0;
     out->evidence |= evidence;
 }
 
