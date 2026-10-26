@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "families": [
+    {
+      "label": "Matroska",
+      "base": "video/x-matroska",
+      "stem": "video/x-matroska",
+      "aliases": [
+        "video/matroska",
+        "video/matroska-3d",
+        "video/x-matroska-3d"
+      ],
+      "kind": "video",
+      "enabled": true
+    },
+    {
+      "label": "WebM",
+      "base": "video/webm",
+      "stem": "video/x-webm",
+      "aliases": [],
+      "kind": "video",
+      "enabled": true
+    },
+    {
+      "label": "MP4",
+      "base": "video/mp4",
+      "stem": "video/x-mp4",
+      "aliases": [],
+      "kind": "video",
+      "enabled": true
+    },
+    {
+      "label": "QuickTime",
+      "base": "video/quicktime",
+      "stem": "video/x-quicktime",
+      "aliases": [],
+      "kind": "video",
+      "enabled": true
+    },
+    {
+      "label": "MPEG",
+      "base": "video/mpeg",
+      "stem": "video/x-mpeg",
+      "aliases": [],
+      "kind": "video",
+      "enabled": true
+    },
+    {
+      "label": "MPEG-TS",
+      "base": "video/mp2t",
+      "stem": "video/x-mp2t",
+      "aliases": [],
+      "kind": "video",
+      "enabled": true
+    },
+    {
+      "label": "AVI",
+      "base": "video/x-msvideo",
+      "stem": "video/x-avi",
+      "aliases": [
+        "video/vnd.avi"
+      ],
+      "kind": "video",
+      "enabled": true
+    },
+    {
+      "label": "Ogg",
+      "base": "video/ogg",
+      "stem": "video/x-ogg",
+      "aliases": [],
+      "kind": "video",
+      "enabled": true
+    },
+    {
+      "label": "PNG",
+      "base": "image/png",
+      "stem": "image/x-png",
+      "kind": "picture",
+      "enabled": true
+    },
+    {
+      "label": "JPEG",
+      "base": "image/jpeg",
+      "stem": "image/x-jpeg",
+      "kind": "picture",
+      "enabled": true
+    },
+    {
+      "label": "HEIF",
+      "base": "image/heif",
+      "stem": "image/x-heif",
+      "kind": "picture",
+      "enabled": false
+    },
+    {
+      "label": "AVIF",
+      "base": "image/avif",
+      "stem": "image/x-avif",
+      "kind": "picture",
+      "enabled": false
+    },
+    {
+      "label": "TIFF",
+      "base": "image/tiff",
+      "stem": "image/x-tiff",
+      "kind": "picture",
+      "enabled": false
+    },
+    {
+      "label": "WebP",
+      "base": "image/webp",
+      "stem": "image/x-webp",
+      "kind": "picture",
+      "enabled": false
+    },
+    {
+      "label": "JPEG XL",
+      "base": "image/jxl",
+      "stem": "image/x-jxl",
+      "kind": "picture",
+      "enabled": false
+    },
+    {
+      "label": "SVG",
+      "base": "image/svg+xml",
+      "stem": "image/x-svg",
+      "kind": "picture",
+      "enabled": false
+    },
+    {
+      "label": "OpenEXR",
+      "base": "image/x-exr",
+      "stem": "image/x-exr",
+      "kind": "picture",
+      "enabled": false
+    }
+  ],
+  "comments": {
+    "video": {
+      "en": {
+        "stereo": "{format} stereoscopic video",
+        "spherical": "{format} spherical video",
+        "stereo_spherical": "{format} stereoscopic spherical video"
+      },
+      "pl": {
+        "stereo": "Stereoskopowy film {format}",
+        "spherical": "Sferyczny film {format}",
+        "stereo_spherical": "Stereoskopowy film sferyczny {format}"
+      },
+      "pt_BR": {
+        "stereo": "Vídeo estereoscópico {format}",
+        "spherical": "Vídeo esférico {format}",
+        "stereo_spherical": "Vídeo esférico estereoscópico {format}"
+      },
+      "fr": {
+        "stereo": "Vidéo stéréoscopique {format}",
+        "spherical": "Vidéo sphérique {format}",
+        "stereo_spherical": "Vidéo sphérique stéréoscopique {format}"
+      },
+      "de": {
+        "stereo": "Stereoskopisches {format}-Video",
+        "spherical": "Sphärisches {format}-Video",
+        "stereo_spherical": "Stereoskopisches sphärisches {format}-Video"
+      },
+      "ja": {
+        "stereo": "{format} 立体映像",
+        "spherical": "{format} 全天球映像",
+        "stereo_spherical": "{format} 立体全天球映像"
+      },
+      "ko": {
+        "stereo": "{format} 입체 동영상",
+        "spherical": "{format} 구면 동영상",
+        "stereo_spherical": "{format} 입체 구면 동영상"
+      },
+      "zh_CN": {
+        "stereo": "{format} 立体视频",
+        "spherical": "{format} 全景视频",
+        "stereo_spherical": "{format} 立体全景视频"
+      },
+      "zh_TW": {
+        "stereo": "{format} 立體影片",
+        "spherical": "{format} 全景影片",
+        "stereo_spherical": "{format} 立體全景影片"
+      }
+    },
+    "picture": {
+      "en": {
+        "stereo": "{format} stereoscopic image"
+      },
+      "pl": {
+        "stereo": "Stereoskopowy obraz {format}"
+      },
+      "pt_BR": {
+        "stereo": "Imagem estereoscópica {format}"
+      },
+      "fr": {
+        "stereo": "Image stéréoscopique {format}"
+      },
+      "de": {
+        "stereo": "Stereoskopisches {format}-Bild"
+      },
+      "ja": {
+        "stereo": "{format} 立体画像"
+      },
+      "ko": {
+        "stereo": "{format} 입체 이미지"
+      },
+      "zh_CN": {
+        "stereo": "{format} 立体图像"
+      },
+      "zh_TW": {
+        "stereo": "{format} 立體影像"
+      }
+    }
+  }
+}

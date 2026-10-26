@@ -9,6 +9,7 @@ Homepage: https://sparkylinux.org
 
 Package: libstereo-layer1
 Architecture: any
+Build-Profiles: <!pkg.stereo-layer.av>
 Depends: ${shlibs:Depends}, ${misc:Depends}, libstereo-policy1 (= ${binary:Version}), qml6-module-qtquick, libstereo-declare1, libkscreen-bin (>= 4:6.7.4-1+stereo3d4), libkf6screen8 (>= 4:6.7.4-1+stereo3d4), kimageformat6-plugins (>= 6.30.0-1+stereo3d3), libqt6gui6 (>= 6.11.2+dfsg-5+stereo3d5)
 Description: Shared stereo picture policy and Qt presentation
  File marks, input choices, picture geometry and anaglyph conversion are
@@ -23,6 +24,7 @@ Description: Shared stereo picture policy and Qt presentation
 Package: libstereo-layer-dev
 Section: libdevel
 Architecture: any
+Build-Profiles: <!pkg.stereo-layer.av>
 Depends: libstereo-layer1 (= ${binary:Version}), libstereo-policy-dev (= ${binary:Version}), ${misc:Depends}, qt6-base-dev, qt6-declarative-dev
 Description: Development files for the shared stereo picture layer
  Headers and CMake targets for stereo picture policy, Qt widget presentation
@@ -30,6 +32,7 @@ Description: Development files for the shared stereo picture layer
 
 Package: libstereo-policy1
 Architecture: any
+Build-Profiles: <!pkg.stereo-layer.av>
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Shared stereo policy for programs without Qt
  How a stereo mark reads (the Stereo3DLayout words of RFC 9559 StereoMode and
@@ -44,12 +47,14 @@ Description: Shared stereo policy for programs without Qt
 Package: libstereo-policy-dev
 Section: libdevel
 Architecture: any
+Build-Profiles: <!pkg.stereo-layer.av>
 Depends: libstereo-policy1 (= ${binary:Version}), ${misc:Depends}
 Description: Development files for the shared stereo policy without Qt
  The C header stereo-policy.h and the pkg-config file stereo-policy.pc.
 
 Package: libstereo-dibr1
 Architecture: any
+Build-Profiles: <!pkg.stereo-layer.av>
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Depth-image-based rendering for programs without Qt
  A picture and its depth map become the two views of full side by side: the
@@ -69,6 +74,7 @@ Description: Depth-image-based rendering for programs without Qt
 Package: libstereo-dibr-dev
 Section: libdevel
 Architecture: any
+Build-Profiles: <!pkg.stereo-layer.av>
 Depends: libstereo-dibr1 (= ${binary:Version}), ${misc:Depends}
 Description: Development files for depth-image-based rendering without Qt
  The C headers stereo-dibr.h and stereo-dibr-gl.h, the pkg-config file

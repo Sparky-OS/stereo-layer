@@ -20,6 +20,39 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(STEREO_DECLARE REQUIRED IMPORTED_TARGET stereo-declare)
 pkg_check_modules(WAYLAND REQUIRED IMPORTED_TARGET wayland-client)
 pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/content/content-mime-map.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/content/stereo-content.xml ${CMAKE_CURRENT_BINARY_DIR}/content/mime-lists.json
+    COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/tools/content-mime.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/content/catalogue.json ${CMAKE_CURRENT_BINARY_DIR}/content
+    DEPENDS tools/content-mime.py data/content/catalogue.json VERBATIM)
+add_custom_target(stereo-content-catalogue DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/content/content-mime-map.inc)
+
+# FFmpeg consumers share native multiview pairing without pulling in Qt.
+pkg_check_modules(STEREO_AV REQUIRED IMPORTED_TARGET libavcodec>=63 libavutil>=61 libavformat>=63)
+add_library(StereoAv SHARED src/av/stereo-av.c src/av/stereo-content.c)
+add_dependencies(StereoAv stereo-content-catalogue)
+target_include_directories(StereoAv PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/content)
+set_target_properties(StereoAv PROPERTIES OUTPUT_NAME stereo-av VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Av)
+target_link_libraries(StereoAv PRIVATE PkgConfig::STEREO_AV ZLIB::ZLIB)
+target_include_directories(StereoAv PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/av> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-av>)
+install(TARGETS StereoAv EXPORT StereoLayerTargets LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR})
+install(FILES src/av/stereo-av.h src/av/stereo-content.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-av)
+configure_file(src/av/stereo-av.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-av.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-av.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
+
+# The FFmpeg library is independently deployable; its ABI has no Qt dependency.
+option(STEREO_AV_ONLY "Build and test only the FFmpeg consumer library" OFF)
+if(STEREO_AV_ONLY)
+    if(BUILD_TESTING)
+        add_executable(avtest autotests/avtest.c)
+        target_compile_definitions(avtest PRIVATE FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/autotests/mvhevc/labelled.mp4")
+        target_link_libraries(avtest PRIVATE StereoAv PkgConfig::STEREO_AV)
+        add_test(NAME avtest COMMAND avtest)
+    endif()
+    return()
+endif()
+
 # The policy without Qt, for any program; the Qt layer builds on it
 add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-policy-picture.c src/policy/stereo-policy.h)
 add_library(Stereo::Policy ALIAS StereoPolicy)
@@ -31,17 +64,6 @@ install(TARGETS StereoPolicy EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEF
 install(FILES src/policy/stereo-policy.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-policy)
 configure_file(src/policy/stereo-policy.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
-
-# FFmpeg consumers share native multiview pairing without pulling in Qt.
-pkg_check_modules(STEREO_AV REQUIRED IMPORTED_TARGET libavcodec>=63 libavutil>=61)
-add_library(StereoAv SHARED src/av/stereo-av.c)
-set_target_properties(StereoAv PROPERTIES OUTPUT_NAME stereo-av VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Av)
-target_link_libraries(StereoAv PRIVATE PkgConfig::STEREO_AV)
-target_include_directories(StereoAv PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/av> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-av>)
-install(TARGETS StereoAv EXPORT StereoLayerTargets LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR})
-install(FILES src/av/stereo-av.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-av)
-configure_file(src/av/stereo-av.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-av.pc @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-av.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 
 # Depth-image-based rendering without Qt, for any program that turns a picture and its depth into stereo
 # The GLSL passes of the DIBR core, built into the library as byte arrays and installed for other programs
@@ -93,4 +115,31 @@ endif()
 option(BUILD_EXAMPLES "Build the widget and QML example client" OFF)
 if(BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+option(BUILD_CONTENT_ENGINE "Build the desktop content refinement service and probe" OFF)
+if(BUILD_CONTENT_ENGINE)
+add_executable(stereo-content-probe src/content/probe.c)
+target_link_libraries(stereo-content-probe PRIVATE StereoAv)
+install(TARGETS stereo-content-probe RUNTIME DESTINATION ${KDE_INSTALL_BINDIR})
+
+# Application selection clients stay independent of FFmpeg and Qt.
+pkg_check_modules(CONTENT_GIO REQUIRED IMPORTED_TARGET gio-unix-2.0)
+add_library(StereoContentClient SHARED src/content/client.c)
+set_target_properties(StereoContentClient PROPERTIES OUTPUT_NAME stereo-content-client
+    VERSION ${PROJECT_VERSION} SOVERSION 1 C_STANDARD 11 C_VISIBILITY_PRESET hidden)
+target_link_libraries(StereoContentClient PRIVATE PkgConfig::CONTENT_GIO)
+target_include_directories(StereoContentClient PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/content>
+    $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-content>)
+install(TARGETS StereoContentClient LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR})
+install(FILES src/content/client.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-content)
+add_executable(stereo-content-worker src/content/worker.c)
+target_link_libraries(stereo-content-worker PRIVATE StereoAv)
+add_executable(stereo-contentd src/content/service.c)
+target_include_directories(stereo-contentd PRIVATE src/av)
+target_link_libraries(stereo-contentd PRIVATE PkgConfig::CONTENT_GIO)
+target_compile_definitions(stereo-contentd PRIVATE STEREO_CONTENT_WORKER="${KDE_INSTALL_FULL_LIBEXECDIR}/stereo-content-worker")
+install(TARGETS stereo-content-worker stereo-contentd RUNTIME DESTINATION ${KDE_INSTALL_LIBEXECDIR})
+configure_file(src/content/org.stereo.Content1.service.in org.stereo.Content1.service @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/org.stereo.Content1.service DESTINATION ${KDE_INSTALL_DATADIR}/dbus-1/services)
 endif()
