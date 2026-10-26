@@ -97,6 +97,12 @@ public:
     // it. The views have the picture's size; null when the images cannot be read or the mark is malformed.
     static Picture fromDepth(const QImage &picture, const QImage &depth, const QString &depthMark, const DepthOptions &options = {},
         const QImage &layer = {}, const QImage &layerDepth = {}, bool layerIsBackground = true);
+    // Existing approximate colour reconstruction, for CPU and GPU consumers.
+    // Row-major nonnegative weights and positive per-row divisors act on encoded
+    // RGB, before transfer decoding. Retained channels are exact; mixed channels
+    // are estimates, not recovery of colours discarded by the anaglyph encoder.
+    // Return false for None/unknown, leaving the arrays zeroed (divisors one).
+    static bool anaglyphTransform(AnaglyphColorPair pair, bool left, int weights[9], int divisors[3]);
     static Picture fromAnaglyph(const QImage &image, AnaglyphColorPair pair);
     static AnaglyphColorPair detectAnaglyph(const QImage &image);
     // Whether the two halves of an unmarked picture are views of one scene, by its pixels, on a reduced copy

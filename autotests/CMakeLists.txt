@@ -47,3 +47,7 @@ add_executable(avtest avtest.c)
 target_compile_definitions(avtest PRIVATE FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/mvhevc/labelled.mp4")
 target_link_libraries(avtest PRIVATE StereoAv PkgConfig::STEREO_AV PkgConfig::AVFORMAT)
 add_test(NAME avtest COMMAND avtest)
+
+add_executable(anaglyphtransformtest anaglyphtransformtest.cpp)
+target_link_libraries(anaglyphtransformtest PRIVATE StereoLayer)
+add_test(NAME anaglyphtransformtest COMMAND anaglyphtransformtest)

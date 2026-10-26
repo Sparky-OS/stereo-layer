@@ -155,8 +155,39 @@ int main(void)
     equal_eye(joined, wide[0], 1);
     assert(stereo_av_pair_base_eye(pair) == AV_STEREO3D_VIEW_RIGHT);
     av_frame_free(&joined);
+    /* Source aspect travels with samples; it never scales the assembled raster. */
+    wide[0]->sample_aspect_ratio = wide[1]->sample_aspect_ratio = (AVRational){2, 1};
+    stereo_av_pair_reset(pair);
+    assert(push(pair, ctx, wide[0], 1) == 0);
+    joined = av_frame_clone(wide[1]);
+    assert(stereo_av_pair_frame(pair, ctx, joined, 1) == 2);
+    assert(joined->sample_aspect_ratio.num == 2 && joined->sample_aspect_ratio.den == 1);
+    equal_eye(joined, wide[1], 0);
+    equal_eye(joined, wide[0], 1);
+    av_frame_free(&joined);
+    /* Missing/late views cannot join across cancellation, flush or unknown PTS. */
+    for (int reset = 0; reset < 3; reset++) {
+        stereo_av_pair_reset(pair);
+        assert(push(pair, ctx, first[0], 1) == 0);
+        stereo_av_pair_reset(pair);
+        assert(push(pair, ctx, first[1], 1) == 0);
+        bad = av_frame_clone(first[0]);
+        bad->pts = AV_NOPTS_VALUE;
+        assert(stereo_av_pair_frame(pair, ctx, bad, 1) == 1);
+        av_frame_free(&bad);
+        assert(push(pair, ctx, first[1], 1) == 0);
+    }
+    /* Arbitrary pictures without a signalled view ID do not become a pair. */
+    stereo_av_pair_reset(pair);
+    assert(push(pair, ctx, first[0], 1) == 0);
+    bad = av_frame_clone(first[1]);
+    av_frame_remove_side_data(bad, AV_FRAME_DATA_VIEW_ID);
+    assert(stereo_av_pair_frame(pair, ctx, bad, 1) == 1);
+    assert(bad->width == first[1]->width);
+    av_frame_free(&bad);
+    assert(push(pair, ctx, first[1], 1) == 0);
     av_frame_free(&wide[0]); av_frame_free(&wide[1]);
-    printf("192 decoded views, 96 sample-exact pairs, presentation metadata and reset/duplicate/timestamp/format controls passed\n");
+    printf("192 decoded views, 96 sample-exact pairs, presentation metadata and SAR/reset/duplicate/timestamp/format/missing-view controls passed\n");
     for (int i = 0; i < 2; i++) { av_frame_free(&first[i]); av_frame_free(&eyes[i]); }
     stereo_av_pair_free(&pair);
     av_frame_free(&frame); av_packet_free(&packet); avcodec_free_context(&ctx); avformat_close_input(&format);

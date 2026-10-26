@@ -114,38 +114,41 @@ double anaglyphScore(const ColorEdges &edges, Picture::AnaglyphColorPair pair)
     return best >= 0.2 ? best - zero : 0;
 }
 
-int anaglyphChannel(const QColor &color, Picture::AnaglyphColorPair pair, bool left, int channel)
-{
-    const int red = color.red();
-    const int green = color.green();
-    const int blue = color.blue();
-    switch (pair) {
-    case Picture::AnaglyphColorPair::RedCyan:
-        if (left) {
-            return channel == 0 ? red : (channel == 1 ? (red + green) / 2 : (red + blue) / 2);
-        }
-        return channel == 0 ? (red + green) / 2 : (channel == 1 ? green : blue);
-    case Picture::AnaglyphColorPair::GreenMagenta:
-        if (left) {
-            return channel == 0 ? (red + green) / 2 : (channel == 1 ? green : (green + blue) / 2);
-        }
-        return channel == 0 ? red : (channel == 1 ? (red + green + blue) / 3 : blue);
-    case Picture::AnaglyphColorPair::AmberBlue:
-        if (left) {
-            return channel == 0 ? red : (channel == 1 ? green : (green + blue) / 2);
-        }
-        return channel == 0 ? (red + blue) / 2 : (channel == 1 ? (green + blue) / 2 : blue);
-    case Picture::AnaglyphColorPair::None:
-        return 0;
-    }
-    return 0;
 }
+
+bool Picture::anaglyphTransform(AnaglyphColorPair pair, bool left, int weights[9], int divisors[3])
+{
+    if (!weights || !divisors) {
+        return false;
+    }
+    std::fill_n(weights, 9, 0);
+    std::fill_n(divisors, 3, 1);
+    // Same integer equations used by fromAnaglyph; public so video consumers
+    // need neither duplicate policy nor reduce high-precision video to RGB32.
+    static constexpr int transforms[3][2][12] = {
+        {{1,0,0, 1,1,0, 1,0,1, 1,2,2}, {1,1,0, 0,1,0, 0,0,1, 2,1,1}},
+        {{1,1,0, 0,1,0, 0,1,1, 2,1,2}, {1,0,0, 1,1,1, 0,0,1, 1,3,1}},
+        {{1,0,0, 0,1,0, 0,1,1, 1,1,2}, {1,0,1, 0,1,1, 0,0,1, 2,2,1}},
+    };
+    const int index = int(pair) - int(AnaglyphColorPair::RedCyan);
+    if (index < 0 || index >= 3) {
+        return false;
+    }
+    const int *transform = transforms[index][left ? 0 : 1];
+    std::copy_n(transform, 9, weights);
+    std::copy_n(transform + 9, 3, divisors);
+    return true;
 }
 
 Picture Picture::fromAnaglyph(const QImage &image, AnaglyphColorPair pair)
 {
     Picture result;
     if (image.isNull() || pair == AnaglyphColorPair::None) {
+        return result;
+    }
+    int weights[2][9], divisors[2][3];
+    if (!anaglyphTransform(pair, true, weights[0], divisors[0])
+        || !anaglyphTransform(pair, false, weights[1], divisors[1])) {
         return result;
     }
     result.original = image;
@@ -156,10 +159,18 @@ Picture Picture::fromAnaglyph(const QImage &image, AnaglyphColorPair pair)
     for (int y = 0; y < image.height(); ++y) {
         for (int x = 0; x < image.width(); ++x) {
             const QColor color = image.pixelColor(x, y);
-            result.left.setPixelColor(
-                x, y, QColor(anaglyphChannel(color, pair, true, 0), anaglyphChannel(color, pair, true, 1), anaglyphChannel(color, pair, true, 2)));
-            result.right.setPixelColor(
-                x, y, QColor(anaglyphChannel(color, pair, false, 0), anaglyphChannel(color, pair, false, 1), anaglyphChannel(color, pair, false, 2)));
+            const int rgb[3] = { color.red(), color.green(), color.blue() };
+            for (int eye = 0; eye < 2; ++eye) {
+                int reconstructed[3] = {};
+                for (int channel = 0; channel < 3; ++channel) {
+                    for (int source = 0; source < 3; ++source) {
+                        reconstructed[channel] += weights[eye][3 * channel + source] * rgb[source];
+                    }
+                    reconstructed[channel] /= divisors[eye][channel];
+                }
+                (eye ? result.right : result.left).setPixelColor(x, y,
+                    QColor(reconstructed[0], reconstructed[1], reconstructed[2]));
+            }
         }
     }
     result.layout = Layout::SideBySide;
