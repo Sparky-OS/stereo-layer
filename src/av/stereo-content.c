@@ -272,6 +272,9 @@ int stereo_content_inspect(const StereoContentRequest *request, StereoContentRes
     }
     int video = -1;
     unsigned video_track = 0;
+    /* Each track starts with the input state, never another track's marks.
+     * No reader calls occur in this loop, so byte accounting stays intact. */
+    const StereoContentResult input = *out;
     for (unsigned i = 0; i < format->nb_streams; ++i) {
         AVStream *stream = format->streams[i];
         if (stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO || stream->disposition & AV_DISPOSITION_ATTACHED_PIC)
@@ -279,7 +282,7 @@ int stereo_content_inspect(const StereoContentRequest *request, StereoContentRes
         ++video_track;
         if (request->video_track_plus_one && video_track != request->video_track_plus_one)
             continue;
-        StereoContentResult candidate = *out;
+        StereoContentResult candidate = input;
         container_data(&candidate, stream->codecpar);
         if (strstr(format->iformat->name, "matroska"))
             matroska_data(&candidate, stream);

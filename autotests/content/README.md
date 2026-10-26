@@ -35,3 +35,21 @@ A minimal local FFmpeg build is sufficient for parser diagnosis but is not a rep
 
 Timings printed by the service test are information, not pass thresholds.
 This test measures a new client process querying a warm shared cache; it does not measure player startup or window creation.
+
+### Track-local selection regression
+
+`selection-test.c` links against either the installed `libstereo-av` or the
+source under test. Its arguments are FILE MARKED_STREAM SPHERICAL WIDTH HEIGHT.
+For each independently authored file it checks automatic selection and both
+explicit video tracks, including stereo/projection/evidence/conflicts, raster,
+SAR, byte/packet counters, base MIME and preservation of the caller's FD offset.
+
+Use the retained `pact-fixtures/multitrack.mkv` (plain 960x804 then SBS 320x180)
+and its lossless `ffmpeg -map 0:v:1 -map 0:v:0 -c copy` reverse. Pass `1 0 320 180`
+and `0 0 320 180` respectively. `selection-fixture.c` independently writes two
+MP4 video tracks through FFmpeg's muxer, putting spherical metadata on only the
+zero-based stream specified by its third argument. With the synthetic 64x32
+`avc-plain.mp4`, generate both orders and pass `0 1 64 32` and `1 1 64 32`.
+The sealed 1.12.0-2 library fails only automatic selection when the mark is first;
+all twelve cases pass with track-local candidate initialization. The fixture
+writer and test require no display and never write the inspected files.
