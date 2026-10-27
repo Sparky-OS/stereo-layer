@@ -111,8 +111,8 @@ A depth map measured along each pixel's ray (Dynamic Depth's and GDepth's `Measu
 In pictures, the marks are text: the `Stereo3DLayout` and `Stereo3DDepth` keys of a PNG `tEXt` chunk, and the same names in the metadata the edition's readers report (`QImageReader::text()`, KFileMetaData's `stereo3dLayout`).
 
 In Matroska, separate depth tracks have registered `TrackPlaneType` values in `TrackCombinePlanes` (below).
-The layouts that pack one frame are still proposed `StereoMode` values, pending expert review.
-Until those packed-frame values are assigned, the edition carries their layout as the track's simple tag `STEREO3D_LAYOUT`.
+The layouts that pack one frame have assigned `StereoMode` values 15 through 20 since 26 October 2026 (below).
+The edition also carries their layout as the track's simple tag `STEREO3D_LAYOUT`; the registry assignment alone does not change existing readers or writers.
 The meaning of depth samples remains in `STEREO3D_DEPTH`, with the values above; a registered plane type does not replace that information.
 
 ## Rules for readers
@@ -125,7 +125,7 @@ The meaning of depth samples remains in `STEREO3D_DEPTH`, with the values above;
 
 ## Registrations
 
-The requests were submitted on 17 October 2026. Status verified against the live registry on 21 October 2026.
+The requests were submitted on 17 October 2026. Status verified against the live registry on 26 October 2026.
 
 ### Assigned: separate depth tracks
 
@@ -142,11 +142,24 @@ These planes combine with their picture tracks through `TrackCombinePlanes` ([se
 For one picture and its depth map, the picture uses the left-eye plane (0) and its depth uses plane type 3.
 This registration assigns identifiers; it does not establish support in every muxer, demuxer or player.
 
-### Pending: packed picture-and-depth layouts
+<a id="pending-packed-picture-and-depth-layouts"></a>
 
-The separate request for six [Matroska Stereo Modes](https://www.iana.org/assignments/matroska#matroska-stereo-modes) remains under designated-expert review under RFC 9559 section 27.7, Specification Required.
-The requested numbers 15–20 are **proposed, not assigned**; the registry still lists values from 15 as unassigned.
-The request covers picture/depth side by side and top/bottom in either order, four rows with graphics and graphics depth, and four quarters with background and background depth.
+### Assigned: packed picture-and-depth layouts
+
+IANA assigned six [Matroska Stereo Modes](https://www.iana.org/assignments/matroska#matroska-stereo-modes) on **26 October 2026**, following designated-expert review under [RFC 9559 section 27.7](https://www.rfc-editor.org/rfc/rfc9559#section-27.7), Specification Required.
+Daniel Ramos is the change controller, and the reference remains the immutable v1.9.0 specification linked above.
+
+| StereoMode | Packed layout |
+| --- | --- |
+| 15 | picture beside depth, picture first |
+| 16 | depth beside picture, depth first |
+| 17 | picture above depth |
+| 18 | depth above picture |
+| 19 | four rows: picture, depth, graphics, graphics depth |
+| 20 | four quarters: picture, depth, background, background depth |
+
+The registry assigns identifiers; it does not establish support in every muxer, demuxer or player.
+The allocation does not change this specification's depth sample conventions or the immutable v1.9.0 tag.
 
 ## Implementations
 
