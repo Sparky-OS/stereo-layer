@@ -51,3 +51,20 @@ add_test(NAME avtest COMMAND avtest)
 add_executable(anaglyphtransformtest anaglyphtransformtest.cpp)
 target_link_libraries(anaglyphtransformtest PRIVATE StereoLayer)
 add_test(NAME anaglyphtransformtest COMMAND anaglyphtransformtest)
+
+add_executable(translationtest translationtest.cpp)
+target_link_libraries(translationtest PRIVATE StereoLayer Qt6::Core)
+set(_translation_root ${CMAKE_CURRENT_BINARY_DIR}/translations)
+set(_french_qm ${_translation_root}/locale/fr/LC_MESSAGES/stereo-layer_qt.qm)
+add_custom_command(OUTPUT ${_french_qm}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/ECMPoQm/fr/stereo-layer_qt.qm ${_french_qm}
+    DEPENDS ${CMAKE_BINARY_DIR}/ECMPoQm/fr/stereo-layer_qt.qm)
+add_custom_target(translationtestqm DEPENDS ${_french_qm})
+add_dependencies(translationtest translationtestqm)
+add_test(NAME translationtest-fr
+    COMMAND translationtest "La couleur est reconstruite et approximative : un anaglyphe ne conserve qu'une partie de la couleur de chaque œil. Le fichier d'origine n'est jamais modifié.")
+set_tests_properties(translationtest-fr PROPERTIES
+    ENVIRONMENT "LANGUAGE=fr:en;LC_ALL=fr_FR.UTF-8;XDG_DATA_DIRS=${_translation_root}")
+add_test(NAME translationtest-c
+    COMMAND translationtest "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed.")
+set_tests_properties(translationtest-c PROPERTIES ENVIRONMENT "LC_ALL=C")
