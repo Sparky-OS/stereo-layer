@@ -13,4 +13,4 @@ msgstr ""
 
 msgctxt "QObject|"
 msgid "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed."
-msgstr "色彩為重建後的近似效果：立體浮雕影像僅保留每隻眼睛部分色彩。原始檔案永不會被修改。"
+msgstr "色彩為重建後的近似效果：互補色立體影像僅保留每隻眼睛的部分色彩。原始檔案絕不會被修改。"
