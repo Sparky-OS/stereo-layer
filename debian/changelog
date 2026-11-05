@@ -1,3 +1,13 @@
+stereo-layer (1.17.1-1) unstable; urgency=medium
+
+  * stereo_dibr_way_memory() counts the picture, its depth and the views at the content's depth (ORDER 411, step 2h; found in the review of
+    step 2g, which counted them at 8 bits for every content): up to 8 bits they are RGBA8, R8 and two RGBA8 views (13 bytes a pixel), above
+    8 bits RGBA16, R16UI and two RGBA16 views (26 bytes a pixel). At 1080p per eye a 10 bit content needs 252 to 342 MB (216 to 305 MB at
+    8 bits) and a 16 bit content 297 to 401 MB, as the driver takes them (times 1.35). dibrchoosetest asserts the figures at 8, 10 and 16 bits
+    (red before the fix: the 10 bit figure was the 8 bit one).
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 05 Nov 2026 22:38:00 +0000
+
 stereo-layer (1.17.0-1) unstable; urgency=medium
 
   * The passes hold the source's depth, and a way needs less of the GPU's memory (ORDER 411, step 2g; Daniel, 2026-10-07: video "at the

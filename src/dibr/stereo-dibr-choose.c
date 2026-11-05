@@ -95,7 +95,8 @@ double stereo_dibr_way_memory(int warp, int fill, int width, int height, int bit
     if (fill == STEREO_DIBR_FILL_PYRAMID)
         phase2 += (2 * color + 32) / 3.0; /* a third of the picture: the levels up and down, colour and state */
     double bytes = px * (phase1 > phase2 ? phase1 : phase2);
-    bytes += px * (4 + 1 + 8); /* the picture, its depth, the views (8 bit; the caller's) */
+    /* the picture, its depth and the two views, at the content's depth: RGBA8, R8 and two RGBA8 up to 8 bits; RGBA16, R16UI and two RGBA16 above */
+    bytes += px * (bits > 8 ? 8 + 2 + 2 * 8 : 4 + 1 + 2 * 4);
     return bytes * DRIVER_OVERHEAD;
 }
 

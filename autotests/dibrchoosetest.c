@@ -205,6 +205,22 @@ static void ladder_timing(void)
     CHECK(!stereo_dibr_way_fits(STEREO_DIBR_WARP_FORWARD, STEREO_DIBR_FILL_BACKGROUND, 3840, 2160, 8, 289e6));
     /* 16 bit content holds float colour: a way needs more of it */
     CHECK(stereo_dibr_way_memory(STEREO_DIBR_WARP_LAYERED, STEREO_DIBR_FILL_DEPTH_AIDED, 1920, 1080, 16) > stereo_dibr_way_memory(STEREO_DIBR_WARP_LAYERED, STEREO_DIBR_FILL_DEPTH_AIDED, 1920, 1080, 8));
+    /* the picture, its depth and the views are counted at the content's depth: at 10 to 16 bits they are RGBA16, R16UI and two RGBA16 (26 bytes a pixel,
+     * 13 at 8 bits); the forward background way holds color 8 or 16, so the difference of 8 and 16 bit content is the colour textures plus 13 bytes a pixel */
+    {
+        const double px = 1920.0 * 1080.0;
+        const double f = 1.35;
+        const double d10 = stereo_dibr_way_memory(STEREO_DIBR_WARP_FORWARD, STEREO_DIBR_FILL_BACKGROUND, 1920, 1080, 10);
+        const double d16 = stereo_dibr_way_memory(STEREO_DIBR_WARP_FORWARD, STEREO_DIBR_FILL_BACKGROUND, 1920, 1080, 16);
+        const double d8 = stereo_dibr_way_memory(STEREO_DIBR_WARP_FORWARD, STEREO_DIBR_FILL_BACKGROUND, 1920, 1080, 8);
+        /* the 10 bit content has the same half-float colour passes as 8 bit, so the whole difference is the 13 bytes a pixel */
+        CHECK(d10 - d8 > 12.9 * px * f && d10 - d8 < 13.1 * px * f);
+        /* the 16 bit content: float colour (8 more bytes twice over in phase 2) and 26 bytes a pixel outside the passes */
+        CHECK(d16 - d10 > 15.9 * px * f && d16 - d10 < 16.1 * px * f);
+        /* at 1080p and 16 bits the forward background way: phase 2 is 8 + 8 + 2 * 16 + 32 = 80 bytes a pixel, plus 26 for the picture, its depth and the views */
+        CHECK(d16 > (80 + 26) * px * f - 1e6 && d16 < (80 + 26) * px * f + 1e6);
+        CHECK(d8 > (64 + 13) * px * f - 1e6 && d8 < (64 + 13) * px * f + 1e6);
+    }
     /* a failing timer ends it, a bad argument is refused */
     CHECK(stereo_dibr_time_ladder(24.0, NULL, &f, p, 4, &timed) == -1);
     CHECK(stereo_dibr_time_ladder(0.0, fixture_time, &f, p, 4, &timed) == -1);
