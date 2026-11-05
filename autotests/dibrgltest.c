@@ -58,6 +58,17 @@ static int failures = 0;
 
 static stereo_dibr_gl_function resolve(const char *name) { return (stereo_dibr_gl_function)eglGetProcAddress(name); }
 
+/* A context that reports a reset when the test says so: the reset status function of KHR_robustness, which a driver answers 0 to until a GPU
+ * is reset, answered by the test */
+static unsigned fake_reset_status;
+static unsigned fake_get_graphics_reset_status(void) { return fake_reset_status; }
+static stereo_dibr_gl_function resolve_with_reset(const char *name)
+{
+    if (!strcmp(name, "glGetGraphicsResetStatus"))
+        return (stereo_dibr_gl_function)fake_get_graphics_reset_status;
+    return resolve(name);
+}
+
 static int context(void)
 {
     PFNEGLGETPLATFORMDISPLAYEXTPROC get_display = (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
@@ -295,6 +306,30 @@ int main(void)
 
     glFinish();
     stereo_dibr_gl_free(gl);
+
+    /* the reset status is watched: a drawing in a context that was reset returns -4 and says so, the next one is refused without drawing, and
+     * the timing is refused */
+    {
+        stereo_dibr_gl *rgl = stereo_dibr_gl_create(resolve_with_reset, STEREO_DIBR_GL_DESKTOP);
+        struct stereo_dibr_params prm;
+        stereo_dibr_params_default(&prm);
+        CHECK(rgl != NULL);
+        if (rgl) {
+            fake_reset_status = 0;
+            CHECK(stereo_dibr_gl_reset_status(rgl) == 0);
+            CHECK(render_gl(rgl, &prm, table, 256, depth, W, H, 0, 0, 0, 0, g_out) == 0);
+            fake_reset_status = 0x8253; /* GL_GUILTY_CONTEXT_RESET */
+            CHECK(render_gl(rgl, &prm, table, 256, depth, W, H, 0, 0, 0, 0, g_out) == -4);
+            CHECK(strstr(stereo_dibr_gl_error(rgl), "reset") != NULL);
+            fake_reset_status = 0; /* a GPU that came back: the context is not trusted again */
+            CHECK(stereo_dibr_gl_reset_status(rgl) == 0x8253);
+            CHECK(render_gl(rgl, &prm, table, 256, depth, W, H, 0, 0, 0, 0, g_out) == -4);
+            double ms[4];
+            int measured;
+            CHECK(stereo_dibr_gl_measure(rgl, 64, 36, 0, 24.0, ms, 4, &measured) == -1);
+            stereo_dibr_gl_free(rgl);
+        }
+    }
     if (failures)
         fprintf(stderr, "%d failures\n", failures);
     return failures != 0;
