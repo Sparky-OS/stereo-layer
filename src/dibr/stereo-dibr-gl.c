@@ -923,8 +923,6 @@ static int time_one_gl(void *user, int rung, double *p95)
     stereo_dibr_params_default(&p);
     p.warp = t->ways[rung].warp;
     p.fill = t->ways[rung].fill;
-    /* the first way run, and every way above one that took over 20 ms, is paced: bands of rows, each finished before the next, so that no
-     * single submission runs long on a slow GPU; the ways above a fast GPU's run as they run in a player */
     {
         /* the memory the way needs against what the GPU has free (GL_ATI_meminfo, GL_NVX_gpu_memory_info: kilobytes), when it says */
         const double free_bytes = stereo_dibr_gl_free_memory(gl);
@@ -933,9 +931,13 @@ static int time_one_gl(void *user, int rung, double *p95)
             return 1;
         }
     }
-    const int paced = rung == t->n - 1 || t->p95[rung + 1] > 20.0;
+    /* the first way run is paced for its first two frames (the GPU is not known yet): its second frame says how long a frame takes, and when it takes
+     * under 100 ms the timed frames run as they run in a player; every way above one that took over 20 ms is paced throughout */
+    const int first = rung == t->n - 1;
+    int paced = first || t->p95[rung + 1] > 20.0;
+    const int warm = first ? 2 : 1;
     stereo_dibr_gl_set_limits(gl, paced ? 270 : 0, paced);
-    for (int f = 0; f < STEREO_DIBR_TIMED_FRAMES + 1; f++) {
+    for (int f = 0; f < STEREO_DIBR_TIMED_FRAMES + warm; f++) {
         const double t0 = stereo_dibr_now_ms();
         if (t->with_transfer) {
             gl->BindTexture(GL_TEXTURE_2D, t->tex[0]);
@@ -956,10 +958,14 @@ static int time_one_gl(void *user, int rung, double *p95)
             return -1;
         }
         const double ft = stereo_dibr_now_ms() - t0;
-        if (f == 0) {
+        if (f < warm) {
             if (ft > 2 * STEREO_DIBR_GIVE_UP_MS) {
                 ms[count++] = ft;
                 break;
+            }
+            if (first && f == warm - 1 && ft < 100.0 && paced) {
+                paced = 0;
+                stereo_dibr_gl_set_limits(gl, 0, 0);
             }
             continue;
         }
