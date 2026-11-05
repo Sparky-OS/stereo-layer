@@ -1,3 +1,22 @@
+stereo-layer (1.17.0-1) unstable; urgency=medium
+
+  * The passes hold the source's depth, and a way needs less of the GPU's memory (ORDER 411, step 2g; Daniel, 2026-10-07: video "at the
+    source's depth (10/12/16 bits ...)", surfaces "at 10 bits or half float"; 2026-10-23: the efficient path to the screen by default).
+    stereo_dibr_gl_set_precision(): the colour textures are half float for content of up to 10 bits and float above, never below the source;
+    the cache of timings keeps 10 and 16 bit content apart. The colour textures of an 8 or 10 bit content are half float, the depth-sized
+    textures of the parallax step, the splat and the band are handed back as soon as they are used, and the colour and state textures
+    are made after that: the layered depth-aided way at 1080p per eye peaks at 193 MB counted from the passes (309 MB in 1.16.0), and the
+    driver's free memory falls by 252 MB at its first drawing instead of 359 MB on a GeForce RTX 3060, by 234 MB instead of 332 MB on a
+    Radeon R5 M330 (measured in a process of its own for each way).
+  * stereo_dibr_way_memory(warp, fill, w, h, bits) counts the two-phase peak times what the driver adds (1.13 to 1.39 measured), and
+    stereo_dibr_way_fits() is the one rule of the guard of the automatic choice and of the sentence beside a way in the controls: the
+    layered depth-aided way at 1080p per eye fits beside a two-screen desktop on a 512 MB carve-out (289 MB free), the layered pyramid does
+    not. The cheapest way is never held back by the guard. The controls say "needs about N MB of the GPU's memory, M MB is free" beside such
+    a way in the fill and warp lists before it is picked (StereoDepthSettings::setGpuMemory(), wayText()); a way the person picks runs.
+  * dibrtime: --memory and --only N; DIBRTIME_BITS sets the precision.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 05 Nov 2026 20:21:47 +0000
+
 stereo-layer (1.16.0-1) unstable; urgency=medium
 
   * The GPU path is paced and watched (ORDER 411, step 2f; a GPU page fault and ring timeout on the station's Ryzen 5600G iGPU while the
