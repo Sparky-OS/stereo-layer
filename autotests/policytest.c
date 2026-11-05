@@ -613,6 +613,48 @@ static void scopeFilm(void)
     CHECK(stereo_policy_video_layout(2400, 800, NULL, STEREO_POLICY_LAYOUT_NONE, 0, 0, &layout, &order, &source) == 0 && layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE);
 }
 
+/* The depth of a display: the one source of the sunk and popped limits, per display kind and size, with the person's choice on top */
+static int near_to(double a, double b, double tolerance) { return fabs(a - b) <= tolerance; }
+
+static void displayDepth(void)
+{
+    struct stereo_policy_depth d;
+    /* the reference: a 24 inch monitor, 531 x 299 mm, framed: the desktop's own defaults, 10 and 4 pixels, seen from 0.8 m */
+    CHECK(stereo_policy_display_depth(STEREO_POLICY_DISPLAY_FRAMED, 531, 299, 100, 0, 0, &d) == 0);
+    CHECK(near_to(d.sunk_px, 10.0, 0.01) && near_to(d.popped_px, 4.0, 0.01) && d.viewing_distance_mm == 797 && d.size_known == 1);
+    /* a 46 inch television (1018 x 573 mm) from 1.8 m, a 65 inch one (1439 x 809 mm) from 2.7 m, a laptop (345 x 194 mm): the same
+     * angle, so about the same pixels: framed screens of any size are coherent */
+    CHECK(stereo_policy_display_depth(STEREO_POLICY_DISPLAY_FRAMED, 1018, 573, 100, 0, 0, &d) == 0);
+    CHECK(near_to(d.sunk_px, 11.8, 0.3) && d.viewing_distance_mm > 1700 && d.viewing_distance_mm < 1900);
+    CHECK(stereo_policy_display_depth(STEREO_POLICY_DISPLAY_FRAMED, 1439, 809, 100, 0, 0, &d) == 0);
+    CHECK(near_to(d.sunk_px, 12.4, 0.3) && d.viewing_distance_mm > 2600 && d.viewing_distance_mm < 2800);
+    CHECK(stereo_policy_display_depth(STEREO_POLICY_DISPLAY_FRAMED, 345, 194, 100, 0, 0, &d) == 0);
+    CHECK(near_to(d.sunk_px, 11.6, 0.3) && d.viewing_distance_mm == 600);
+    /* the kind: a headset takes 2.5 times the separation at its window distance (2.2 times the reference monitor), a screen in colours 0.7 times, popped in the same ratio to sunk */
+    struct stereo_policy_depth h, a, f;
+    CHECK(stereo_policy_display_depth(STEREO_POLICY_DISPLAY_FRAMED, 531, 299, 100, 0, 0, &f) == 0);
+    CHECK(stereo_policy_display_depth(STEREO_POLICY_DISPLAY_HEADSET, 531, 299, 100, 0, 0, &h) == 0);
+    CHECK(stereo_policy_display_depth(STEREO_POLICY_DISPLAY_ANAGLYPH, 531, 299, 100, 0, 0, &a) == 0);
+    CHECK(h.sunk_px > 2.1 * f.sunk_px && h.sunk_px < 2.4 * f.sunk_px && near_to(a.sunk_px, 0.7 * f.sunk_px, 0.01));
+    CHECK(near_to(h.popped_px / h.sunk_px, 0.4, 0.001) && h.viewing_distance_mm == 700);
+    /* the person's choice on top: a strength scales the display's default, an absolute value replaces a limit */
+    CHECK(stereo_policy_display_depth(STEREO_POLICY_DISPLAY_FRAMED, 531, 299, 150, 0, 0, &d) == 0);
+    CHECK(near_to(d.sunk_px, 15.0, 0.01) && near_to(d.popped_px, 6.0, 0.01));
+    CHECK(stereo_policy_display_depth(STEREO_POLICY_DISPLAY_FRAMED, 531, 299, 150, 20, 0, &d) == 0);
+    CHECK(near_to(d.sunk_px, 20.0, 0.01) && near_to(d.popped_px, 6.0, 0.01));
+    CHECK(stereo_policy_display_depth(STEREO_POLICY_DISPLAY_FRAMED, 531, 299, 0, 0, 0, &d) == 0 && d.sunk_px == 0 && d.popped_px == 0);
+    /* a size that is not known is the reference monitor, and says so */
+    CHECK(stereo_policy_display_depth(STEREO_POLICY_DISPLAY_FRAMED, 0, 0, 100, 0, 0, &d) == 0);
+    CHECK(near_to(d.sunk_px, 10.0, 0.01) && d.size_known == 0);
+    /* a bad argument */
+    CHECK(stereo_policy_display_depth(3, 531, 299, 100, 0, 0, &d) == -1);
+    CHECK(stereo_policy_display_depth(-1, 531, 299, 100, 0, 0, &d) == -1);
+    CHECK(stereo_policy_display_depth(0, 531, 299, -1, 0, 0, &d) == -1);
+    CHECK(stereo_policy_display_depth(0, 531, 299, 1001, 0, 0, &d) == -1);
+    CHECK(stereo_policy_display_depth(0, 531, 299, 100, -1, 0, &d) == -1);
+    CHECK(stereo_policy_display_depth(0, 531, 299, 100, 0, 0, NULL) == -1);
+}
+
 int main(void)
 {
     marks();
@@ -629,6 +671,7 @@ int main(void)
     contents();
     siteMarks();
     scopeFilm();
+    displayDepth();
     if (failures)
         fprintf(stderr, "%d check(s) failed\n", failures);
     else

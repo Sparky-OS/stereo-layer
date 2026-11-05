@@ -17,11 +17,6 @@ stereo-layer (1.15.0-1) unstable; urgency=medium
     picking a warping or a gap filling turns automatic off and the pick holds for everything, the slowest way included.
     dibrbench asserts that the ladder follows the measured ranking, dibrchoosetest asserts the choice on fixtures of times (the
     budget of a GPU) and the cache, dibrtime times every way on a GPU or the processor and, with --choose, what a player chooses.
-
- -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 05 Nov 2026 17:00:00 +0000
-
-stereo-layer (1.14.0-1) unstable; urgency=medium
-
   * Picture plus depth has one set of options for every program (ORDER 411, group 2c; Daniel, 2026-11-05: where the assembly of
     full side by side from a picture and its depth has options, the library carries the best default and the person's choice, and
     every player shows the same controls). libstereo-dibr: struct stereo_dibr_options (depth strength, screen plane, shift,
@@ -41,8 +36,15 @@ stereo-layer (1.14.0-1) unstable; urgency=medium
   * StereoMode 13 and 14 are both eyes laced in one Block (RFC 9559 sections 5.1.4.1.28.3 and 18.10): they are written only when
     the track's blocks are laced that way; frame sequential and block laced layouts into a file whose blocks are not laced are
     refused (NOT_LACED), though FFmpeg's muxer writes 13 and 14 for its frame sequence.
+  * libstereo-policy: the depth of a display, one source for every program that puts depth on a stereo output.
+    stereo_policy_display_depth() gives, per display kind (framed screen, anaglyph screen, headset), physical
+    size and the person's choice (a strength in percent, or absolute limits), how far the output sinks and pops
+    in pixels of a 1920 wide view and where it is seen from. The browser's WebXR modes read it, and Stereo KWin
+    reads it for the desktop's depth, so a page and the desktop agree on the same screen (ORDER 194, docs/display-depth.md).
+  * This entry also carries the work of 1.14.0, which was staged and never published: the depth options and their controls, the writers'
+    size of the views and the laced blocks, and the yt3d reader and the 3D layout writers of 1.13.0.
 
- -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 05 Nov 2026 15:10:00 +0000
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 05 Nov 2026 17:00:00 +0000
 
 stereo-layer (1.13.0-1) unstable; urgency=medium
 
