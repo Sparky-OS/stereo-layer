@@ -18,6 +18,9 @@ if(EGL_FOUND)
     target_link_libraries(dibrgltest PRIVATE StereoDibr PkgConfig::EGL m)
     add_test(NAME dibrgltest COMMAND dibrgltest)
     set_tests_properties(dibrgltest PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "LIBGL_ALWAYS_SOFTWARE=1")
+    # not a test: the time of every way of drawing on a GPU (GLSL) and on the CPU, at the size a player has to keep up with
+    add_executable(dibrtime dibrtime.c)
+    target_link_libraries(dibrtime PRIVATE StereoDibr PkgConfig::EGL m)
 endif()
 # a reader that gives pictures with their depth map the way the edition's image readers do
 add_library(depthtestreader MODULE depthreader/depthreader.cpp)
