@@ -7,7 +7,9 @@
  * file byte for byte as it was. Needs ffmpeg, mkvmerge and mkvpropedit in PATH (mkvtoolnix); a missing tool fails the test.
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "stereo-mark.h"
 #include "stereo-policy.h"
 
@@ -41,9 +43,10 @@ static char dir[512];
         } \
     } while (0)
 
+static int run(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static int run(const char *fmt, ...)
 {
-    char cmd[2048];
+    char cmd[16384];
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(cmd, sizeof(cmd), fmt, ap);
@@ -53,9 +56,9 @@ static int run(const char *fmt, ...)
 
 static char *path_of(const char *name)
 {
-    static char bufs[8][700];
+    static char bufs[64][700];
     static int next;
-    char *b = bufs[next++ & 7];
+    char *b = bufs[next++ & 63];
     snprintf(b, 700, "%s/%s", dir, name);
     return b;
 }
@@ -334,6 +337,43 @@ static void test_matroska(void)
     CHECK(mkvmerge_stereo(f, 1) == 11 && mkvmerge_stereo(f, 2) == 0, "mkvmerge: track 1 is %d, track 2 is %d", mkvmerge_stereo(f, 1), mkvmerge_stereo(f, 2));
 }
 
+/* The offset of the last occurrence of a 4-byte element ID: the element itself, behind its mention in the SeekHead. */
+static long find_id(const char *path, const unsigned char id[4])
+{
+    size_t len;
+    unsigned char *b = slurp(path, &len);
+    long at = -1;
+    for (size_t i = 0; b && i + 4 <= len; ++i)
+        if (memcmp(b + i, id, 4) == 0)
+            at = (long)i;
+    free(b);
+    return at;
+}
+
+/* A file whose Tracks element mkvpropedit has had to move behind the clusters: the writer's reader follows it there. */
+static void test_tracks_moved(void)
+{
+    const unsigned char tracks_id[4] = { 0x16, 0x54, 0xAE, 0x6B }, cluster_id[4] = { 0x1F, 0x43, 0xB6, 0x75 };
+    CHECK(run("mkvmerge -q -o '%s' '%s'", path_of("mm.mkv"), path_of("m.mkv")) <= 1, "mkvmerge remakes the file");
+    const char *f = path_of("mm.mkv");
+    char big[6001];
+    memset(big, 'x', 6000);
+    big[6000] = 0;
+    CHECK(run("mkvpropedit '%s' --edit track:v1 --set name=%s >/dev/null", f, big) == 0, "a long track name makes Tracks grow");
+    long t = find_id(f, tracks_id), c = find_id(f, cluster_id);
+    CHECK(t > c && c > 0, "Tracks (%ld) now follows the last cluster (%ld)", t, c);
+    int packets = packet_count(f);
+    for (int v = 0; v <= 20; ++v) {
+        int layout, order, anaglyph;
+        stereo_mark_value_layout(STEREO_MARK_CONTAINER_MATROSKA, v, &layout, &order, &anaglyph);
+        stereo_mark_result r;
+        int st = stereo_mark_save(f, 2, layout, order, anaglyph, &r);
+        CHECK(st == STEREO_MARK_WRITTEN || st == STEREO_MARK_UNCHANGED, "StereoMode %d into the file with Tracks last: %s (%s)", v, stereo_mark_status_name(st), r.details);
+        CHECK(mkvmerge_stereo(f, 2) == v, "mkvmerge reads %d, wanted %d (Tracks last)", mkvmerge_stereo(f, 2), v);
+        CHECK(packet_count(f) == packets, "the media is intact (Tracks last, value %d)", v);
+    }
+}
+
 static void test_refusals(void)
 {
     const char *f = path_of("m.mkv");
@@ -469,8 +509,8 @@ static void test_tool_failures(void)
     drop(&s);
 
     /* the tool writes another value: the file is put back as it was */
-    char body[900];
-    snprintf(body, sizeof(body), "case \"$*\" in *--set*) exec '%s' \"$1\" --edit \"$3\" --set stereo-mode=7 ;; *) exec '%s' \"$@\" ;; esac\n", real, real);
+    char body[2200];
+    snprintf(body, sizeof(body), "flag='%s/wrong.flag'\ncase \"$*\" in *--set*) if [ ! -e \"$flag\" ]; then : > \"$flag\"; exec '%s' \"$1\" --edit \"$3\" --set stereo-mode=7; fi ;; esac\nexec '%s' \"$@\"\n", dir, real, real);
     stub_tool("wrong", body);
     setenv("PATH", path_of("wrong"), 1);
     st = stereo_mark_save(f, 2, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, 0, 0, &r);
@@ -507,6 +547,89 @@ static void test_declared_by_stream(void)
     CHECK(st == STEREO_MARK_UNCHANGED, "the stream declares what is asked: %s", stereo_mark_status_name(st));
     CHECK(same_as(&s, f), "nothing is written for what the stream declares");
     drop(&s);
+}
+
+/* Rewrite an ISO base media file of the shape ftyp, moov, free (8 bytes), mdat so that its free box has free_size bytes, and
+ * move every chunk offset (stco and co64, ISO/IEC 14496-12 8.7.5) by the difference, so the file plays as before. */
+static int tail_same(const char *a, const char *b, size_t n)
+{
+    size_t la, lb;
+    unsigned char *da = slurp(a, &la), *db = slurp(b, &lb);
+    int same = da && db && la >= n && lb >= n && memcmp(da + la - n, db + lb - n, n) == 0;
+    free(da);
+    free(db);
+    return same;
+}
+
+static int make_free_room(const char *src, const char *dst, int free_size)
+{
+    size_t len;
+    unsigned char *b = slurp(src, &len);
+    if (!b)
+        return -1;
+    size_t pos = 0, moov = 0, moov_size = 0, mdat = 0;
+    uint32_t sizes[4], types[4];
+    int n = 0;
+    while (pos + 8 <= len && n < 4) {
+        sizes[n] = (uint32_t)b[pos] << 24 | b[pos + 1] << 16 | b[pos + 2] << 8 | b[pos + 3];
+        types[n] = (uint32_t)b[pos + 4] << 24 | b[pos + 5] << 16 | b[pos + 6] << 8 | b[pos + 7];
+        if (types[n] == 0x6d6f6f76) {
+            moov = pos;
+            moov_size = sizes[n];
+        }
+        if (types[n] == 0x6d646174)
+            mdat = pos;
+        pos += sizes[n];
+        ++n;
+    }
+    if (n != 4 || !moov || !mdat || types[2] != 0x66726565 || sizes[2] != 8) {
+        free(b);
+        return -2;
+    }
+    long delta = (long)free_size - 8;
+    for (size_t p = moov; p + 16 < moov + moov_size; ++p) {
+        int is32 = memcmp(b + p, "stco", 4) == 0, is64 = memcmp(b + p, "co64", 4) == 0;
+        if (!is32 && !is64)
+            continue;
+        uint32_t count = (uint32_t)b[p + 8] << 24 | b[p + 9] << 16 | b[p + 10] << 8 | b[p + 11];
+        for (uint32_t i = 0; i < count; ++i) {
+            unsigned char *e = b + p + 12 + (size_t)i * (is64 ? 8 : 4);
+            if (is64) {
+                uint64_t v = 0;
+                for (int k = 0; k < 8; ++k)
+                    v = v << 8 | e[k];
+                v += delta;
+                for (int k = 7; k >= 0; --k, v >>= 8)
+                    e[k] = v & 0xff;
+            } else {
+                uint32_t v = (uint32_t)e[0] << 24 | e[1] << 16 | e[2] << 8 | e[3];
+                v += delta;
+                e[0] = v >> 24; e[1] = v >> 16; e[2] = v >> 8; e[3] = v;
+            }
+        }
+    }
+    FILE *f = fopen(dst, "wb");
+    if (!f) {
+        free(b);
+        return -3;
+    }
+    size_t head = moov + moov_size;
+    fwrite(b, 1, head, f);
+    if (free_size >= 8) {
+        unsigned char fh[8] = { (unsigned char)(free_size >> 24), (unsigned char)(free_size >> 16), (unsigned char)(free_size >> 8), (unsigned char)free_size, 'f', 'r', 'e', 'e' };
+        fwrite(fh, 1, 8, f);
+        for (int i = 8; i < free_size; ++i)
+            fputc(0, f);
+    } else {
+        /* a gap smaller than a box header cannot exist: the case with no free box at all is not made */
+        fclose(f);
+        free(b);
+        return -4;
+    }
+    fwrite(b + mdat, 1, len - mdat, f);
+    fclose(f);
+    free(b);
+    return 0;
 }
 
 static void test_mp4(void)
@@ -582,34 +705,45 @@ static void test_mp4(void)
     CHECK(st == STEREO_MARK_NO_TRACK && same_as(&s, f), "no second video track in the mp4: %s", stereo_mark_status_name(st));
     drop(&s);
 
-    /* moov at the start with no free space after it: st3d would move the media data, so it is refused */
+    /* moov at the start with a free box of 8 bytes after it (what ffmpeg's faststart leaves): too small, st3d would move the media data */
     CHECK(run("ffmpeg -v error -y -i '%s' -map 0:v:0 -c copy -movflags +faststart -f mp4 '%s'", path_of("src.mkv"), path_of("fs.mp4")) == 0, "ffmpeg makes the faststart mp4");
     boxes_of(path_of("fs.mp4"), boxes, sizeof(boxes));
-    CHECK(strcmp(boxes, "ftyp moov mdat") == 0, "the fixture has its moov before mdat and no free box: %s", boxes);
+    CHECK(strcmp(boxes, "ftyp moov free mdat") == 0, "the fixture has its moov before mdat and a free box of 8 bytes: %s", boxes);
     s = snap(path_of("fs.mp4"));
     st = stereo_mark_save(path_of("fs.mp4"), 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, 0, 0, &r);
     CHECK(st == STEREO_MARK_MP4_NO_ROOM, "moov before mdat with no room: %s", stereo_mark_status_name(st));
     CHECK(same_as(&s, path_of("fs.mp4")), "no room, the file is byte for byte");
     drop(&s);
 
-    /* moov at the start with a free box after it: the free box gives the 13 bytes, mdat does not move */
-    CHECK(run("ffmpeg -v error -y -i '%s' -map 0:v:0 -c copy -movflags +faststart -moov_size 4096 -f mp4 '%s'", path_of("src.mkv"), path_of("fr.mp4")) == 0, "ffmpeg makes the mp4 with reserved moov space");
-    boxes_of(path_of("fr.mp4"), boxes, sizeof(boxes));
-    if (strcmp(boxes, "ftyp moov free mdat") == 0) {
+    /* the free box of other sizes: 13 bytes (all taken, the box goes), 4104 (shortened), 20 (too small by one byte) */
+    static const struct { int free_size; int fits; } rooms[] = { { 13, 1 }, { 4104, 1 }, { 20, 0 }, { 21, 1 }, { 12, 0 } };
+    for (size_t i = 0; i < sizeof(rooms) / sizeof(rooms[0]); ++i) {
+        char name[32];
+        snprintf(name, sizeof(name), "room%d.mp4", rooms[i].free_size);
+        CHECK(make_free_room(path_of("fs.mp4"), path_of(name), rooms[i].free_size) == 0, "make the file with a free box of %d bytes", rooms[i].free_size);
+        const char *g = path_of(name);
+        int n = packet_count(g);
+        CHECK(n == packets, "the rebuilt file (free box %d) demuxes like the original: %d, %d", rooms[i].free_size, n, packets);
         size_t size_before;
-        free(slurp(path_of("fr.mp4"), &size_before));
-        int n = packet_count(path_of("fr.mp4"));
-        st = stereo_mark_save(path_of("fr.mp4"), 1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_POLICY_LEFT_FIRST, 0, &r);
-        CHECK(st == STEREO_MARK_WRITTEN && r.now == 1, "st3d into the free space: %s (%s)", stereo_mark_status_name(st), r.details);
-        size_t size_after;
-        free(slurp(path_of("fr.mp4"), &size_after));
-        CHECK(size_after == size_before, "the file keeps its size: %zu, %zu", size_before, size_after);
-        boxes_of(path_of("fr.mp4"), boxes, sizeof(boxes));
-        CHECK(strcmp(boxes, "ftyp moov free mdat") == 0, "the boxes: %s", boxes);
-        CHECK(packet_count(path_of("fr.mp4")) == n, "the media of the free-space file is intact");
-        CHECK(libav_mark(path_of("fr.mp4"), 1, tag, sizeof(tag), &type, &flags) == 1 && type == AV_STEREO3D_TOPBOTTOM, "libavformat reads top and bottom from it");
-    } else {
-        CHECK(0, "ffmpeg did not leave a free box after moov (%s): the free-space case has no fixture", boxes);
+        free(slurp(g, &size_before));
+        Snapshot sg = snap(g);
+        st = stereo_mark_save(g, 1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_POLICY_LEFT_FIRST, 0, &r);
+        if (rooms[i].fits) {
+            CHECK(st == STEREO_MARK_WRITTEN && r.now == 1, "st3d into a free box of %d bytes: %s (%s)", rooms[i].free_size, stereo_mark_status_name(st), r.details);
+            size_t size_after;
+            free(slurp(g, &size_after));
+            CHECK(size_after == size_before, "the file keeps its size: %zu, %zu", size_before, size_after);
+            boxes_of(g, boxes, sizeof(boxes));
+            CHECK(strcmp(boxes, rooms[i].free_size == 13 ? "ftyp moov mdat" : "ftyp moov free mdat") == 0, "the boxes after a free box of %d: %s", rooms[i].free_size, boxes);
+            CHECK(packet_count(g) == n, "the media is intact after st3d into a free box of %d: %d packets of %d", rooms[i].free_size, packet_count(g), n);
+            CHECK(libav_mark(g, 1, tag, sizeof(tag), &type, &flags) == 1 && type == AV_STEREO3D_TOPBOTTOM, "libavformat reads top and bottom (free box %d)", rooms[i].free_size);
+            /* nothing else moved: the bytes of mdat are the same */
+            CHECK(tail_same(g, path_of("fs.mp4"), 11000), "the media data is where and as it was (free box %d)", rooms[i].free_size);
+        } else {
+            CHECK(st == STEREO_MARK_MP4_NO_ROOM, "a free box of %d bytes is too small: %s", rooms[i].free_size, stereo_mark_status_name(st));
+            CHECK(same_as(&sg, g), "no room (free box %d), the file is byte for byte", rooms[i].free_size);
+        }
+        drop(&sg);
     }
 }
 
@@ -629,6 +763,7 @@ int main(void)
     av_log_set_level(AV_LOG_ERROR);
     test_values();
     test_matroska();
+    test_tracks_moved();
     test_refusals();
     test_webm();
     test_tool_failures();

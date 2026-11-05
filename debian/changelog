@@ -1,3 +1,32 @@
+stereo-layer (1.13.0-1) unstable; urgency=medium
+
+  * New in libstereo-av (stereo-mark.h): stereo_mark_save() writes a video's
+    3D layout and eye order into its container when the person asked for it,
+    so programs offer "save the correction into the file" through one library
+    (ORDER 411, group 2b of ORDER 151). Matroska and WebM: the track's
+    StereoMode, every value of RFC 9559 and the packed depth layouts 15 to 20
+    IANA assigned on 26 October 2026, through mkvpropedit; WebM only 0, 1, 2,
+    3 and 11 (WebM Container Guidelines). MP4 and MOV: st3d (Spherical Video
+    V2: mono, top-bottom, left-right, right-left) written in place, so no chunk
+    offset of ISO/IEC 14496-12 section 8.7.5 moves: into the last box, or into
+    a free box after moov.
+  * A depth layout into MP4 is refused (st3d has no depth value), as is every
+    packing the container has no value for; a video whose stream declares
+    another layout itself (the frame packing SEI) is refused; a file that
+    carries the layout already is left alone. Every refusal is a status that
+    says why, and leaves the file byte for byte.
+  * Every write is read back by a reader of its own that follows the file's
+    bytes (including a Tracks element mkvpropedit moved behind the clusters),
+    and a write that does not read back is put back as it was.
+  * The technique is that of sView's StVideoStereoMark (MIT), moved here so
+    sView, Dragon Player and the players after them write the same way.
+  * Test: marktest against ffmpeg-made files, with mkvmerge and libavformat as
+    the independent readers, 516 checks.
+  * Build-depend on ffmpeg and mkvtoolnix for that test. The programs that
+    call stereo_mark_save depend on mkvtoolnix, which provides mkvpropedit.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 05 Nov 2026 12:44:00 +0000
+
 stereo-layer (1.12.1-1) unstable; urgency=medium
 
   * Build and install the stereo-layer_qt translations for the eight
