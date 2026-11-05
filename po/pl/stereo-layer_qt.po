@@ -154,3 +154,7 @@ msgstr "%1 (GPU zostało zresetowane podczas rysowania: teraz rysuje procesor)"
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (%2 needs more of the GPU's memory than is free)"
 msgstr "%1 (%2 potrzebuje więcej pamięci GPU, niż jest wolne)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (needs about %2 MB of the GPU's memory, %3 MB is free)"
+msgstr "%1 (potrzebuje około %2 MB pamięci GPU, wolne jest %3 MB)"

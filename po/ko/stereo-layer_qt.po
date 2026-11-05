@@ -154,3 +154,7 @@ msgstr "%1 (그리는 중에 GPU가 초기화되어 이제 프로세서가 그�
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (%2 needs more of the GPU's memory than is free)"
 msgstr "%1 (%2은(는) 남은 GPU 메모리보다 더 많이 필요함)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (needs about %2 MB of the GPU's memory, %3 MB is free)"
+msgstr "%1 (GPU 메모리가 약 %2MB 필요합니다. 여유 %3MB)"

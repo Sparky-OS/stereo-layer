@@ -154,3 +154,7 @@ msgstr "%1（描画中に GPU がリセットされました。今はプロセ�
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (%2 needs more of the GPU's memory than is free)"
 msgstr "%1（%2 には空きより多くの GPU メモリが必要です）"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (needs about %2 MB of the GPU's memory, %3 MB is free)"
+msgstr "%1（GPU メモリを約 %2 MB 必要とします。空きは %3 MB）"

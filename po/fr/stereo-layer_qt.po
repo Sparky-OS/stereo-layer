@@ -154,3 +154,7 @@ msgstr "%1 (le GPU a été réinitialisé pendant le dessin : le processeur dess
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (%2 needs more of the GPU's memory than is free)"
 msgstr "%1 (%2 demande plus de mémoire du GPU qu’il n’y en a de libre)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (needs about %2 MB of the GPU's memory, %3 MB is free)"
+msgstr "%1 (demande environ %2 Mo de mémoire du GPU, %3 Mo sont libres)"

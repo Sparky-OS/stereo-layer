@@ -98,6 +98,14 @@ public:
     // What the player's drawing chose for the video: the map of QQuickVideoOutput::stereoDepthChoice (warp, fill, keepsUp, fps,
     // skippedWarp, skippedFill, onGpu); an empty map says no video is drawing
     Q_INVOKABLE void setChoice(const QVariantMap &choice);
+    // What the GPU that draws has free: the map of QQuickVideoOutput::stereoDepthGpuMemory (freeBytes, width, height, bits); empty when the
+    // processor draws. It never takes a way away: a way that would not fit is said beside it in the list, and runs when the person picks it.
+    Q_INVOKABLE void setGpuMemory(const QVariantMap &memory);
+    Q_PROPERTY(QVariantMap gpuMemory READ gpuMemory WRITE setGpuMemory NOTIFY changed)
+    QVariantMap gpuMemory() const;
+    // The text of a way in the lists: its name, and when the way needs more of the GPU's memory than is free, how much it needs and how much is
+    // free (the sentence the guard of the automatic choice uses, said before the person picks). key is a label() key: warpLayered, fillPyramid...
+    Q_INVOKABLE QString wayText(const QString &key, int warp, int fill) const;
     Q_INVOKABLE void reset();
     // The options as the picture drawing takes them
     Picture::DepthOptions toOptions() const;

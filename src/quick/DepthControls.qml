@@ -19,10 +19,19 @@ ColumnLayout {
 
     // the library's values of stereo_dibr_view, _warp, _fill and _smooth
     readonly property var pictureModel: [{text: word("pictureLeft"), value: 0}, {text: word("pictureMiddle"), value: 1}]
-    readonly property var fillModel: [{text: word("fillBackground"), value: 0}, {text: word("fillDepthAided"), value: 1},
-                                      {text: word("fillPyramid"), value: 4}, {text: word("fillTelea"), value: 2},
-                                      {text: word("fillNone"), value: 3}]
-    readonly property var warpModel: [{text: word("warpForward"), value: 0}, {text: word("warpBackward"), value: 1}, {text: word("warpLayered"), value: 2}]
+    // each way says, before it is picked, when it needs more of the GPU's memory than is free (and still runs when picked): the text of a
+    // way is the settings' (wayText), read again when the memory or the other half of the way changes
+    readonly property var fillModel: {
+        settings.gpuMemory; settings.shownWarp
+        return [{text: settings.wayText("fillBackground", settings.shownWarp, 0), value: 0}, {text: settings.wayText("fillDepthAided", settings.shownWarp, 1), value: 1},
+                {text: settings.wayText("fillPyramid", settings.shownWarp, 4), value: 4}, {text: settings.wayText("fillTelea", settings.shownWarp, 2), value: 2},
+                {text: settings.wayText("fillNone", settings.shownWarp, 3), value: 3}]
+    }
+    readonly property var warpModel: {
+        settings.gpuMemory; settings.shownFill
+        return [{text: settings.wayText("warpForward", 0, settings.shownFill), value: 0}, {text: settings.wayText("warpBackward", 1, settings.shownFill), value: 1},
+                {text: settings.wayText("warpLayered", 2, settings.shownFill), value: 2}]
+    }
 
     Controls.Label {
         text: root.word("title")
@@ -104,7 +113,7 @@ ColumnLayout {
             model: root.fillModel
             textRole: "text"
             valueRole: "value"
-            currentIndex: count > 0 ? indexOfValue(root.settings.shownFill) : -1
+            currentIndex: { model; return count > 0 ? indexOfValue(root.settings.shownFill) : -1 }
             onActivated: root.settings.useWay(root.settings.shownWarp, currentValue)
             Controls.ToolTip.text: root.word("fillTip")
             Controls.ToolTip.visible: hovered
@@ -116,7 +125,7 @@ ColumnLayout {
             model: root.warpModel
             textRole: "text"
             valueRole: "value"
-            currentIndex: count > 0 ? indexOfValue(root.settings.shownWarp) : -1
+            currentIndex: { model; return count > 0 ? indexOfValue(root.settings.shownWarp) : -1 }
             onActivated: root.settings.useWay(currentValue, root.settings.shownFill)
         }
 

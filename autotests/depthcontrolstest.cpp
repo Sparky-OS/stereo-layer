@@ -209,6 +209,34 @@ private Q_SLOTS:
         QVERIFY(u.toOptions().warp == Picture::DepthOptions::Warp::Layered && u.toOptions().fill == Picture::DepthOptions::Fill::DepthAided);
     }
 
+    void aWayThatDoesNotFitSaysSoBesideItBeforeItIsPicked()
+    {
+        Stereo::DepthSettings s;
+        // nothing known of the GPU: every way is its name
+        QCOMPARE(s.wayText(QStringLiteral("warpLayered"), 2, 1), Stereo::DepthSettings::label(QStringLiteral("warpLayered")));
+        // a two-screen desktop on a 512 MB carve-out leaves 289 MB: the layered depth-aided way fits, the layered pyramid does not
+        s.setGpuMemory({{QStringLiteral("freeBytes"), 289e6}, {QStringLiteral("width"), 1920}, {QStringLiteral("height"), 1080}, {QStringLiteral("bits"), 8}});
+        QCOMPARE(s.wayText(QStringLiteral("fillDepthAided"), STEREO_DIBR_WARP_LAYERED, STEREO_DIBR_FILL_DEPTH_AIDED), Stereo::DepthSettings::label(QStringLiteral("fillDepthAided")));
+        const QString pyramid = s.wayText(QStringLiteral("fillPyramid"), STEREO_DIBR_WARP_LAYERED, STEREO_DIBR_FILL_PYRAMID);
+        QVERIFY2(pyramid.startsWith(Stereo::DepthSettings::label(QStringLiteral("fillPyramid")) + QStringLiteral(" (needs about ")) && pyramid.endsWith(QStringLiteral(" MB is free)")), qPrintable(pyramid));
+        QVERIFY2(pyramid.contains(QStringLiteral("289 MB is free")), qPrintable(pyramid));
+        // the pick is never taken away: the way is the person's and the settings keep it
+        s.useWay(STEREO_DIBR_WARP_LAYERED, STEREO_DIBR_FILL_PYRAMID);
+        QCOMPARE(s.shownWarp(), int(STEREO_DIBR_WARP_LAYERED));
+        QCOMPARE(s.shownFill(), int(STEREO_DIBR_FILL_PYRAMID));
+        // the widgets say it in the lists
+        Stereo::DepthControls controls(&s);
+        const auto combos = controls.findChildren<QComboBox *>();
+        bool said = false;
+        for (QComboBox *c : combos)
+            for (int i = 0; i < c->count(); ++i)
+                said = said || c->itemText(i).contains(QStringLiteral("needs about"));
+        QVERIFY(said);
+        // the processor draws: nothing is said
+        s.setGpuMemory({});
+        QCOMPARE(s.wayText(QStringLiteral("fillPyramid"), STEREO_DIBR_WARP_LAYERED, STEREO_DIBR_FILL_PYRAMID), Stereo::DepthSettings::label(QStringLiteral("fillPyramid")));
+    }
+
     void widgetsShowWhatWasChosen()
     {
         DepthSettings s;

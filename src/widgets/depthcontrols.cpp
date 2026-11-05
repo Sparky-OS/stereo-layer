@@ -102,6 +102,13 @@ DepthControls::DepthControls(DepthSettings *settings, QWidget *parent)
         d->zero->setValue(d->settings->zero());
         d->shift->setValue(d->settings->shift());
         d->picture->setCurrentIndex(d->picture->findData(d->settings->view()));
+        // each way in the lists says, before it is picked, when it needs more of the GPU's memory than is free (and still runs when picked)
+        static const char *fillKeys[] = { "fillBackground", "fillDepthAided", "fillPyramid", "fillTelea", "fillNone" };
+        static const char *warpKeys[] = { "warpForward", "warpBackward", "warpLayered" };
+        for (int i = 0; i < d->fill->count(); ++i)
+            d->fill->setItemText(i, d->settings->wayText(QLatin1String(fillKeys[i]), d->settings->shownWarp(), d->fill->itemData(i).toInt()));
+        for (int i = 0; i < d->warp->count(); ++i)
+            d->warp->setItemText(i, d->settings->wayText(QLatin1String(warpKeys[i]), d->warp->itemData(i).toInt(), d->settings->shownFill()));
         d->fill->setCurrentIndex(d->fill->findData(d->settings->shownFill()));
         d->warp->setCurrentIndex(d->warp->findData(d->settings->shownWarp()));
         d->automatic->setChecked(d->settings->automatic());

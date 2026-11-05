@@ -154,3 +154,7 @@ msgstr "%1（繪製時 GPU 被重置：現在由處理器繪製）"
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (%2 needs more of the GPU's memory than is free)"
 msgstr "%1（%2 需要的 GPU 記憶體超過可用量）"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (needs about %2 MB of the GPU's memory, %3 MB is free)"
+msgstr "%1（需要約 %2 MB 的 GPU 記憶體，可用 %3 MB）"

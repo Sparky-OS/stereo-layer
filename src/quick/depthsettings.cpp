@@ -14,6 +14,9 @@ struct DepthSettings::Private {
     bool hasChoice = false;
     int warp = 0, fill = 0, skippedWarp = -1, skippedFill = -1, fps = 0;
     bool keepsUp = true, onGpu = true, gpuLost = false, skippedMemory = false;
+    // what the GPU has free, and the size and depth the video is drawn at
+    double freeBytes = -1;
+    int memWidth = 0, memHeight = 0, memBits = 8;
 };
 
 DepthSettings::DepthSettings(QObject *parent)
@@ -172,6 +175,44 @@ void DepthSettings::useWay(int warp, int fill)
         return;
     d->o = next;
     Q_EMIT changed();
+}
+
+void DepthSettings::setGpuMemory(const QVariantMap &memory)
+{
+    const double freeBytes = memory.contains(QStringLiteral("freeBytes")) ? memory.value(QStringLiteral("freeBytes")).toDouble() : -1;
+    const int w = memory.value(QStringLiteral("width"), 0).toInt(), h = memory.value(QStringLiteral("height"), 0).toInt();
+    const int bits = memory.value(QStringLiteral("bits"), 8).toInt();
+    if (freeBytes == d->freeBytes && w == d->memWidth && h == d->memHeight && bits == d->memBits)
+        return;
+    d->freeBytes = freeBytes;
+    d->memWidth = w;
+    d->memHeight = h;
+    d->memBits = bits;
+    Q_EMIT changed();
+}
+
+QVariantMap DepthSettings::gpuMemory() const
+{
+    QVariantMap map;
+    if (d->freeBytes >= 0 && d->memWidth > 0) {
+        map.insert(QStringLiteral("freeBytes"), d->freeBytes);
+        map.insert(QStringLiteral("width"), d->memWidth);
+        map.insert(QStringLiteral("height"), d->memHeight);
+        map.insert(QStringLiteral("bits"), d->memBits);
+    }
+    return map;
+}
+
+QString DepthSettings::wayText(const QString &key, int warp, int fill) const
+{
+    const QString text = label(key);
+    // the guard of the automatic choice and this sentence are one rule: stereo_dibr_way_fits()
+    if (d->freeBytes < 0 || d->memWidth <= 0 || stereo_dibr_way_fits(warp, fill, d->memWidth, d->memHeight, d->memBits, d->freeBytes))
+        return text;
+    static const char *context = "Stereo::DepthControls";
+    const double need = stereo_dibr_way_memory(warp, fill, d->memWidth, d->memHeight, d->memBits);
+    return QCoreApplication::translate(context, "%1 (needs about %2 MB of the GPU's memory, %3 MB is free)")
+        .arg(text, QString::number(qRound(need / 1e6)), QString::number(qRound(d->freeBytes / 1e6)));
 }
 
 void DepthSettings::setChoice(const QVariantMap &choice)
