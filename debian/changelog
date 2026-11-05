@@ -1,3 +1,14 @@
+stereo-layer (1.13.0-1) unstable; urgency=medium
+
+  * libstereo-policy: the site mark. stereo_policy_site_mark(), stereo_policy_site_mark_list()
+    and stereo_policy_site_mark_word() read YouTube's yt3d keywords in every form
+    (enable=LR, RL, LonR, RonL, true, false; swap; aspect; left and right
+    rectangles; malformed values read as far as they can be), one reader for the
+    browser and PlasmaTube (docs/yt3d.md). The first form is right eye first and
+    swap=true makes it left eye first, as YouTube's player took them.
+
+ -- Daniel Campos Ramos <Capitain_Jack@yahoo.com>  Thu, 05 Nov 2026 04:40:00 +0000
+
 stereo-layer (1.12.1-1) unstable; urgency=medium
 
   * Build and install the stereo-layer_qt translations for the eight

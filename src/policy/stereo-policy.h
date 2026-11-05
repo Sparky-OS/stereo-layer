@@ -52,6 +52,43 @@ enum stereo_policy_layout {
 /* Whether a layout holds a picture and its depth rather than two views: 1, else 0. */
 STEREO_POLICY_EXPORT int stereo_policy_is_depth_layout(int layout);
 
+/*
+ * A site's mark for a video: the packing a video site declares in the page's keywords, for a video whose stream and
+ * container say nothing (the YouTube convention of 2010, the video keywords yt3d:*). The one reader of the edition's
+ * programs (the browser, PlasmaTube): it comes after the stream's own mark and before the shape rule, and the user's
+ * choice comes before all of them. Case and spaces do not matter and a malformed value is read as far as it can be
+ * (docs/yt3d.md lists every form):
+ *   yt3d:enable=LR | RL | LonR | RonL   side by side, left eye first | right eye first; top and bottom, left eye on top |
+ *                                      right eye on top (YouTube's help of 2010, "Upload 3D video")
+ *   yt3d:enable=true (also 1, yes, on)  the first form: what yt3d:left and yt3d:right place, else side by side, right eye first
+ *                                      (YouTube's player took it for cross-eyed; yt3d:swap=true says parallel, left eye first)
+ *   yt3d:enable=false (also 0, no, off) the site says the video is not 3D
+ *   yt3d:swap=true (also 1, yes, on, or the bare tag)   the eyes the other way round, whatever else decided (so the first form
+ *                                      with it is left eye first)
+ *   yt3d:left=l_t_r_b, yt3d:right=l_t_r_b   where each eye is, as the left, top, right and bottom fractions of the frame
+ *                                      (the halves of a frame are the two supported arrangements; any other rectangle is
+ *                                      not an arrangement of this policy and the keywords give no mark, return value 2)
+ *   yt3d:aspect=W:H (also W/H, a number)  the shape of ONE view as the site shows it: a frame of that shape holds half
+ *                                      views, one twice as wide (side by side) or as tall (top and bottom) full views
+ * keywords is an array of count keywords, one tag each. Returns 1 when the keywords make a mark (layout NONE for "not 3D",
+ * order LEFT_FIRST or RIGHT_FIRST, aspect_num and aspect_den the shape of one view, 0 and 0 when none is given), 0 when
+ * they carry no yt3d tag, 2 when they carry yt3d tags that name no arrangement of this policy (an unsupported rectangle,
+ * an unknown enable value), -1 for a bad argument. An output pointer may be null.
+ */
+STEREO_POLICY_EXPORT int stereo_policy_site_mark(
+    const char *const *keywords, int count, int *layout, int *order, int *aspect_num, int *aspect_den);
+
+/* The same for the keywords as a page hands them on in a list, tags separated by commas or line breaks (the keywords meta
+ * tag of a watch page). The tags are read by stereo_policy_site_mark(): one reader. */
+STEREO_POLICY_EXPORT int stereo_policy_site_mark_list(const char *keywords, int *layout, int *order, int *aspect_num, int *aspect_den);
+
+/*
+ * The mark as the Stereo3DLayout word stereo_policy_read_mark() reads ("sideBySideLeftFirst", "topBottomRightFirst", "mono"),
+ * so a program that takes marks as words needs no table of its own. Returns 1, or -1 when the layout is not a packing of
+ * a site mark. word receives a string of the library, valid for ever.
+ */
+STEREO_POLICY_EXPORT int stereo_policy_site_mark_word(int layout, int order, const char **word);
+
 /* A value of user_layout for stereo_policy_video_layout(): the user says the video is not 3D, whatever its mark says. */
 #define STEREO_POLICY_USER_FORCE_2D (-1)
 

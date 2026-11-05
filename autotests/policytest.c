@@ -14,6 +14,10 @@
 
 static int failures = 0;
 
+/* what yt3d:enable=true without an arrangement means, and with yt3d:swap=true (docs/yt3d.md) */
+#define GENERIC_TRUE_ORDER STEREO_POLICY_RIGHT_FIRST
+#define GENERIC_TRUE_SWAPPED_ORDER STEREO_POLICY_LEFT_FIRST
+
 #define CHECK(condition)                                                                                                                             \
     do {                                                                                                                                             \
         if (!(condition)) {                                                                                                                          \
@@ -473,6 +477,127 @@ static void depthLayouts(void)
     CHECK(stereo_policy_matroska_plane(1920, 1080, 2, 1, STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE, &plane_w, &plane_h) == 0 && plane_w == 1920);
 }
 
+/* A site's mark: YouTube's yt3d keywords, every form (docs/yt3d.md), as one reader for the browser and PlasmaTube */
+static int site(const char *const *keywords, int count, int *layout, int *order, int *an, int *ad)
+{
+    return stereo_policy_site_mark(keywords, count, layout, order, an, ad);
+}
+
+static void siteMarks(void)
+{
+    int layout, order, an, ad;
+    static const struct {
+        const char *tags[4];
+        int found, layout, order;
+    } table[] = {
+        /* no yt3d tag: no mark */
+        { { "music", "live" }, 0, 0, 0 },
+        { { 0 }, 0, 0, 0 },
+        /* the four arrangements of YouTube's help */
+        { { "yt3d:enable=LR" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_LEFT_FIRST },
+        { { "yt3d:enable=RL" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_RIGHT_FIRST },
+        { { "yt3d:enable=LonR" }, 1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_POLICY_LEFT_FIRST },
+        { { "yt3d:enable=RonL" }, 1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_POLICY_RIGHT_FIRST },
+        /* the first form */
+        { { "yt3d:enable=true" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, GENERIC_TRUE_ORDER },
+        { { "yt3d:enable=false" }, 1, STEREO_POLICY_LAYOUT_NONE, STEREO_POLICY_LEFT_FIRST },
+        { { "yt3d:enable=0" }, 1, STEREO_POLICY_LAYOUT_NONE, STEREO_POLICY_LEFT_FIRST },
+        /* case, spaces and quotes do not matter */
+        { { " YT3D:Enable = lr " }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_LEFT_FIRST },
+        { { "\"yt3d:enable=RL\"" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_RIGHT_FIRST },
+        /* swap reverses whatever decided, in either order of the tags; alone it is no mark */
+        { { "yt3d:enable=LR", "yt3d:swap=true" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_RIGHT_FIRST },
+        { { "yt3d:swap=true", "yt3d:enable=LonR" }, 1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_POLICY_RIGHT_FIRST },
+        { { "yt3d:enable=RL", "yt3d:swap" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_LEFT_FIRST },
+        { { "yt3d:enable=LR", "yt3d:swap=false" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_LEFT_FIRST },
+        { { "yt3d:swap=true" }, 2, 0, 0 },
+        /* rectangles: the halves, either way round */
+        { { "yt3d:left=0_0_0.5_1", "yt3d:right=0.5_0_1_1" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_LEFT_FIRST },
+        { { "yt3d:left=0.5_0_1_1", "yt3d:right=0_0_0.5_1" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_RIGHT_FIRST },
+        { { "yt3d:left=0_0_1_0.5", "yt3d:right=0_0.5_1_1" }, 1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_POLICY_LEFT_FIRST },
+        { { "yt3d:right=0_0_1_0.5", "yt3d:left=0_0.5_1_1" }, 1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_POLICY_RIGHT_FIRST },
+        /* "Kate in 3D!": a malformed number ("0.") is read as far as it can be, and the rectangles with enable=true */
+        { { "yt3d:enable=true", "yt3d:aspect=4:3", "yt3d:right=0.5_0_1_1", "yt3d:left=0_0._0.5_1" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE,
+            STEREO_POLICY_LEFT_FIRST },
+        { { "yt3d:left=.0_.0_.5_1.", "yt3d:right=.5_0_1_1" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_LEFT_FIRST },
+        { { "yt3d:left=0,0_0_0,5_1", "yt3d:right=0,5_0_1_1" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_LEFT_FIRST },
+        { { "yt3d:left=0 0 0.5 1", "yt3d:right=0.5;0;1;1" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_LEFT_FIRST },
+        /* rectangles beat the first form's side by side; an explicit arrangement beats rectangles */
+        { { "yt3d:enable=true", "yt3d:left=0_0_1_0.5", "yt3d:right=0_0.5_1_1" }, 1, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_POLICY_LEFT_FIRST },
+        { { "yt3d:left=0_0_1_0.5", "yt3d:right=0_0.5_1_1", "yt3d:enable=LR" }, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_LEFT_FIRST },
+        /* rectangles of no arrangement of this policy, a broken rectangle, an unknown value: a tag was met, no mark */
+        { { "yt3d:left=0_0_1_0.4", "yt3d:right=0_0.6_1_1" }, 2, 0, 0 },
+        { { "yt3d:left=0_0_0.5", "yt3d:right=0.5_0_1_1" }, 2, 0, 0 },
+        { { "yt3d:enable=maybe" }, 2, 0, 0 },
+        { { "yt3d:enable=true", "yt3d:left=0_0_0.3_1", "yt3d:right=0.7_0_1_1" }, 2, 0, 0 },
+        { { "yt3d:aspect=16:9" }, 2, 0, 0 },
+    };
+    for (size_t i = 0; i < sizeof(table) / sizeof(table[0]); ++i) {
+        int count = 0;
+        while (count < 4 && table[i].tags[count])
+            ++count;
+        const int found = site(table[i].tags, count, &layout, &order, &an, &ad);
+        if (found != table[i].found || layout != table[i].layout || order != table[i].order)
+            fprintf(stderr, "site mark row %zu (%s ...): found %d layout %d order %d\n", i, count ? table[i].tags[0] : "-", found, layout, order);
+        CHECK(found == table[i].found && layout == table[i].layout && order == table[i].order);
+    }
+
+    /* the aspect: the shape of one view as the site shows it */
+    const char *aspect169[] = { "yt3d:enable=true", "yt3d:aspect=16:9", "yt3d:swap=true" };
+    CHECK(site(aspect169, 3, &layout, &order, &an, &ad) == 1 && an == 16000 && ad == 9000);
+    const char *aspect178[] = { "yt3d:enable=LR", "yt3d:aspect=1.78:1" };
+    CHECK(site(aspect178, 2, &layout, &order, &an, &ad) == 1 && an == 1780 && ad == 1000);
+    const char *aspect43[] = { "yt3d:enable=LR", "yt3d:aspect=4/3" };
+    CHECK(site(aspect43, 2, &layout, &order, &an, &ad) == 1 && an == 4000 && ad == 3000);
+    const char *aspectNumber[] = { "yt3d:enable=LR", "yt3d:aspect=1.777" };
+    CHECK(site(aspectNumber, 2, &layout, &order, &an, &ad) == 1 && an == 1777 && ad == 1000);
+    const char *aspectBad[] = { "yt3d:enable=LR", "yt3d:aspect=wide" };
+    CHECK(site(aspectBad, 2, &layout, &order, &an, &ad) == 1 && an == 0 && ad == 0);
+    const char *none[] = { "yt3d:enable=LR" };
+    CHECK(site(none, 1, &layout, &order, &an, &ad) == 1 && an == 0 && ad == 0);
+
+    /* the aspect decides full or half views through the plane rule: 3D Maestro (1920x1080, aspect 16:9) holds half views, a
+     * 3840x1080 frame of the same aspect full ones; Kate in 3D! (640x480, 4:3) half */
+    int decided_by;
+    CHECK(stereo_policy_video_views(1920, 1080, 1, 1, 16000, 9000, STEREO_POLICY_UPSAMPLED_UNKNOWN, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, &decided_by) == 0
+        && decided_by == STEREO_POLICY_VIEWS_BY_MARK);
+    CHECK(stereo_policy_video_views(3840, 1080, 1, 1, 16000, 9000, STEREO_POLICY_UPSAMPLED_UNKNOWN, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, &decided_by) == 1
+        && decided_by == STEREO_POLICY_VIEWS_BY_MARK);
+    CHECK(stereo_policy_video_views(640, 480, 1, 1, 4000, 3000, STEREO_POLICY_UPSAMPLED_UNKNOWN, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, &decided_by) == 0);
+    CHECK(stereo_policy_video_views(1280, 720, 1, 1, 16000, 9000, STEREO_POLICY_UPSAMPLED_UNKNOWN, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, &decided_by) == 0);
+    CHECK(stereo_policy_video_views(1280, 1440, 1, 1, 16000, 9000, STEREO_POLICY_UPSAMPLED_UNKNOWN, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, &decided_by) == 1);
+
+    /* the list form of a watch page's keywords meta tag reads the same tags; a long tag or a missing list is no crash */
+    CHECK(stereo_policy_site_mark_list("guitar, 3D, yt3d:enable=true, yt3d:aspect=16:9, yt3d:swap=true", &layout, &order, &an, &ad) == 1);
+    CHECK(layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE && order == GENERIC_TRUE_SWAPPED_ORDER && an == 16000 && ad == 9000);
+    CHECK(stereo_policy_site_mark_list("yt3d:left=0_0._0.5_1\nyt3d:right=0.5_0_1_1", &layout, &order, &an, &ad) == 1 && layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE);
+    CHECK(stereo_policy_site_mark_list("music, live", &layout, &order, &an, &ad) == 0);
+    CHECK(stereo_policy_site_mark_list("", &layout, &order, &an, &ad) == 0);
+    CHECK(stereo_policy_site_mark_list(NULL, &layout, &order, &an, &ad) == -1);
+    CHECK(site(NULL, 1, &layout, &order, &an, &ad) == -1 && site(NULL, 0, &layout, &order, &an, &ad) == 0 && site(none, -1, &layout, &order, &an, &ad) == -1);
+    char longtag[1200];
+    memset(longtag, 'a', sizeof(longtag));
+    memcpy(longtag, "yt3d:enable=", 12);
+    longtag[sizeof(longtag) - 1] = 0;
+    CHECK(stereo_policy_site_mark_list(longtag, &layout, &order, &an, &ad) == 0);
+
+    /* the words the other readers take */
+    const char *word;
+    CHECK(stereo_policy_site_mark_word(STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_RIGHT_FIRST, &word) == 1 && strcmp(word, "sideBySideRightFirst") == 0);
+    CHECK(stereo_policy_site_mark_word(STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_POLICY_LEFT_FIRST, &word) == 1 && strcmp(word, "topBottomLeftFirst") == 0);
+    CHECK(stereo_policy_site_mark_word(STEREO_POLICY_LAYOUT_NONE, STEREO_POLICY_LEFT_FIRST, &word) == 1 && strcmp(word, "mono") == 0);
+    CHECK(stereo_policy_site_mark_word(STEREO_POLICY_LAYOUT_CHECKERBOARD, STEREO_POLICY_LEFT_FIRST, &word) == -1);
+    for (size_t i = 0; i < sizeof(table) / sizeof(table[0]); ++i) {
+        int count = 0, l, o, a;
+        while (count < 4 && table[i].tags[count])
+            ++count;
+        if (site(table[i].tags, count, &l, &o, &an, &ad) == 1) {
+            stereo_policy_site_mark_word(l, o, &word);
+            CHECK(stereo_policy_read_mark(word, &l, &o, &a) == 1);
+        }
+    }
+}
+
 int main(void)
 {
     marks();
@@ -487,6 +612,7 @@ int main(void)
     namedLayout();
     shapes();
     contents();
+    siteMarks();
     if (failures)
         fprintf(stderr, "%d check(s) failed\n", failures);
     else
