@@ -14,3 +14,103 @@ msgstr ""
 msgctxt "QObject|"
 msgid "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed."
 msgstr "色は再構成された近似値です。アナグリフは各目の色の一部だけを保持します。元のファイルが変更されることはありません。"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Picture and depth"
+msgstr "画像と深度"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Depth strength"
+msgstr "奥行きの強さ"
+
+msgctxt "Stereo::DepthControls|"
+msgid "How deep the picture looks: the largest parallax in front of and behind the screen, in pixels of a picture 1920 wide. 58 is about one degree of visual angle."
+msgstr "画像がどれだけ奥行きを持って見えるか。画面の手前と奥それぞれの最大視差を、幅 1920 の画像のピクセルで表します。58 は視角約 1 度です。"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Screen plane"
+msgstr "画面の位置"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Where the screen is in the depth of the picture, from 0 (the farthest) to 1 (the nearest). What is nearer comes out of the screen, what is farther stays behind it."
+msgstr "画像の奥行きの中で画面がある位置。0（最も遠い）から 1（最も近い）まで。それより近いものは画面から飛び出し、遠いものは画面の奥に残ります。"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Shift"
+msgstr "シフト"
+
+msgctxt "Stereo::DepthControls|"
+msgid "The picture is"
+msgstr "画像は"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Which view the picture is. As the left eye it stays exactly as it is in that eye and the right eye is drawn; as the middle, both views are drawn."
+msgstr "画像がどの視点にあたるか。左目とすると、その目では画像がそのまま表示され、右目が描画されます。中央とすると、両方の視点が描画されます。"
+
+msgctxt "Stereo::DepthControls|"
+msgid "the left eye"
+msgstr "左目"
+
+msgctxt "Stereo::DepthControls|"
+msgid "the middle"
+msgstr "中央"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Gap filling"
+msgstr "穴の補完"
+
+msgctxt "Stereo::DepthControls|"
+msgid "How the places that the picture does not show, behind the objects in front, are filled."
+msgstr "手前の物体の背後など、画像に写っていない部分をどう埋めるか。"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Background"
+msgstr "背景"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Depth-aided"
+msgstr "深度を利用"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Inpainting"
+msgstr "インペインティング"
+
+msgctxt "Stereo::DepthControls|"
+msgid "None"
+msgstr "なし"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Warping"
+msgstr "ワーピング"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Forward"
+msgstr "前方向"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Backward"
+msgstr "後方向"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Layered"
+msgstr "レイヤー式"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Smooth the depth"
+msgstr "深度を平滑化"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Filling reach"
+msgstr "補完の範囲"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Nearest distance"
+msgstr "最も近い距離"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Farthest distance"
+msgstr "最も遠い距離"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Back to the default"
+msgstr "既定に戻す"

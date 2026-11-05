@@ -164,6 +164,9 @@ const char *stereo_mark_status_name(int status)
     case STEREO_MARK_TOOL_MISSING: return "tool-missing";
     case STEREO_MARK_WRITE_FAILED: return "write-failed";
     case STEREO_MARK_READ_BACK: return "read-back";
+    case STEREO_MARK_MP4_VIEWS: return "mp4-views";
+    case STEREO_MARK_VIEWS_LAYOUT: return "views-layout";
+    case STEREO_MARK_NOT_LACED: return "not-laced";
     default: return "unknown";
     }
 }
@@ -210,6 +213,15 @@ static int pwrite_all(int fd, uint64_t off, const void *buf, size_t n)
 #define MKV_TRACKTYPE 0x83u
 #define MKV_VIDEO 0xE0u
 #define MKV_STEREOMODE 0x53B8u
+#define MKV_TRACKNUMBER 0xD7u
+#define MKV_PIXELWIDTH 0xB0u
+#define MKV_PIXELHEIGHT 0xBAu
+#define MKV_DISPLAYWIDTH 0x54B0u
+#define MKV_DISPLAYHEIGHT 0x54BAu
+#define MKV_CLUSTER 0x1F43B675u
+#define MKV_SIMPLEBLOCK 0xA3u
+#define MKV_BLOCKGROUP 0xA0u
+#define MKV_BLOCK 0xA1u
 #define MKV_MAX_VIDEO_TRACKS 256
 
 typedef struct {
@@ -271,6 +283,9 @@ typedef struct {
     int is_matroska;
     int tracks;
     int values[MKV_MAX_VIDEO_TRACKS];
+    /* of each video track: its TrackNumber, PixelWidth and PixelHeight, DisplayWidth and DisplayHeight (0 when absent) */
+    int number[MKV_MAX_VIDEO_TRACKS], pw[MKV_MAX_VIDEO_TRACKS], ph[MKV_MAX_VIDEO_TRACKS], dw[MKV_MAX_VIDEO_TRACKS], dh[MKV_MAX_VIDEO_TRACKS];
+    uint64_t seg_data, seg_end;
 } mkv_info;
 
 /* The StereoMode of the video tracks, in the order of the Tracks element. Returns 1, or 0 for a file this cannot walk. */
@@ -310,6 +325,8 @@ static int mkv_scan(int fd, uint64_t fsize, mkv_info *mi)
     if (!found)
         return 0;
     uint64_t end = seg.unknown ? fsize : seg.data + seg.size;
+    mi->seg_data = seg.data;
+    mi->seg_end = end;
     pos = seg.data;
     for (long iter = 0; iter < 4000000 && pos < end; ++iter) {
         ebml_el c;
@@ -323,7 +340,7 @@ static int mkv_scan(int fd, uint64_t fsize, mkv_info *mi)
                 if (!ebml_read(fd, t, c.data + c.size, &te) || te.unknown)
                     return 0;
                 if (te.id == MKV_TRACKENTRY) {
-                    uint64_t type = 0;
+                    uint64_t type = 0, number = 0, pixw = 0, pixh = 0, disw = 0, dish = 0;
                     int stereo = -1;
                     for (uint64_t f = te.data; f < te.data + te.size;) {
                         ebml_el fe;
@@ -331,6 +348,8 @@ static int mkv_scan(int fd, uint64_t fsize, mkv_info *mi)
                             return 0;
                         if (fe.id == MKV_TRACKTYPE) {
                             ebml_uint(fd, &fe, &type);
+                        } else if (fe.id == MKV_TRACKNUMBER) {
+                            ebml_uint(fd, &fe, &number);
                         } else if (fe.id == MKV_VIDEO) {
                             for (uint64_t v = fe.data; v < fe.data + fe.size;) {
                                 ebml_el ve;
@@ -339,13 +358,27 @@ static int mkv_scan(int fd, uint64_t fsize, mkv_info *mi)
                                 uint64_t sm;
                                 if (ve.id == MKV_STEREOMODE && ebml_uint(fd, &ve, &sm))
                                     stereo = (int)sm;
+                                else if (ve.id == MKV_PIXELWIDTH)
+                                    ebml_uint(fd, &ve, &pixw);
+                                else if (ve.id == MKV_PIXELHEIGHT)
+                                    ebml_uint(fd, &ve, &pixh);
+                                else if (ve.id == MKV_DISPLAYWIDTH)
+                                    ebml_uint(fd, &ve, &disw);
+                                else if (ve.id == MKV_DISPLAYHEIGHT)
+                                    ebml_uint(fd, &ve, &dish);
                                 v = ve.data + ve.size;
                             }
                         }
                         f = fe.data + fe.size;
                     }
-                    if (type == 1 && mi->tracks < MKV_MAX_VIDEO_TRACKS)
+                    if (type == 1 && mi->tracks < MKV_MAX_VIDEO_TRACKS) {
+                        mi->number[mi->tracks] = (int)number;
+                        mi->pw[mi->tracks] = (int)pixw;
+                        mi->ph[mi->tracks] = (int)pixh;
+                        mi->dw[mi->tracks] = (int)disw;
+                        mi->dh[mi->tracks] = (int)dish;
                         mi->values[mi->tracks++] = stereo;
+                    }
                 }
                 t = te.data + te.size;
             }
@@ -357,6 +390,74 @@ static int mkv_scan(int fd, uint64_t fsize, mkv_info *mi)
         pos = c.data + c.size;
     }
     return 0;
+}
+
+
+/*
+ * Whether the blocks of the track lace two frames: "packing two frames together in a Block that uses lacing" (RFC 9559
+ * section 18.10; the Block header of section 10.1: the track number, a 16-bit timestamp, the flags with the lacing in bits
+ * 0x06, then the number of frames minus one for a laced block). A few blocks of the first clusters are sampled. Returns 1
+ * when every sampled block of the track laces two frames, 0 when one does not, -1 when none could be read.
+ */
+static int mkv_blocks_laced(int fd, const mkv_info *mi, int track_number)
+{
+    int sampled = 0, laced = 1;
+    uint64_t pos = mi->seg_data;
+    for (int clusters = 0; clusters < 64 && pos < mi->seg_end && sampled < 8; ++clusters) {
+        ebml_el c;
+        if (!ebml_read(fd, pos, mi->seg_end, &c))
+            break;
+        pos = c.data + (c.unknown ? 0 : c.size);
+        if (c.id != MKV_CLUSTER) {
+            if (c.unknown)
+                break;
+            continue;
+        }
+        if (c.unknown)
+            break;
+        for (uint64_t b = c.data; b < c.data + c.size && sampled < 8;) {
+            ebml_el be;
+            if (!ebml_read(fd, b, c.data + c.size, &be) || be.unknown)
+                break;
+            b = be.data + be.size;
+            ebml_el blk = be;
+            if (be.id == MKV_BLOCKGROUP) {
+                int found = 0;
+                for (uint64_t g = be.data; g < be.data + be.size;) {
+                    ebml_el ge;
+                    if (!ebml_read(fd, g, be.data + be.size, &ge) || ge.unknown)
+                        break;
+                    if (ge.id == MKV_BLOCK) {
+                        blk = ge;
+                        found = 1;
+                        break;
+                    }
+                    g = ge.data + ge.size;
+                }
+                if (!found)
+                    continue;
+            } else if (be.id != MKV_SIMPLEBLOCK) {
+                continue;
+            }
+            uint8_t h[8];
+            size_t n = blk.size < sizeof(h) ? (size_t)blk.size : sizeof(h);
+            if (n < 4 || !pread_all(fd, blk.data, h, n) || h[0] == 0)
+                continue;
+            int tl = __builtin_clz((unsigned)h[0]) - 24 + 1;
+            if ((size_t)tl + 3 > n || tl > 4)
+                continue;
+            int number = h[0] & (0xFF >> tl);
+            for (int i = 1; i < tl; ++i)
+                number = number << 8 | h[i];
+            if (number != track_number)
+                continue;
+            int lacing = (h[tl + 2] >> 1) & 3;
+            ++sampled;
+            if (lacing == 0 || (size_t)tl + 4 > n || h[tl + 3] != 1)
+                laced = 0;
+        }
+    }
+    return sampled ? laced : -1;
 }
 
 /* ---- ISO base media files (ISO/IEC 14496-12) --------------------------------------------------------------------- */
@@ -761,16 +862,32 @@ static int same_layout(int l1, int o1, int l2, int o2)
 /* ---- writing ---------------------------------------------------------------------------------------------------- */
 
 /* Run mkvpropedit on the file without a shell. value below 0 deletes the element. Returns 0, or a status. */
-static int run_mkvpropedit(const char *path, int video_track, int value, char *out, size_t outsize)
+static int run_mkvpropedit(const char *path, int video_track, int value, int dw, int dh, char *out, size_t outsize)
 {
-    char file[4096], track[32], set[48];
+    char file[4096], track[32], set[48], setw[48], seth[48];
     if (path[0] == '-')
         snprintf(file, sizeof(file), "./%s", path);
     else
         snprintf(file, sizeof(file), "%s", path);
     snprintf(track, sizeof(track), "track:v%d", video_track);
     snprintf(set, sizeof(set), "stereo-mode=%d", value);
-    const char *argv[] = { "mkvpropedit", file, "--edit", track, value >= 0 ? "--set" : "--delete", value >= 0 ? set : "stereo-mode", NULL };
+    snprintf(setw, sizeof(setw), "display-width=%d", dw);
+    snprintf(seth, sizeof(seth), "display-height=%d", dh);
+    /* dw below 0: the display size is left alone; 0: the display size is deleted (the file carried none); else it is set */
+    const char *argv[16] = { "mkvpropedit", file, "--edit", track, value >= 0 ? "--set" : "--delete", value >= 0 ? set : "stereo-mode" };
+    int ac = 6;
+    if (dw > 0 && dh > 0) {
+        argv[ac++] = "--set";
+        argv[ac++] = setw;
+        argv[ac++] = "--set";
+        argv[ac++] = seth;
+    } else if (dw == 0) {
+        argv[ac++] = "--delete";
+        argv[ac++] = "display-width";
+        argv[ac++] = "--delete";
+        argv[ac++] = "display-height";
+    }
+    argv[ac] = NULL;
 
     int po[2], pe[2];
     out[0] = 0;
@@ -948,11 +1065,26 @@ static int restore_mp4(const char *path, const backup *bk)
     return close(fd) == 0 && ok;
 }
 
-int stereo_mark_save(const char *path, int video_track, int layout, int order, int anaglyph, stereo_mark_result *result)
+static int mkv_open_info(const char *path, mkv_info *mi)
+{
+    uint64_t size;
+    int fd = open_regular(path, O_RDONLY, &size);
+    if (fd < 0)
+        return 0;
+    int ok = mkv_scan(fd, size, mi);
+    close(fd);
+    return ok;
+}
+
+static int save_impl(const char *path, int video_track, int layout, int order, int anaglyph, int views, stereo_mark_views_result *ext)
 {
     stereo_mark_result local;
-    stereo_mark_result *r = result ? result : &local;
+    stereo_mark_result *r = ext ? &ext->base : &local;
     memset(r, 0, sizeof(*r));
+    if (ext) {
+        ext->plane_width = ext->plane_height = 0;
+        ext->laced = -1;
+    }
     r->value = r->previous = r->now = -1;
     r->declared_layout = r->declared_order = -1;
     if (!path || video_track < 1)
@@ -987,9 +1119,51 @@ int stereo_mark_save(const char *path, int video_track, int layout, int order, i
         return STEREO_MARK_LAYOUT;
     if (container == STEREO_MARK_CONTAINER_WEBM && !stereo_mark_webm_allows(value))
         return STEREO_MARK_WEBM_LAYOUT;
+    if (views != STEREO_MARK_VIEWS_UNSPECIFIED) {
+        if (views != STEREO_MARK_VIEWS_HALF && views != STEREO_MARK_VIEWS_FULL)
+            return STEREO_MARK_BAD_ARGUMENT;
+        if (layout != STEREO_POLICY_LAYOUT_SIDE_BY_SIDE && layout != STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM)
+            return STEREO_MARK_VIEWS_LAYOUT;
+        if (container == STEREO_MARK_CONTAINER_MP4)
+            return STEREO_MARK_MP4_VIEWS;
+    }
     if (st)
         return st;
     r->previous = r->now = previous;
+
+    /* what the Matroska track carries besides its mark: the size of its planes and whether its blocks lace both eyes */
+    mkv_info mi;
+    int track_dw = 0, track_dh = 0, want_dw = -1, want_dh = -1;
+    if (container != STEREO_MARK_CONTAINER_MP4) {
+        if (!mkv_open_info(path, &mi) || video_track > mi.tracks)
+            return STEREO_MARK_BROKEN;
+        track_dw = mi.dw[video_track - 1];
+        track_dh = mi.dh[video_track - 1];
+        if (ext) {
+            ext->plane_width = track_dw;
+            ext->plane_height = track_dh;
+        }
+        if (value == 13 || value == 14) {
+            int fd2 = open(path, O_RDONLY | O_CLOEXEC);
+            int laced = fd2 >= 0 ? mkv_blocks_laced(fd2, &mi, mi.number[video_track - 1]) : -1;
+            if (fd2 >= 0)
+                close(fd2);
+            if (ext)
+                ext->laced = laced;
+            if (laced != 1) {
+                snprintf(r->details, sizeof(r->details), laced == 0 ? "the blocks of the track do not lace two frames" : "no block of the track could be read");
+                return STEREO_MARK_NOT_LACED;
+            }
+        }
+        if (views != STEREO_MARK_VIEWS_UNSPECIFIED) {
+            int pw = mi.pw[video_track - 1], ph = mi.ph[video_track - 1];
+            int side = layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE;
+            if (pw <= 0 || ph <= 0 || (views == STEREO_MARK_VIEWS_FULL && ((side && (pw & 1)) || (!side && (ph & 1)))))
+                return STEREO_MARK_VIEWS_LAYOUT;
+            want_dw = views == STEREO_MARK_VIEWS_FULL && side ? pw / 2 : pw;
+            want_dh = views == STEREO_MARK_VIEWS_FULL && !side ? ph / 2 : ph;
+        }
+    }
 
     /* a declaration in the video stream itself (the frame packing SEI) comes before the container's */
     int dl, dord;
@@ -997,15 +1171,18 @@ int stereo_mark_save(const char *path, int video_track, int layout, int order, i
         int al = layout;
         if (layout == STEREO_POLICY_LAYOUT_NONE && anaglyph != STEREO_POLICY_ANAGLYPH_NONE)
             al = -2;
-        if (same_layout(dl, dord, al, order))
+        if (same_layout(dl, dord, al, order) && (want_dw < 0 || (track_dw == want_dw && track_dh == want_dh)))
             return STEREO_MARK_UNCHANGED;
+        if (same_layout(dl, dord, al, order))
+            goto write;
         r->declared_layout = dl;
         r->declared_order = dord;
         return STEREO_MARK_STREAM_DECLARES;
     }
-    if (previous == value)
+    if (previous == value && (want_dw < 0 || (track_dw == want_dw && track_dh == want_dh)))
         return STEREO_MARK_UNCHANGED;
 
+write:;
     /* write, read back, put back what does not read back */
     int c2, v2;
     if (container == STEREO_MARK_CONTAINER_MP4) {
@@ -1043,21 +1220,76 @@ int stereo_mark_save(const char *path, int video_track, int layout, int order, i
         return STEREO_MARK_WRITTEN;
     }
 
-    st = run_mkvpropedit(path, video_track, value, r->details, sizeof(r->details));
+    st = run_mkvpropedit(path, video_track, value, want_dw, want_dh, r->details, sizeof(r->details));
     if (st) {
         r->now = stereo_mark_read(path, video_track, &c2, &v2) == 0 ? v2 : -1;
         return st;
     }
     int rb = stereo_mark_read(path, video_track, &c2, &v2);
     r->now = rb == 0 ? v2 : -1;
-    if (rb != 0 || v2 != value) {
+    mkv_info after;
+    int plane_ok = 1;
+    if (want_dw >= 0) {
+        plane_ok = mkv_open_info(path, &after) && video_track <= after.tracks && after.dw[video_track - 1] == want_dw && after.dh[video_track - 1] == want_dh;
+    }
+    if (ext && mkv_open_info(path, &after) && video_track <= after.tracks) {
+        ext->plane_width = after.dw[video_track - 1];
+        ext->plane_height = after.dh[video_track - 1];
+    }
+    if (rb != 0 || v2 != value || !plane_ok) {
         char ignored[64];
-        run_mkvpropedit(path, video_track, previous, ignored, sizeof(ignored));
+        run_mkvpropedit(path, video_track, previous, want_dw < 0 ? -1 : track_dw, want_dw < 0 ? -1 : track_dh, ignored, sizeof(ignored));
+        if (ext && mkv_open_info(path, &after) && video_track <= after.tracks) {
+            ext->plane_width = after.dw[video_track - 1];
+            ext->plane_height = after.dh[video_track - 1];
+        }
         int c3, v3;
         r->now = stereo_mark_read(path, video_track, &c3, &v3) == 0 ? v3 : -1;
         snprintf(r->details, sizeof(r->details), "the file read back StereoMode %d after the write; %s", rb == 0 ? v2 : -1,
                  r->now == previous ? "put back as it was" : "putting it back failed");
         return STEREO_MARK_READ_BACK;
+    }
+    return STEREO_MARK_WRITTEN;
+}
+
+int stereo_mark_save(const char *path, int video_track, int layout, int order, int anaglyph, stereo_mark_result *result)
+{
+    stereo_mark_views_result ext;
+    int st = save_impl(path, video_track, layout, order, anaglyph, STEREO_MARK_VIEWS_UNSPECIFIED, &ext);
+    if (result)
+        *result = ext.base;
+    return st;
+}
+
+int stereo_mark_save_views(const char *path, int video_track, int layout, int order, int anaglyph, int views, stereo_mark_views_result *result)
+{
+    stereo_mark_views_result local;
+    return save_impl(path, video_track, layout, order, anaglyph, views, result ? result : &local);
+}
+
+int stereo_mark_read_detail(const char *path, int video_track, stereo_mark_detail *detail)
+{
+    stereo_mark_detail local;
+    stereo_mark_detail *d = detail ? detail : &local;
+    memset(d, 0, sizeof(*d));
+    d->value = -1;
+    d->laced = -1;
+    int st = stereo_mark_read(path, video_track, &d->container, &d->value);
+    if (st != STEREO_MARK_WRITTEN)
+        return st;
+    if (d->container == STEREO_MARK_CONTAINER_MATROSKA || d->container == STEREO_MARK_CONTAINER_WEBM) {
+        mkv_info mi;
+        if (!mkv_open_info(path, &mi) || video_track > mi.tracks)
+            return STEREO_MARK_BROKEN;
+        d->pixel_width = mi.pw[video_track - 1];
+        d->pixel_height = mi.ph[video_track - 1];
+        d->display_width = mi.dw[video_track - 1];
+        d->display_height = mi.dh[video_track - 1];
+        int fd = open(path, O_RDONLY | O_CLOEXEC);
+        if (fd >= 0) {
+            d->laced = mkv_blocks_laced(fd, &mi, mi.number[video_track - 1]);
+            close(fd);
+        }
     }
     return STEREO_MARK_WRITTEN;
 }

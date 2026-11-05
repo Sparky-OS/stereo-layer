@@ -781,9 +781,95 @@ static void unpack(void)
     stereo_dibr_free(d);
 }
 
+
+/* The options of drawing as one set: the default, the limits, the text a program keeps, and what they give the drawing. */
+static void options(void)
+{
+    struct stereo_dibr_options o, d, back;
+    stereo_dibr_options_default(&d);
+    CHECK(stereo_dibr_options_is_default(&d));
+    /* the measured best (autotests/dibrbench.c): the picture is the left eye, layered warping, depth-aided filling, no smoothing, about one degree */
+    CHECK(d.view == STEREO_DIBR_VIEW_LEFT && d.warp == STEREO_DIBR_WARP_LAYERED && d.fill == STEREO_DIBR_FILL_DEPTH_AIDED && d.smooth == STEREO_DIBR_SMOOTH_OFF);
+    CHECK(NEAR(d.strength, 58.0) && NEAR(d.zero, 0.5) && NEAR(d.shift, 0.0) && d.z_near == 0.0 && d.z_far == 0.0);
+
+    /* text: the default writes, reads back, and any set round trips exactly */
+    char text[512];
+    CHECK(stereo_dibr_options_write(&d, text, sizeof(text)) > 0);
+    CHECK(!strcmp(text, "view=left warp=layered fill=depthAided smooth=off sigmaH=10 sigmaV=30 radius=5 strength=58 zero=0.5 shift=0 near=0 far=0"));
+    o = d;
+    o.view = STEREO_DIBR_VIEW_CENTER;
+    o.warp = STEREO_DIBR_WARP_BACKWARD;
+    o.fill = STEREO_DIBR_FILL_TELEA;
+    o.smooth = STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN;
+    o.sigma_h = 7.5;
+    o.sigma_v = 22.25;
+    o.radius = 9;
+    o.strength = 101.5;
+    o.zero = 0.35;
+    o.shift = -12.0;
+    o.z_near = 0.5;
+    o.z_far = 8000.0;
+    CHECK(stereo_dibr_options_write(&o, text, sizeof(text)) > 0);
+    CHECK(stereo_dibr_options_read(text, &back) == 1);
+    CHECK(!memcmp(&o, &back, sizeof(o)));
+    CHECK(!stereo_dibr_options_is_default(&o));
+    /* the C notation, whatever the locale */
+    setlocale(LC_NUMERIC, "pt_BR.UTF-8");
+    CHECK(stereo_dibr_options_write(&o, text, sizeof(text)) > 0 && strchr(text, ',') == NULL && strstr(text, "strength=101.5 "));
+    CHECK(stereo_dibr_options_read(text, &back) == 1 && !memcmp(&o, &back, sizeof(o)));
+    setlocale(LC_NUMERIC, "C");
+    CHECK(stereo_dibr_options_write(&o, text, 20) == -1);
+
+    /* a key the reader does not know is skipped; a key it knows with nothing it can read is refused; the rest is the default */
+    CHECK(stereo_dibr_options_read("fill=telea future=1", &back) == 1 && back.fill == STEREO_DIBR_FILL_TELEA && NEAR(back.strength, 58.0));
+    CHECK(stereo_dibr_options_read("fill=sparkles", &back) == -1);
+    CHECK(stereo_dibr_options_read("strength=lots", &back) == -1);
+    CHECK(stereo_dibr_options_read("strength", &back) == -1);
+    CHECK(stereo_dibr_options_read(NULL, &back) == -1);
+    CHECK(stereo_dibr_options_read("", &back) == 1 && stereo_dibr_options_is_default(&back));
+
+    /* limits: a value outside is held at the limit, a set within is left alone */
+    o = d;
+    CHECK(!stereo_dibr_options_clamp(&o));
+    o.strength = 1e6;
+    o.zero = -1.0;
+    o.shift = 500.0;
+    o.radius = 0;
+    o.view = 7;
+    CHECK(stereo_dibr_options_clamp(&o));
+    CHECK(NEAR(o.strength, STEREO_DIBR_STRENGTH_MAX) && NEAR(o.zero, 0.0) && NEAR(o.shift, STEREO_DIBR_SHIFT_MAX) && o.radius == 1 && o.view == STEREO_DIBR_VIEW_LEFT);
+    CHECK(stereo_dibr_options_read("strength=1000000 zero=9", &back) == 1 && NEAR(back.strength, STEREO_DIBR_STRENGTH_MAX) && NEAR(back.zero, 1.0));
+
+    /* what they give the drawing: the convention's range, zero and shift, and the whole of the params; the rest of the convention stays */
+    struct stereo_depth_convention c;
+    struct stereo_dibr_params p;
+    memset(&c, 0, sizeof(c));
+    c.kind = STEREO_DEPTH_METRIC;
+    c.bits = 16;
+    o = d;
+    o.strength = 80.0;
+    o.zero = 0.25;
+    o.shift = 3.0;
+    o.fill = STEREO_DIBR_FILL_TELEA;
+    o.radius = 11;
+    stereo_dibr_options_apply(&o, &c, &p);
+    CHECK(c.kind == STEREO_DEPTH_METRIC && c.bits == 16 && NEAR(c.range, 80.0) && NEAR(c.zero, 0.25) && NEAR(c.shift, 3.0) && !c.z_present);
+    CHECK(p.fill == STEREO_DIBR_FILL_TELEA && p.radius == 11 && p.warp == STEREO_DIBR_WARP_LAYERED && p.view == STEREO_DIBR_VIEW_LEFT);
+    o.z_near = 300.0;
+    o.z_far = 5000.0;
+    stereo_dibr_options_apply(&o, &c, NULL);
+    CHECK(c.z_present && NEAR(c.z_near, 300.0) && NEAR(c.z_far, 5000.0));
+    /* only both ends of a range count (a range with one end is the file's) */
+    o.z_far = 0.0;
+    memset(&c, 0, sizeof(c));
+    stereo_dibr_options_apply(&o, &c, NULL);
+    CHECK(!c.z_present);
+}
+
 int main(void)
 {
     conventions();
+    options();
     for (int warp = 0; warp < 3; warp++)
         for (int fill = 0; fill < 4; fill++)
             for (int smooth = 0; smooth < 2; smooth++)

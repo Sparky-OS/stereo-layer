@@ -14,3 +14,103 @@ msgstr ""
 msgctxt "QObject|"
 msgid "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed."
 msgstr "色彩為重建後的近似效果：互補色立體影像僅保留每隻眼睛的部分色彩。原始檔案絕不會被修改。"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Picture and depth"
+msgstr "畫面與深度"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Depth strength"
+msgstr "深度強度"
+
+msgctxt "Stereo::DepthControls|"
+msgid "How deep the picture looks: the largest parallax in front of and behind the screen, in pixels of a picture 1920 wide. 58 is about one degree of visual angle."
+msgstr "畫面看起來有多深：螢幕前方和後方的最大視差，以寬 1920 的畫面的像素計。58 約為 1 度視角。"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Screen plane"
+msgstr "螢幕平面"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Where the screen is in the depth of the picture, from 0 (the farthest) to 1 (the nearest). What is nearer comes out of the screen, what is farther stays behind it."
+msgstr "螢幕位於畫面深度中的位置，從 0（最遠）到 1（最近）。比它近的會從螢幕中凸出，比它遠的留在螢幕後方。"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Shift"
+msgstr "偏移"
+
+msgctxt "Stereo::DepthControls|"
+msgid "The picture is"
+msgstr "畫面是"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Which view the picture is. As the left eye it stays exactly as it is in that eye and the right eye is drawn; as the middle, both views are drawn."
+msgstr "畫面是哪一個視圖。作為左眼，它在該眼中保持原樣，右眼由此生成；作為中間視圖，則兩個視圖都由它生成。"
+
+msgctxt "Stereo::DepthControls|"
+msgid "the left eye"
+msgstr "左眼"
+
+msgctxt "Stereo::DepthControls|"
+msgid "the middle"
+msgstr "中間"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Gap filling"
+msgstr "空洞填補"
+
+msgctxt "Stereo::DepthControls|"
+msgid "How the places that the picture does not show, behind the objects in front, are filled."
+msgstr "如何填補畫面沒有顯示的部分，即前景物體後方的區域。"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Background"
+msgstr "背景"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Depth-aided"
+msgstr "深度輔助"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Inpainting"
+msgstr "影像修補"
+
+msgctxt "Stereo::DepthControls|"
+msgid "None"
+msgstr "無"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Warping"
+msgstr "扭曲方式"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Forward"
+msgstr "正向"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Backward"
+msgstr "反向"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Layered"
+msgstr "分層"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Smooth the depth"
+msgstr "平滑深度"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Filling reach"
+msgstr "填補範圍"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Nearest distance"
+msgstr "最近距離"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Farthest distance"
+msgstr "最遠距離"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Back to the default"
+msgstr "恢復預設"

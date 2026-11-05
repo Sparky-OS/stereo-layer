@@ -132,6 +132,42 @@ static int mkvmerge_stereo(const char *path, int nth)
     return value;
 }
 
+
+/* The DisplayWidth (which 0) or DisplayHeight (1) of the nth video track as mkvmerge reads it ("display_dimensions": "WxH"), 0 when absent. */
+static int mkvmerge_display(const char *path, int nth, int which)
+{
+    char cmd[900];
+    snprintf(cmd, sizeof(cmd), "mkvmerge -J '%s' 2>/dev/null", path);
+    FILE *p = popen(cmd, "r");
+    if (!p)
+        return -2;
+    char *out = malloc(1 << 20);
+    size_t n = fread(out, 1, (1 << 20) - 1, p);
+    out[n] = 0;
+    pclose(p);
+    int seen = 0, value = 0;
+    char *at = strstr(out, "\"tracks\"");
+    while (at && (at = strstr(at, "\"codec\":"))) {
+        char *next = strstr(at + 8, "\"codec\":");
+        char saved = 0;
+        if (next) {
+            saved = *next;
+            *next = 0;
+        }
+        if (strstr(at, "\"type\": \"video\"") && ++seen == nth) {
+            char *s = strstr(at, "\"display_dimensions\": \"");
+            int w = 0, h = 0;
+            if (s && (s = strchr(s + 21, '"')) && sscanf(s + 1, "%dx%d", &w, &h) == 2)
+                value = which ? h : w;
+        }
+        if (next)
+            *next = saved;
+        at = next;
+    }
+    free(out);
+    return value;
+}
+
 static int video_stream_index(AVFormatContext *ctx, int nth)
 {
     int seen = 0;
@@ -300,6 +336,14 @@ static void test_matroska(void)
         int layout, order, anaglyph;
         stereo_mark_value_layout(STEREO_MARK_CONTAINER_MATROSKA, v, &layout, &order, &anaglyph);
         stereo_mark_result r;
+        if (v == 13 || v == 14) {
+            /* both eyes laced in one Block: this file's blocks are not laced, so the mark is refused and the track keeps what it had */
+            int before = mkvmerge_stereo(f, 2);
+            int st13 = stereo_mark_save(f, 2, layout, order, anaglyph, &r);
+            CHECK(st13 == STEREO_MARK_NOT_LACED && r.value == v, "StereoMode %d into blocks that are not laced: %s", v, stereo_mark_status_name(st13));
+            CHECK(mkvmerge_stereo(f, 2) == before, "the track keeps StereoMode %d (%d)", before, mkvmerge_stereo(f, 2));
+            continue;
+        }
         int st = stereo_mark_save(f, 2, layout, order, anaglyph, &r);
         CHECK(st == STEREO_MARK_WRITTEN, "StereoMode %d written: %s (%s)", v, stereo_mark_status_name(st), r.details);
         CHECK(r.value == v && r.now == v, "result says value %d now %d, wanted %d", r.value, r.now, v);
@@ -367,11 +411,184 @@ static void test_tracks_moved(void)
         int layout, order, anaglyph;
         stereo_mark_value_layout(STEREO_MARK_CONTAINER_MATROSKA, v, &layout, &order, &anaglyph);
         stereo_mark_result r;
+        if (v == 13 || v == 14)
+            continue;
         int st = stereo_mark_save(f, 2, layout, order, anaglyph, &r);
         CHECK(st == STEREO_MARK_WRITTEN || st == STEREO_MARK_UNCHANGED, "StereoMode %d into the file with Tracks last: %s (%s)", v, stereo_mark_status_name(st), r.details);
         CHECK(mkvmerge_stereo(f, 2) == v, "mkvmerge reads %d, wanted %d (Tracks last)", mkvmerge_stereo(f, 2), v);
         CHECK(packet_count(f) == packets, "the media is intact (Tracks last, value %d)", v);
     }
+}
+
+
+/* ---- a Matroska file made by hand: one video track whose blocks lace two frames ---- */
+
+typedef struct { unsigned char *d; size_t n; } Buf;
+static void bput(Buf *b, const void *p, size_t n) { b->d = realloc(b->d, b->n + n); memcpy(b->d + b->n, p, n); b->n += n; }
+static void bbyte(Buf *b, int v) { unsigned char c = (unsigned char)v; bput(b, &c, 1); }
+/* an element: its ID bytes, an 8 byte size, the content */
+static void belem(Buf *out, const char *id, size_t idlen, const Buf *content)
+{
+    bput(out, id, idlen);
+    unsigned char sz[8] = { 0x01 };
+    for (int i = 0; i < 7; ++i)
+        sz[1 + i] = (unsigned char)(content->n >> (8 * (6 - i)));
+    bput(out, sz, 8);
+    bput(out, content->d, content->n);
+}
+static void buint(Buf *out, const char *id, size_t idlen, unsigned v, int bytes)
+{
+    Buf c = { NULL, 0 };
+    for (int i = bytes - 1; i >= 0; --i)
+        bbyte(&c, (int)(v >> (8 * i)) & 0xff);
+    belem(out, id, idlen, &c);
+    free(c.d);
+}
+static void bstr(Buf *out, const char *id, size_t idlen, const char *s)
+{
+    Buf c = { NULL, 0 };
+    bput(&c, s, strlen(s));
+    belem(out, id, idlen, &c);
+    free(c.d);
+}
+
+static void make_laced_mkv(const char *path, int laced)
+{
+    Buf hdr = { NULL, 0 }, file = { NULL, 0 }, tracks = { NULL, 0 }, entry = { NULL, 0 }, video = { NULL, 0 }, info = { NULL, 0 }, seg = { NULL, 0 };
+    buint(&hdr, "\x42\x86", 2, 1, 1);
+    buint(&hdr, "\x42\xF7", 2, 1, 1);
+    buint(&hdr, "\x42\xF2", 2, 4, 1);
+    buint(&hdr, "\x42\xF3", 2, 8, 1);
+    bstr(&hdr, "\x42\x82", 2, "matroska");
+    buint(&hdr, "\x42\x87", 2, 4, 1);
+    buint(&hdr, "\x42\x85", 2, 2, 1);
+    belem(&file, "\x1A\x45\xDF\xA3", 4, &hdr);
+    buint(&info, "\x2A\xD7\xB1", 3, 1000000, 4);
+    belem(&seg, "\x15\x49\xA9\x66", 4, &info);
+    buint(&video, "\xB0", 1, 320, 2);
+    buint(&video, "\xBA", 1, 90, 1);
+    buint(&entry, "\xD7", 1, 1, 1);
+    buint(&entry, "\x73\xC5", 2, 1, 1);
+    buint(&entry, "\x83", 1, 1, 1);
+    bstr(&entry, "\x86", 1, "V_VP8");
+    belem(&entry, "\xE0", 1, &video);
+    belem(&tracks, "\xAE", 1, &entry);
+    belem(&seg, "\x16\x54\xAE\x6B", 4, &tracks);
+    for (int c = 0; c < 3; ++c) {
+        Buf cluster = { NULL, 0 }, block = { NULL, 0 };
+        buint(&cluster, "\xE7", 1, (unsigned)c * 40, 1);
+        bbyte(&block, 0x81);                  /* track number 1 */
+        bbyte(&block, 0); bbyte(&block, 0);   /* relative timestamp */
+        if (laced) {
+            bbyte(&block, 0x84);              /* keyframe, fixed-size lacing */
+            bbyte(&block, 1);                 /* two frames */
+            for (int i = 0; i < 8; ++i)
+                bbyte(&block, 'A' + i);
+        } else {
+            bbyte(&block, 0x80);              /* keyframe, no lacing */
+            for (int i = 0; i < 8; ++i)
+                bbyte(&block, 'A' + i);
+        }
+        belem(&cluster, "\xA3", 1, &block);
+        belem(&seg, "\x1F\x43\xB6\x75", 4, &cluster);
+        free(cluster.d);
+        free(block.d);
+    }
+    belem(&file, "\x18\x53\x80\x67", 4, &seg);
+    FILE *f = fopen(path, "wb");
+    fwrite(file.d, 1, file.n, f);
+    fclose(f);
+    free(hdr.d); free(file.d); free(tracks.d); free(entry.d); free(video.d); free(info.d); free(seg.d);
+}
+
+static void test_laced(void)
+{
+    make_laced_mkv(path_of("laced.mkv"), 1);
+    make_laced_mkv(path_of("unlaced.mkv"), 0);
+    const char *l = path_of("laced.mkv"), *u = path_of("unlaced.mkv");
+    stereo_mark_detail d;
+    CHECK(stereo_mark_read_detail(l, 1, &d) == STEREO_MARK_WRITTEN && d.laced == 1 && d.pixel_width == 320 && d.pixel_height == 90 && d.value == -1,
+          "the laced fixture reads laced=%d, %dx%d", d.laced, d.pixel_width, d.pixel_height);
+    CHECK(stereo_mark_read_detail(u, 1, &d) == STEREO_MARK_WRITTEN && d.laced == 0, "the other one reads laced=%d", d.laced);
+    CHECK(mkvmerge_stereo(l, 1) == -1, "mkvmerge opens the hand-made file");
+    for (int order = 0; order <= 1; ++order) {
+        for (int k = 0; k < 2; ++k) {
+            int layout = k ? STEREO_POLICY_LAYOUT_FRAME_SEQUENTIAL : STEREO_POLICY_LAYOUT_BLOCK_LACED;
+            char name[32];
+            snprintf(name, sizeof(name), "l%d%d.mkv", order, k);
+            CHECK(run("cp '%s' '%s'", l, path_of(name)) == 0, "copy");
+            stereo_mark_result r;
+            int st = stereo_mark_save(path_of(name), 1, layout, order, 0, &r);
+            CHECK(st == STEREO_MARK_WRITTEN && r.value == 13 + order, "laced blocks take StereoMode %d: %s (%s)", 13 + order, stereo_mark_status_name(st), r.details);
+            CHECK(mkvmerge_stereo(path_of(name), 1) == 13 + order, "mkvmerge reads %d, wanted %d", mkvmerge_stereo(path_of(name), 1), 13 + order);
+        }
+    }
+    Snapshot s = snap(u);
+    for (int k = 0; k < 2; ++k) {
+        stereo_mark_result r;
+        int st = stereo_mark_save(u, 1, k ? STEREO_POLICY_LAYOUT_FRAME_SEQUENTIAL : STEREO_POLICY_LAYOUT_BLOCK_LACED, STEREO_POLICY_LEFT_FIRST, 0, &r);
+        CHECK(st == STEREO_MARK_NOT_LACED, "blocks that are not laced refuse 13 (%s): %s", k ? "frame sequential" : "block laced", stereo_mark_status_name(st));
+        CHECK(same_as(&s, u), "and the file is byte for byte");
+    }
+    drop(&s);
+    /* the other layouts do not care about lacing */
+    stereo_mark_result r;
+    CHECK(stereo_mark_save(u, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, 0, 0, &r) == STEREO_MARK_WRITTEN && mkvmerge_stereo(u, 1) == 1, "side by side into the unlaced file");
+}
+
+static void test_views(void)
+{
+    CHECK(run("ffmpeg -v error -y -f lavfi -i testsrc=size=640x180:rate=10:duration=1 -c:v mpeg4 '%s'", path_of("v.mkv")) == 0, "ffmpeg makes the wide fixture");
+    const char *f = path_of("v.mkv");
+    stereo_mark_views_result r;
+    stereo_mark_detail d;
+    CHECK(stereo_mark_read_detail(f, 1, &d) == STEREO_MARK_WRITTEN && d.pixel_width == 640 && d.pixel_height == 180 && d.display_width == 0 && d.display_height == 0,
+          "the fixture: %dx%d, display %dx%d", d.pixel_width, d.pixel_height, d.display_width, d.display_height);
+    /* RFC 9559 section 18.10: DisplayWidth/DisplayHeight are the pixels of one plane */
+    static const struct { int layout, views, dw, dh; const char *why; } t[] = {
+        { STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_MARK_VIEWS_FULL, 320, 180, "full side by side: one plane is half the width" },
+        { STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_MARK_VIEWS_HALF, 640, 180, "half side by side: one plane as large as the frame" },
+        { STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_MARK_VIEWS_FULL, 640, 90, "full top and bottom: one plane is half the height" },
+        { STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM, STEREO_MARK_VIEWS_HALF, 640, 180, "half top and bottom" },
+        { STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_MARK_VIEWS_FULL, 320, 180, "full again" },
+    };
+    for (size_t i = 0; i < sizeof(t) / sizeof(t[0]); ++i) {
+        int st = stereo_mark_save_views(f, 1, t[i].layout, STEREO_POLICY_LEFT_FIRST, 0, t[i].views, &r);
+        CHECK(st == STEREO_MARK_WRITTEN, "%s: %s (%s)", t[i].why, stereo_mark_status_name(st), r.base.details);
+        CHECK(r.plane_width == t[i].dw && r.plane_height == t[i].dh, "%s: the result says %dx%d, wanted %dx%d", t[i].why, r.plane_width, r.plane_height, t[i].dw, t[i].dh);
+        CHECK(mkvmerge_display(f, 1, 0) == t[i].dw && mkvmerge_display(f, 1, 1) == t[i].dh, "%s: mkvmerge reads display %dx%d, wanted %dx%d", t[i].why,
+              mkvmerge_display(f, 1, 0), mkvmerge_display(f, 1, 1), t[i].dw, t[i].dh);
+        CHECK(stereo_mark_read_detail(f, 1, &d) == STEREO_MARK_WRITTEN && d.display_width == t[i].dw && d.display_height == t[i].dh, "our reader agrees");
+    }
+    /* the same again: nothing is written; the mark alone differs: the display size stays */
+    Snapshot s = snap(f);
+    CHECK(stereo_mark_save_views(f, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_LEFT_FIRST, 0, STEREO_MARK_VIEWS_FULL, &r) == STEREO_MARK_UNCHANGED, "the same mark and size again is unchanged");
+    CHECK(same_as(&s, f), "and the file is byte for byte");
+    drop(&s);
+    CHECK(stereo_mark_save_views(f, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_RIGHT_FIRST, 0, STEREO_MARK_VIEWS_UNSPECIFIED, &r) == STEREO_MARK_WRITTEN, "eye order only");
+    CHECK(mkvmerge_stereo(f, 1) == 11 && mkvmerge_display(f, 1, 0) == 320, "the size of the views is left as the file has it (%d, display %d)", mkvmerge_stereo(f, 1), mkvmerge_display(f, 1, 0));
+    /* the mark is the same and only the size changes: that is a write too */
+    CHECK(stereo_mark_save_views(f, 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, STEREO_POLICY_RIGHT_FIRST, 0, STEREO_MARK_VIEWS_HALF, &r) == STEREO_MARK_WRITTEN && mkvmerge_display(f, 1, 0) == 640,
+          "only the size of the views changes");
+    /* refusals */
+    s = snap(f);
+    int st = stereo_mark_save_views(f, 1, STEREO_POLICY_LAYOUT_ROWS, STEREO_POLICY_LEFT_FIRST, 0, STEREO_MARK_VIEWS_FULL, &r);
+    CHECK(st == STEREO_MARK_VIEWS_LAYOUT, "rows have no half or full: %s", stereo_mark_status_name(st));
+    st = stereo_mark_save_views(f, 1, STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE, STEREO_POLICY_PICTURE_FIRST, 0, STEREO_MARK_VIEWS_FULL, &r);
+    CHECK(st == STEREO_MARK_VIEWS_LAYOUT, "a depth layout has none either: %s", stereo_mark_status_name(st));
+    CHECK(same_as(&s, f), "refused, byte for byte");
+    drop(&s);
+    /* WebM takes the size too; MP4 has no field for it */
+    CHECK(run("ffmpeg -v error -y -f lavfi -i testsrc=size=640x180:rate=10:duration=1 -c:v libvpx -b:v 200k -f webm '%s'", path_of("v.webm")) == 0, "webm");
+    CHECK(stereo_mark_save_views(path_of("v.webm"), 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, 0, 0, STEREO_MARK_VIEWS_FULL, &r) == STEREO_MARK_WRITTEN && mkvmerge_display(path_of("v.webm"), 1, 0) == 320,
+          "WebM takes DisplayWidth too");
+    CHECK(run("ffmpeg -v error -y -f lavfi -i testsrc=size=640x180:rate=10:duration=1 -c:v mpeg4 -f mp4 '%s'", path_of("v.mp4")) == 0, "mp4");
+    s = snap(path_of("v.mp4"));
+    st = stereo_mark_save_views(path_of("v.mp4"), 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, 0, 0, STEREO_MARK_VIEWS_FULL, &r);
+    CHECK(st == STEREO_MARK_MP4_VIEWS, "st3d has no field for the size of the views: %s", stereo_mark_status_name(st));
+    CHECK(same_as(&s, path_of("v.mp4")), "the mp4 is byte for byte");
+    drop(&s);
+    CHECK(stereo_mark_save_views(path_of("v.mp4"), 1, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE, 0, 0, STEREO_MARK_VIEWS_UNSPECIFIED, &r) == STEREO_MARK_WRITTEN, "the packing alone goes into the mp4");
 }
 
 static void test_refusals(void)
@@ -764,6 +981,8 @@ int main(void)
     test_values();
     test_matroska();
     test_tracks_moved();
+    test_laced();
+    test_views();
     test_refusals();
     test_webm();
     test_tool_failures();

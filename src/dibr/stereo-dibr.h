@@ -264,6 +264,52 @@ struct stereo_dibr_parts {
 STEREO_DIBR_EXPORT int stereo_dibr_unpack(
     const struct stereo_dibr_picture *frame, int packing, int depth_first, int depth_plane, struct stereo_dibr_parts *parts);
 
+/*
+ * The options of drawing the views from a picture and its depth map, as one set for every program (Daniel, 2026-11-05: picture
+ * plus depth is assembled into full side by side by one common library; where it has options the library carries the best
+ * default and the person's choice, and every player shows the same controls). stereo_dibr_options_default() is the best
+ * way measured on scenes whose true views are known (autotests/dibrbench.c prints the table and fails when it is not the
+ * best); a program keeps the person's choice in its own store as the text of stereo_dibr_options_write() and gives it back
+ * with stereo_dibr_options_read().
+ *
+ *   view, warp, fill, smooth, sigma_h, sigma_v, radius   as stereo_dibr_params;
+ *   strength  the largest parallax either side of the screen, in pixels of a view 1920 wide, for the depth that carries no
+ *             absolute parallax (the convention's range): how deep the picture looks;
+ *   zero      where the screen is, 0 the farthest samples to 1 the nearest: what is in front of the screen and what behind;
+ *   shift     a parallax added to every point, pixels of a view 1920 wide;
+ *   z_near, z_far  the depth range of a depth map whose samples are distances, in the unit the map has (0 for both: what the
+ *             file says).
+ */
+struct stereo_dibr_options {
+    int view, warp, fill, smooth;
+    double sigma_h, sigma_v;
+    int radius;
+    double strength, zero, shift;
+    double z_near, z_far;
+};
+
+/* The limits a control offers; stereo_dibr_options_clamp() holds a set within them (returns 1 when it changed one). */
+#define STEREO_DIBR_STRENGTH_MAX 300.0
+#define STEREO_DIBR_SHIFT_MAX 100.0
+#define STEREO_DIBR_SIGMA_MAX 100.0
+#define STEREO_DIBR_RADIUS_MAX 30
+
+STEREO_DIBR_EXPORT void stereo_dibr_options_default(struct stereo_dibr_options *o);
+STEREO_DIBR_EXPORT int stereo_dibr_options_clamp(struct stereo_dibr_options *o);
+/* 1 when o is the default set. */
+STEREO_DIBR_EXPORT int stereo_dibr_options_is_default(const struct stereo_dibr_options *o);
+/* The options into the drawing's two structures: params whole, and convention's zero, range, shift (and z_near and z_far when
+ * both are given); its kind, bits and the rest stay as the caller (the depth map's mark) set them. */
+STEREO_DIBR_EXPORT void stereo_dibr_options_apply(const struct stereo_dibr_options *o, struct stereo_depth_convention *c, struct stereo_dibr_params *p);
+/*
+ * The text of a set: "view=left warp=forward fill=background smooth=off sigmaH=10 sigmaV=30 radius=5 strength=58 zero=0.5
+ * shift=0 near=0 far=0", numbers in the C locale's notation. stereo_dibr_options_read() starts from the default, takes the
+ * keys it knows, skips the others, and returns 1, or -1 for a malformed pair or a word that is not one of the key's;
+ * stereo_dibr_options_write() returns the length, or -1 when buf is too small.
+ */
+STEREO_DIBR_EXPORT int stereo_dibr_options_read(const char *text, struct stereo_dibr_options *o);
+STEREO_DIBR_EXPORT int stereo_dibr_options_write(const struct stereo_dibr_options *o, char *buf, size_t size);
+
 #ifdef __cplusplus
 }
 #endif

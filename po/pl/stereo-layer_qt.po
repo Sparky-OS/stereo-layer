@@ -14,3 +14,103 @@ msgstr ""
 msgctxt "QObject|"
 msgid "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed."
 msgstr "Kolor jest odtworzony i przybliżony: anaglif zachowuje tylko część koloru każdego oka. Oryginalny plik nigdy nie jest zmieniany."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Picture and depth"
+msgstr "Obraz i głębia"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Depth strength"
+msgstr "Siła głębi"
+
+msgctxt "Stereo::DepthControls|"
+msgid "How deep the picture looks: the largest parallax in front of and behind the screen, in pixels of a picture 1920 wide. 58 is about one degree of visual angle."
+msgstr "Jak głęboko wygląda obraz: największa paralaksa przed ekranem i za nim, w pikselach obrazu o szerokości 1920. 58 to około jednego stopnia kąta widzenia."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Screen plane"
+msgstr "Płaszczyzna ekranu"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Where the screen is in the depth of the picture, from 0 (the farthest) to 1 (the nearest). What is nearer comes out of the screen, what is farther stays behind it."
+msgstr "Gdzie w głębi obrazu znajduje się ekran, od 0 (najdalej) do 1 (najbliżej). To, co bliżej, wychodzi przed ekran, to, co dalej, zostaje za nim."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Shift"
+msgstr "Przesunięcie"
+
+msgctxt "Stereo::DepthControls|"
+msgid "The picture is"
+msgstr "Obraz jest"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Which view the picture is. As the left eye it stays exactly as it is in that eye and the right eye is drawn; as the middle, both views are drawn."
+msgstr "Którym widokiem jest obraz. Jako lewe oko pozostaje w tym oku dokładnie takie, jakie jest, a rysowane jest prawe oko; jako środek rysowane są oba widoki."
+
+msgctxt "Stereo::DepthControls|"
+msgid "the left eye"
+msgstr "lewym okiem"
+
+msgctxt "Stereo::DepthControls|"
+msgid "the middle"
+msgstr "środkiem"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Gap filling"
+msgstr "Wypełnianie luk"
+
+msgctxt "Stereo::DepthControls|"
+msgid "How the places that the picture does not show, behind the objects in front, are filled."
+msgstr "Jak wypełniane są miejsca, których obraz nie pokazuje, za obiektami z przodu."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Background"
+msgstr "Tło"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Depth-aided"
+msgstr "Wspomagane głębią"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Inpainting"
+msgstr "Rekonstrukcja obrazu (inpainting)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "None"
+msgstr "Brak"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Warping"
+msgstr "Deformacja"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Forward"
+msgstr "Do przodu"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Backward"
+msgstr "Wstecz"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Layered"
+msgstr "Warstwowa"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Smooth the depth"
+msgstr "Wygładź głębię"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Filling reach"
+msgstr "Zasięg wypełniania"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Nearest distance"
+msgstr "Najmniejsza odległość"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Farthest distance"
+msgstr "Największa odległość"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Back to the default"
+msgstr "Przywróć domyślne"

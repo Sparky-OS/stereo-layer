@@ -60,6 +60,9 @@ enum stereo_mark_status {
     STEREO_MARK_TOOL_MISSING,        /* mkvpropedit is not installed */
     STEREO_MARK_WRITE_FAILED,        /* writing failed; details says why */
     STEREO_MARK_READ_BACK,           /* the written file did not read back with the layout; it was put back as it was */
+    STEREO_MARK_MP4_VIEWS,           /* st3d has no field for half or full size views (RFC 9559 section 18.10 has one: DisplayWidth and DisplayHeight) */
+    STEREO_MARK_VIEWS_LAYOUT,        /* half or full size views are asked for a layout that has no such choice (only side by side and top and bottom do) */
+    STEREO_MARK_NOT_LACED,           /* StereoMode 13 and 14 are both eyes laced in one Block (RFC 9559 section 18.10); the file's blocks are not laced that way */
 };
 
 typedef struct stereo_mark_result {
@@ -71,6 +74,13 @@ typedef struct stereo_mark_result {
     int declared_order;  /* and its eye order (stereo_policy_order) */
     char details[320];   /* English, for the log: what the operating system or mkvpropedit said */
 } stereo_mark_result;
+
+/* Half or full size views of a side by side or top and bottom frame (stereo_policy_video_views()). */
+enum stereo_mark_views {
+    STEREO_MARK_VIEWS_UNSPECIFIED = -1, /* write the packing and the eye order only; the size of the views stays as the file has it */
+    STEREO_MARK_VIEWS_HALF = 0,         /* each view is squeezed to half the frame: one plane is displayed as large as the frame */
+    STEREO_MARK_VIEWS_FULL = 1,         /* each view has the size of its half of the frame: one plane is displayed at that size */
+};
 
 /*
  * The container's value for a layout, -1 when it has none.
@@ -100,6 +110,40 @@ STEREO_AV_EXPORT int stereo_mark_read(const char *path, int video_track, int *co
  * (a failed or unread-back write is put back), and the result says why.
  */
 STEREO_AV_EXPORT int stereo_mark_save(const char *path, int video_track, int layout, int order, int anaglyph, stereo_mark_result *result);
+
+/*
+ * stereo_mark_save() and the size of the views. Matroska and WebM say it with DisplayWidth and DisplayHeight, "the number
+ * of pixels for one plane (1920x1080 for that full HD stream)" of 3840x1080 pixels (RFC 9559 section 18.10): FULL writes
+ * one plane's size (half the width of a side by side frame, half the height of a top and bottom one), HALF writes the
+ * size of the frame (a plane as large as the frame is the elements' default and says only that the views are not full;
+ * stereo_policy_video_views() decides what a reader makes of it). MP4's st3d has no such field: MP4_VIEWS. A layout with
+ * no such choice: VIEWS_LAYOUT. UNSPECIFIED is stereo_mark_save().
+ *
+ * StereoMode 13 and 14 are written only when the track's blocks lace both eyes (RFC 9559 sections 5.1.4.1.28.3 and 18.10:
+ * "packing two frames together in a Block that uses lacing", the first frame the left eye or the right); frame sequential
+ * and block laced layouts get NOT_LACED when they are not, though FFmpeg's muxer writes 13 and 14 for its frame sequence.
+ *
+ * result may be null; plane_width and plane_height are what the file carries after the call (0 when it carries none),
+ * laced 1 when the sampled blocks of the track lace two frames, 0 when they do not, -1 when none could be sampled.
+ */
+typedef struct stereo_mark_views_result {
+    stereo_mark_result base;
+    int plane_width, plane_height;
+    int laced;
+} stereo_mark_views_result;
+STEREO_AV_EXPORT int stereo_mark_save_views(
+    const char *path, int video_track, int layout, int order, int anaglyph, int views, stereo_mark_views_result *result);
+
+/* What a Matroska or WebM track carries besides its StereoMode: PixelWidth and PixelHeight, DisplayWidth and DisplayHeight
+ * (0 when absent), and whether its blocks lace two frames (as stereo_mark_save_views()). An MP4 track gives the sizes 0 and
+ * laced -1. Returns as stereo_mark_read(). */
+typedef struct stereo_mark_detail {
+    int container, value;
+    int pixel_width, pixel_height;
+    int display_width, display_height;
+    int laced;
+} stereo_mark_detail;
+STEREO_AV_EXPORT int stereo_mark_read_detail(const char *path, int video_track, stereo_mark_detail *detail);
 
 /* The status as a word for logs and tests: "written", "unchanged", "no-room"... Never null. */
 STEREO_AV_EXPORT const char *stereo_mark_status_name(int status);

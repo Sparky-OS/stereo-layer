@@ -6,6 +6,11 @@ add_test(NAME policytest COMMAND policytest)
 add_executable(dibrtest dibrtest.c)
 target_link_libraries(dibrtest PRIVATE StereoDibr m)
 add_test(NAME dibrtest COMMAND dibrtest)
+# the default way of drawing the views is the best way measured on scenes with known views (prints the table)
+add_executable(dibrbench dibrbench.c)
+target_link_libraries(dibrbench PRIVATE StereoDibr m)
+add_test(NAME dibrbench COMMAND dibrbench)
+set_tests_properties(dibrbench PROPERTIES TIMEOUT 900)
 # the GLSL passes against the C code, in Mesa's software renderer; skipped without EGL
 pkg_check_modules(EGL IMPORTED_TARGET egl)
 if(EGL_FOUND)
@@ -54,6 +59,14 @@ target_link_libraries(marktest PRIVATE StereoAv PkgConfig::STEREO_AV PkgConfig::
 target_include_directories(marktest PRIVATE ${CMAKE_SOURCE_DIR}/src/policy)
 add_test(NAME marktest COMMAND marktest)
 
+add_executable(depthcontrolstest depthcontrolstest.cpp)
+target_link_libraries(depthcontrolstest PRIVATE StereoLayer StereoDibr Qt6::Quick Qt6::Qml Qt6::Widgets Qt6::Test)
+target_compile_definitions(depthcontrolstest PRIVATE QML_IMPORT_DIR="${CMAKE_BINARY_DIR}/qml")
+add_dependencies(depthcontrolstest StereoLayerplugin)
+target_include_directories(depthcontrolstest PRIVATE ${CMAKE_SOURCE_DIR}/src/quick ${CMAKE_SOURCE_DIR}/src/widgets ${CMAKE_SOURCE_DIR}/src/dibr)
+add_test(NAME depthcontrolstest COMMAND depthcontrolstest)
+set_tests_properties(depthcontrolstest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QML_IMPORT_PATH=${CMAKE_BINARY_DIR}/qml")
+
 add_executable(anaglyphtransformtest anaglyphtransformtest.cpp)
 target_link_libraries(anaglyphtransformtest PRIVATE StereoLayer)
 add_test(NAME anaglyphtransformtest COMMAND anaglyphtransformtest)
@@ -68,9 +81,9 @@ add_custom_command(OUTPUT ${_french_qm}
 add_custom_target(translationtestqm DEPENDS ${_french_qm})
 add_dependencies(translationtest translationtestqm)
 add_test(NAME translationtest-fr
-    COMMAND translationtest "La couleur est reconstruite et approximative : un anaglyphe ne conserve qu'une partie de la couleur de chaque œil. Le fichier d'origine n'est jamais modifié.")
+    COMMAND translationtest "La couleur est reconstruite et approximative : un anaglyphe ne conserve qu'une partie de la couleur de chaque œil. Le fichier d'origine n'est jamais modifié." "Intensité de la profondeur")
 set_tests_properties(translationtest-fr PROPERTIES
     ENVIRONMENT "LANGUAGE=fr:en;LC_ALL=fr_FR.UTF-8;XDG_DATA_DIRS=${_translation_root}")
 add_test(NAME translationtest-c
-    COMMAND translationtest "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed.")
+    COMMAND translationtest "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed." "Depth strength")
 set_tests_properties(translationtest-c PROPERTIES ENVIRONMENT "LC_ALL=C")

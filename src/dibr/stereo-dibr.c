@@ -1013,3 +1013,100 @@ int stereo_dibr_unpack(const struct stereo_dibr_picture *frame, int packing, int
         return -1;
     return 0;
 }
+
+
+/* ---- the options as one set ---------------------------------------------------------------------------------------- */
+
+void stereo_dibr_options_default(struct stereo_dibr_options *o)
+{
+    memset(o, 0, sizeof(*o));
+    o->view = STEREO_DIBR_VIEW_LEFT;
+    /* measured on scenes with known views (autotests/dibrbench.c): the picture as the left eye keeps that eye exact; layered
+     * warping with depth-aided filling has the lowest error over both eyes and in the places the picture does not show;
+     * smoothing the depth makes it worse when the depth is exact and no better when it is noisy */
+    o->warp = STEREO_DIBR_WARP_LAYERED;
+    o->fill = STEREO_DIBR_FILL_DEPTH_AIDED;
+    o->smooth = STEREO_DIBR_SMOOTH_OFF;
+    o->sigma_h = 10.0;
+    o->sigma_v = 30.0;
+    o->radius = 5;
+    o->strength = 58.0;
+    o->zero = 0.5;
+}
+
+static double clampd(double v, double lo, double hi, int *changed)
+{
+    if (!(v >= lo)) {
+        *changed = 1;
+        return lo;
+    }
+    if (v > hi) {
+        *changed = 1;
+        return hi;
+    }
+    return v;
+}
+
+int stereo_dibr_options_clamp(struct stereo_dibr_options *o)
+{
+    int changed = 0;
+    if (o->view != STEREO_DIBR_VIEW_LEFT && o->view != STEREO_DIBR_VIEW_CENTER) {
+        o->view = STEREO_DIBR_VIEW_LEFT;
+        changed = 1;
+    }
+    if (o->warp < STEREO_DIBR_WARP_FORWARD || o->warp > STEREO_DIBR_WARP_LAYERED) {
+        o->warp = STEREO_DIBR_WARP_FORWARD;
+        changed = 1;
+    }
+    if (o->fill < STEREO_DIBR_FILL_BACKGROUND || o->fill > STEREO_DIBR_FILL_NONE) {
+        o->fill = STEREO_DIBR_FILL_BACKGROUND;
+        changed = 1;
+    }
+    if (o->smooth != STEREO_DIBR_SMOOTH_OFF && o->smooth != STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN) {
+        o->smooth = STEREO_DIBR_SMOOTH_OFF;
+        changed = 1;
+    }
+    o->sigma_h = clampd(o->sigma_h, 0.0, STEREO_DIBR_SIGMA_MAX, &changed);
+    o->sigma_v = clampd(o->sigma_v, 0.0, STEREO_DIBR_SIGMA_MAX, &changed);
+    if (o->radius < 1 || o->radius > STEREO_DIBR_RADIUS_MAX) {
+        o->radius = o->radius < 1 ? 1 : STEREO_DIBR_RADIUS_MAX;
+        changed = 1;
+    }
+    o->strength = clampd(o->strength, 0.0, STEREO_DIBR_STRENGTH_MAX, &changed);
+    o->zero = clampd(o->zero, 0.0, 1.0, &changed);
+    o->shift = clampd(o->shift, -STEREO_DIBR_SHIFT_MAX, STEREO_DIBR_SHIFT_MAX, &changed);
+    o->z_near = clampd(o->z_near, 0.0, 1e12, &changed);
+    o->z_far = clampd(o->z_far, 0.0, 1e12, &changed);
+    return changed;
+}
+
+int stereo_dibr_options_is_default(const struct stereo_dibr_options *o)
+{
+    struct stereo_dibr_options d;
+    stereo_dibr_options_default(&d);
+    return o->view == d.view && o->warp == d.warp && o->fill == d.fill && o->smooth == d.smooth && o->sigma_h == d.sigma_h && o->sigma_v == d.sigma_v
+        && o->radius == d.radius && o->strength == d.strength && o->zero == d.zero && o->shift == d.shift && o->z_near == d.z_near && o->z_far == d.z_far;
+}
+
+void stereo_dibr_options_apply(const struct stereo_dibr_options *o, struct stereo_depth_convention *c, struct stereo_dibr_params *p)
+{
+    if (p) {
+        p->view = o->view;
+        p->warp = o->warp;
+        p->fill = o->fill;
+        p->smooth = o->smooth;
+        p->sigma_h = o->sigma_h;
+        p->sigma_v = o->sigma_v;
+        p->radius = o->radius;
+    }
+    if (c) {
+        c->zero = o->zero;
+        c->range = o->strength;
+        c->shift = o->shift;
+        if (o->z_near > 0.0 && o->z_far > 0.0) {
+            c->z_present = 1;
+            c->z_near = o->z_near;
+            c->z_far = o->z_far;
+        }
+    }
+}

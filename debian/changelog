@@ -1,3 +1,27 @@
+stereo-layer (1.14.0-1) unstable; urgency=medium
+
+  * Picture plus depth has one set of options for every program (ORDER 411, group 2c; Daniel, 2026-11-05: where the assembly of
+    full side by side from a picture and its depth has options, the library carries the best default and the person's choice, and
+    every player shows the same controls). libstereo-dibr: struct stereo_dibr_options (depth strength, screen plane, shift,
+    which eye the picture is, warping, gap filling, smoothing, filling reach, the depth range), stereo_dibr_options_default(),
+    _clamp(), _apply(), and the text a program keeps per file (_read, _write).
+  * The default is the best way measured: autotests/dibrbench.c scores every way of drawing on scenes whose true views are known
+    (layered shapes, exact and noisy depth, several depth budgets) and fails when the default is not the best. Layered warping with
+    depth-aided filling has the lowest error over both eyes and where the picture shows nothing (0.736 and 4.14 against 0.806 and
+    5.11 for forward warping with background filling, the earlier choice), smoothing the depth makes exact depth worse, and the
+    default strength of 58 pixels is 1.03 degrees of visual angle. docs/depth-defaults.md has the table.
+  * Controls in the library: Stereo::DepthSettings (QML StereoDepthSettings) holds the set; Stereo::DepthControls (Qt widgets) and
+    DepthControls (QML, org.sparky.stereo) show it with the same words, translated in the eight edition languages.
+  * libstereo-av, stereo_mark_save_views(): the size of the views of a side by side or top and bottom video goes into Matroska and
+    WebM as DisplayWidth and DisplayHeight, "the number of pixels for one plane" (RFC 9559 section 18.10); MP4's st3d has no field
+    for it and is refused (MP4_VIEWS), as is a layout with no such choice (VIEWS_LAYOUT). stereo_mark_read_detail() reads the
+    sizes and whether the blocks lace two frames.
+  * StereoMode 13 and 14 are both eyes laced in one Block (RFC 9559 sections 5.1.4.1.28.3 and 18.10): they are written only when
+    the track's blocks are laced that way; frame sequential and block laced layouts into a file whose blocks are not laced are
+    refused (NOT_LACED), though FFmpeg's muxer writes 13 and 14 for its frame sequence.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 05 Nov 2026 15:10:00 +0000
+
 stereo-layer (1.13.0-1) unstable; urgency=medium
 
   * libstereo-policy: the site mark. stereo_policy_site_mark(), stereo_policy_site_mark_list()

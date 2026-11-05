@@ -14,3 +14,103 @@ msgstr ""
 msgctxt "QObject|"
 msgid "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed."
 msgstr "색은 재구성되며 근사치입니다: 아나글리프는 각 눈의 색 중 일부만 남깁니다. 원본 파일은 변경되지 않습니다."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Picture and depth"
+msgstr "이미지와 깊이"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Depth strength"
+msgstr "깊이 강도"
+
+msgctxt "Stereo::DepthControls|"
+msgid "How deep the picture looks: the largest parallax in front of and behind the screen, in pixels of a picture 1920 wide. 58 is about one degree of visual angle."
+msgstr "이미지가 얼마나 깊어 보이는지입니다. 화면 앞뒤의 최대 시차를 너비 1920 이미지의 픽셀로 나타냅니다. 58은 시각 약 1도입니다."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Screen plane"
+msgstr "화면 평면"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Where the screen is in the depth of the picture, from 0 (the farthest) to 1 (the nearest). What is nearer comes out of the screen, what is farther stays behind it."
+msgstr "이미지 깊이에서 화면이 있는 위치로, 0(가장 먼 곳)부터 1(가장 가까운 곳)까지입니다. 더 가까운 것은 화면 밖으로 나오고 더 먼 것은 화면 뒤에 남습니다."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Shift"
+msgstr "이동"
+
+msgctxt "Stereo::DepthControls|"
+msgid "The picture is"
+msgstr "이미지는"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Which view the picture is. As the left eye it stays exactly as it is in that eye and the right eye is drawn; as the middle, both views are drawn."
+msgstr "이미지가 어느 시점인지입니다. 왼쪽 눈이면 그 눈에는 이미지가 그대로 표시되고 오른쪽 눈이 생성됩니다. 가운데이면 두 시점이 모두 생성됩니다."
+
+msgctxt "Stereo::DepthControls|"
+msgid "the left eye"
+msgstr "왼쪽 눈"
+
+msgctxt "Stereo::DepthControls|"
+msgid "the middle"
+msgstr "가운데"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Gap filling"
+msgstr "빈 곳 채우기"
+
+msgctxt "Stereo::DepthControls|"
+msgid "How the places that the picture does not show, behind the objects in front, are filled."
+msgstr "앞에 있는 물체 뒤처럼 이미지가 보여 주지 않는 곳을 어떻게 채울지입니다."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Background"
+msgstr "배경"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Depth-aided"
+msgstr "깊이 활용"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Inpainting"
+msgstr "인페인팅"
+
+msgctxt "Stereo::DepthControls|"
+msgid "None"
+msgstr "없음"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Warping"
+msgstr "워핑"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Forward"
+msgstr "순방향"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Backward"
+msgstr "역방향"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Layered"
+msgstr "레이어"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Smooth the depth"
+msgstr "깊이 부드럽게 하기"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Filling reach"
+msgstr "채우기 범위"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Nearest distance"
+msgstr "가장 가까운 거리"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Farthest distance"
+msgstr "가장 먼 거리"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Back to the default"
+msgstr "기본값으로 되돌리기"

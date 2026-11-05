@@ -330,3 +330,102 @@ int stereo_depth_write_mark(const struct stereo_depth_convention *c, const uint1
     memcpy(buf, out, n + 1);
     return (int)n;
 }
+
+
+/* ---- the options as text (stereo_dibr_options_read and _write) ----------------------------------------------------- */
+
+static const char *const k_view_words[] = { "left", "middle" };
+static const char *const k_warp_words[] = { "forward", "backward", "layered" };
+static const char *const k_fill_words[] = { "background", "depthAided", "telea", "none" };
+static const char *const k_smooth_words[] = { "off", "asymmetricGaussian" };
+
+static int word_index(const char *const *words, int n, const char *s, size_t len)
+{
+    for (int i = 0; i < n; ++i)
+        if (strlen(words[i]) == len && strncmp(words[i], s, len) == 0)
+            return i;
+    return -1;
+}
+
+int stereo_dibr_options_read(const char *text, struct stereo_dibr_options *o)
+{
+    stereo_dibr_options_default(o);
+    if (!text)
+        return -1;
+    const char *p = text;
+    while (*p) {
+        while (*p == ' ')
+            ++p;
+        if (!*p)
+            break;
+        const char *key = p;
+        while (*p && *p != '=' && *p != ' ')
+            ++p;
+        size_t klen = (size_t)(p - key);
+        if (*p != '=')
+            return -1;
+        const char *val = ++p;
+        while (*p && *p != ' ')
+            ++p;
+        size_t vlen = (size_t)(p - val);
+        int i;
+        double d;
+        if (klen == 4 && !strncmp(key, "view", 4)) {
+            if ((i = word_index(k_view_words, 2, val, vlen)) < 0)
+                return -1;
+            o->view = i;
+        } else if (klen == 4 && !strncmp(key, "warp", 4)) {
+            if ((i = word_index(k_warp_words, 3, val, vlen)) < 0)
+                return -1;
+            o->warp = i;
+        } else if (klen == 4 && !strncmp(key, "fill", 4)) {
+            if ((i = word_index(k_fill_words, 4, val, vlen)) < 0)
+                return -1;
+            o->fill = i;
+        } else if (klen == 6 && !strncmp(key, "smooth", 6)) {
+            if ((i = word_index(k_smooth_words, 2, val, vlen)) < 0)
+                return -1;
+            o->smooth = i;
+        } else if (klen == 6 && !strncmp(key, "radius", 6)) {
+            if (read_number(val, val + vlen, &d))
+                return -1;
+            o->radius = d < -1000 ? -1000 : d > 1000 ? 1000 : (int)d;
+        } else {
+            double *target = NULL;
+            if (klen == 6 && !strncmp(key, "sigmaH", 6))
+                target = &o->sigma_h;
+            else if (klen == 6 && !strncmp(key, "sigmaV", 6))
+                target = &o->sigma_v;
+            else if (klen == 8 && !strncmp(key, "strength", 8))
+                target = &o->strength;
+            else if (klen == 4 && !strncmp(key, "zero", 4))
+                target = &o->zero;
+            else if (klen == 5 && !strncmp(key, "shift", 5))
+                target = &o->shift;
+            else if (klen == 4 && !strncmp(key, "near", 4))
+                target = &o->z_near;
+            else if (klen == 3 && !strncmp(key, "far", 3))
+                target = &o->z_far;
+            if (target && read_number(val, val + vlen, target))
+                return -1;
+        }
+    }
+    stereo_dibr_options_clamp(o);
+    return 1;
+}
+
+int stereo_dibr_options_write(const struct stereo_dibr_options *o, char *buf, size_t size)
+{
+    char n[8][64];
+    write_number(n[0], sizeof(n[0]), o->sigma_h);
+    write_number(n[1], sizeof(n[1]), o->sigma_v);
+    write_number(n[2], sizeof(n[2]), o->strength);
+    write_number(n[3], sizeof(n[3]), o->zero);
+    write_number(n[4], sizeof(n[4]), o->shift);
+    write_number(n[5], sizeof(n[5]), o->z_near);
+    write_number(n[6], sizeof(n[6]), o->z_far);
+    int len = snprintf(buf, size, "view=%s warp=%s fill=%s smooth=%s sigmaH=%s sigmaV=%s radius=%d strength=%s zero=%s shift=%s near=%s far=%s",
+        k_view_words[o->view == STEREO_DIBR_VIEW_CENTER], k_warp_words[o->warp >= 0 && o->warp <= 2 ? o->warp : 0], k_fill_words[o->fill >= 0 && o->fill <= 3 ? o->fill : 0],
+        k_smooth_words[o->smooth == STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN], n[0], n[1], o->radius, n[2], n[3], n[4], n[5], n[6]);
+    return len < 0 || (size_t)len >= size ? -1 : len;
+}
