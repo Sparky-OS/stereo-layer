@@ -115,6 +115,92 @@ static void choice(void)
     CHECK(stereo_dibr_choose_from_times(card, 4, 30.0, NULL) == -1);
 }
 
+
+/* the timing of the ladder: from the cheapest way up, each way at most once, stopping at the first that misses the budget; the dearer ways
+ * never run and stay -1; a way that is already known is not run again; a way that would take over a second (eight times a cheaper
+ * one's 125 ms) is not run */
+struct fixture {
+    const double *times;
+    int calls[4];
+    int order[8];
+    int nb;
+};
+
+static int fixture_time(void *user, int rung, double *p95)
+{
+    struct fixture *f = user;
+    f->calls[rung]++;
+    f->order[f->nb++] = rung;
+    *p95 = f->times[rung];
+    return 0;
+}
+
+static int fixture_time_memory(void *user, int rung, double *p95)
+{
+    struct fixture *f = user;
+    if (rung <= 1)
+        return 1; /* the two dearest ways do not fit the memory */
+    f->calls[rung]++;
+    *p95 = f->times[rung];
+    return 0;
+}
+
+static void ladder_timing(void)
+{
+    double p[4];
+    int timed;
+    /* the card at 24 fps (budget 33.3 ms): 4.5 fits, 6.2 fits, 15.9 fits, 77 misses: all four run, the cheapest first */
+    static const double card_times[4] = { 77.0, 15.9, 6.2, 4.5 };
+    struct fixture f = { card_times, { 0 }, { 0 }, 0 };
+    memset(p, 0xff, sizeof(p));
+    for (int i = 0; i < 4; i++)
+        p[i] = -1.0;
+    CHECK(stereo_dibr_time_ladder(24.0, fixture_time, &f, p, 4, &timed) == 0 && timed == 4);
+    CHECK(f.order[0] == 3 && f.order[1] == 2 && f.order[2] == 1 && f.order[3] == 0 && f.nb == 4);
+    CHECK(p[0] == 77.0 && p[3] == 4.5);
+    /* at 60 fps (budget 13.3 ms): 4.5 fits, 6.2 fits, 15.9 misses: the best way never runs and stays untimed */
+    struct fixture g = { card_times, { 0 }, { 0 }, 0 };
+    for (int i = 0; i < 4; i++)
+        p[i] = -1.0;
+    CHECK(stereo_dibr_time_ladder(60.0, fixture_time, &g, p, 4, &timed) == 0 && timed == 3);
+    CHECK(g.calls[0] == 0 && g.calls[1] == 1 && p[0] < 0.0 && p[1] == 15.9);
+    /* a slow GPU: the cheapest misses, nothing dearer runs: one way timed */
+    static const double slow_times[4] = { 2583.0, 686.0, 217.0, 130.0 };
+    struct fixture s = { slow_times, { 0 }, { 0 }, 0 };
+    for (int i = 0; i < 4; i++)
+        p[i] = -1.0;
+    CHECK(stereo_dibr_time_ladder(24.0, fixture_time, &s, p, 4, &timed) == 0 && timed == 1 && s.nb == 1 && s.order[0] == 3 && p[2] < 0.0);
+    /* what is known is not run again, and a lower rate that has room goes on from where it stopped */
+    for (int i = 0; i < 4; i++)
+        p[i] = i == 3 ? 4.5 : i == 2 ? 6.2 : i == 1 ? 15.9 : -1.0;
+    struct fixture k = { card_times, { 0 }, { 0 }, 0 };
+    CHECK(stereo_dibr_time_ladder(24.0, fixture_time, &k, p, 4, &timed) == 0 && timed == 1 && k.calls[0] == 1 && k.calls[1] == 0 && k.calls[3] == 0);
+    /* a way that would take over a second is not run: the cheaper one took 130 ms, which the budget of a 5 fps video (160 ms) allows */
+    static const double heavy[4] = { 99999.0, 1040.0, 130.0, 100.0 };
+    struct fixture h = { heavy, { 0 }, { 0 }, 0 };
+    for (int i = 0; i < 4; i++)
+        p[i] = -1.0;
+    CHECK(stereo_dibr_time_ladder(5.0, fixture_time, &h, p, 4, &timed) == 0 && h.calls[0] == 0 && h.calls[1] == 0 && p[1] < 0.0);
+    /* a way the GPU has not the memory for is not run (the callback says 1): -2, and nothing dearer runs */
+    struct fixture m = { card_times, { 0 }, { 0 }, 0 };
+    for (int i = 0; i < 4; i++)
+        p[i] = -1.0;
+    CHECK(stereo_dibr_time_ladder(24.0, fixture_time_memory, &m, p, 4, &timed) == 0 && p[3] == 4.5 && p[2] == 6.2 && p[1] == -2.0 && m.calls[0] == 0 && p[0] == -1.0);
+    CHECK(timed == 2);
+    /* the memory a way needs grows with the picture and with the way, in the order of the ladder's cost */
+    struct stereo_dibr_way w[4];
+    stereo_dibr_ways(w, 4);
+    /* (the layered pyramid needs more than the layered depth-aided, though it costs less time: the order that matters is the pyramid's) */
+    CHECK(stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080) > stereo_dibr_way_memory(w[3].warp, w[3].fill, 1920, 1080));
+    for (int i = 1; i < 3; i++)
+        CHECK(stereo_dibr_way_memory(w[i].warp, w[i].fill, 1920, 1080) > stereo_dibr_way_memory(w[i + 1].warp, w[i + 1].fill, 1920, 1080));
+    CHECK(stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080) > 250e6 && stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080) < 500e6);
+    CHECK(stereo_dibr_way_memory(w[0].warp, w[0].fill, 3840, 2160) > 3.9 * stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080));
+    /* a failing timer ends it, a bad argument is refused */
+    CHECK(stereo_dibr_time_ladder(24.0, NULL, &f, p, 4, &timed) == -1);
+    CHECK(stereo_dibr_time_ladder(0.0, fixture_time, &f, p, 4, &timed) == -1);
+}
+
 static void cache(void)
 {
     char dir[] = "/tmp/dibrchoosetest-XXXXXX";
@@ -171,16 +257,16 @@ static void cpu(void)
     setenv("XDG_CACHE_HOME", dir, 1);
     double first[4], second[4];
     int measured = 0;
-    CHECK(stereo_dibr_measure_cpu(96, 54, first, 4, &measured) == 0 && measured == 1);
+    CHECK(stereo_dibr_measure_cpu(96, 54, 24.0, first, 4, &measured) == 0 && measured == 1);
     for (int i = 0; i < 4; i++)
         CHECK(first[i] > 0.0 && first[i] < 5000.0);
     /* the second time is the cache's: the same numbers, nothing timed */
-    CHECK(stereo_dibr_measure_cpu(96, 54, second, 4, &measured) == 0 && measured == 0);
+    CHECK(stereo_dibr_measure_cpu(96, 54, 24.0, second, 4, &measured) == 0 && measured == 0);
     for (int i = 0; i < 4; i++)
         CHECK(fabs(first[i] - second[i]) < 0.001);
     /* another size is timed */
-    CHECK(stereo_dibr_measure_cpu(64, 36, second, 4, &measured) == 0 && measured == 1);
-    CHECK(stereo_dibr_measure_cpu(0, 36, second, 4, &measured) == -1);
+    CHECK(stereo_dibr_measure_cpu(64, 36, 24.0, second, 4, &measured) == 0 && measured == 1);
+    CHECK(stereo_dibr_measure_cpu(0, 36, 24.0, second, 4, &measured) == -1);
     char cmd[640];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", dir);
     CHECK(system(cmd) == 0);
@@ -223,6 +309,7 @@ int main(void)
 {
     ladder_and_default();
     choice();
+    ladder_timing();
     cache();
     cpu();
     options_text();

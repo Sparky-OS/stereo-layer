@@ -157,6 +157,18 @@ private Q_SLOTS:
         choice[QStringLiteral("fill")] = int(STEREO_DIBR_FILL_BACKGROUND);
         s.setChoice(choice);
         QCOMPARE(s.chosenText(), QStringLiteral("Forward, Background (the quickest: no way keeps 24 frames a second on this processor)"));
+        // a GPU that was reset: said; a way the GPU has not the memory for: said
+        choice[QStringLiteral("gpuLost")] = true;
+        s.setChoice(choice);
+        QCOMPARE(s.chosenText(), QStringLiteral("Forward, Background (the GPU was reset while drawing: the processor draws now)"));
+        choice[QStringLiteral("gpuLost")] = false;
+        choice[QStringLiteral("keepsUp")] = true;
+        choice[QStringLiteral("onGpu")] = true;
+        choice[QStringLiteral("skippedWarp")] = int(STEREO_DIBR_WARP_LAYERED);
+        choice[QStringLiteral("skippedFill")] = int(STEREO_DIBR_FILL_DEPTH_AIDED);
+        choice[QStringLiteral("skippedMs")] = -2.0;
+        s.setChoice(choice);
+        QCOMPARE(s.chosenText(), QStringLiteral("Forward, Background (Layered, Depth-aided needs more of the GPU's memory than is free)"));
         s.setChoice({});
         QVERIFY(s.chosenText().isEmpty());
         QCOMPARE(s.shownFill(), int(STEREO_DIBR_FILL_DEPTH_AIDED));

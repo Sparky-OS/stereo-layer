@@ -77,6 +77,21 @@ int stereo_dibr_choose_from_times(const double *p95_ms, int n, double fps, struc
     return 0;
 }
 
+/* The GPU memory a way needs at width x height, bytes: the 32 bit float textures of its passes (positions, splats, colour and state twice over,
+ * the layered warp's band and boundary, the pyramid's levels), counted from the passes. */
+double stereo_dibr_way_memory(int warp, int fill, int width, int height)
+{
+    const double px = (double)width * height;
+    double bytes = px * (8 + 8 + 4 * 16 + 8);        /* parallax at the depth's and the picture's size, colour and state twice, the map */
+    bytes += px * 16;                                 /* the splat */
+    if (warp == STEREO_DIBR_WARP_LAYERED)
+        bytes += px * (16 + 16);                      /* the band and the boundary */
+    if (fill == STEREO_DIBR_FILL_PYRAMID)
+        bytes += px * 16 * 4 / 3;                     /* the levels of the pyramid, up and down: a third of the picture, four textures */
+    bytes += px * (4 + 1 + 8);                        /* the picture, its depth, the views */
+    return bytes;
+}
+
 /* ---- the clock, the statistics and the synthetic picture ------------------------------------------------------------ */
 
 double stereo_dibr_now_ms(void)
@@ -279,24 +294,98 @@ static void cpu_key(char *key, size_t size)
     snprintf(key, size, "cpu %s", model);
 }
 
-int stereo_dibr_measure_cpu(int width, int height, double *p95_ms, int n, int *measured)
+int stereo_dibr_time_ladder(double fps, stereo_dibr_time_way time, void *user, double *p95_ms, int n, int *timed)
+{
+    if (!time || !p95_ms || n != NB_WAYS || !(fps > 0.0) || fps > 1000.0)
+        return -1;
+    const double budget = 0.8 * 1000.0 / fps;
+    int count = 0;
+    for (int i = n - 1; i >= 0; i--) {
+        if (p95_ms[i] < 0.0) {
+            /* eight times a way that took over 125 ms is over a second: not run, it does not keep up */
+            if (i < n - 1 && p95_ms[i + 1] * 8.0 > 1000.0)
+                break;
+            double t;
+            const int r = time(user, i, &t);
+            if (r < 0) {
+                if (timed)
+                    *timed = count;
+                return -1;
+            }
+            if (r > 0) {
+                /* not run (the GPU has not the memory for it): -2, and nothing dearer runs */
+                p95_ms[i] = -2.0;
+                break;
+            }
+            p95_ms[i] = t;
+            count++;
+        }
+        if (p95_ms[i] > budget)
+            break;
+    }
+    if (timed)
+        *timed = count;
+    return 0;
+}
+
+struct cpu_timing {
+    stereo_dibr *d;
+    const float *table;
+    struct stereo_dibr_picture in, l, r;
+    struct stereo_dibr_depth dep;
+};
+
+static int time_one_cpu(void *user, int rung, double *p95)
+{
+    struct cpu_timing *t = user;
+    struct stereo_dibr_params p;
+    double ms[STEREO_DIBR_TIMED_FRAMES];
+    int count = 0;
+
+    stereo_dibr_params_default(&p);
+    p.warp = ladder[rung].warp;
+    p.fill = ladder[rung].fill;
+    /* a first frame to warm up; given up on at once when it is hopeless; then the timed frames, given up on after the first when it is */
+    for (int f = 0; f < STEREO_DIBR_TIMED_FRAMES + 1; f++) {
+        const double t0 = stereo_dibr_now_ms();
+        if (stereo_dibr_render(t->d, &p, t->table, 256, &t->in, &t->dep, &t->l, &t->r) < 0)
+            return -1;
+        const double ft = stereo_dibr_now_ms() - t0;
+        if (f == 0) {
+            if (ft > 2 * STEREO_DIBR_GIVE_UP_MS) {
+                ms[count++] = ft;
+                break;
+            }
+            continue;
+        }
+        ms[count++] = ft;
+        if (count == 1 && ft > STEREO_DIBR_GIVE_UP_MS)
+            break;
+    }
+    *p95 = count ? stereo_dibr_p95(ms, count) : -1.0;
+    return 0;
+}
+
+int stereo_dibr_measure_cpu(int width, int height, double fps, double *p95_ms, int n, int *measured)
 {
     char key[160];
     if (measured)
         *measured = 0;
-    if (n != NB_WAYS || !p95_ms || width < 2 || height < 2 || width > 16384 || height > 16384)
+    if (n != NB_WAYS || !p95_ms || width < 2 || height < 2 || width > 16384 || height > 16384 || !(fps > 0.0))
         return -1;
     cpu_key(key, sizeof(key));
-    if (stereo_dibr_cache_load(key, width, height, p95_ms, n))
-        return 0;
+    for (int i = 0; i < n; i++)
+        p95_ms[i] = -1.0;
+    stereo_dibr_cache_load(key, width, height, p95_ms, n);
 
     const size_t luma = (size_t)width * height, chroma = (size_t)((width + 1) / 2) * ((height + 1) / 2);
     const int cw = (width + 1) / 2;
     unsigned char *rgba = malloc(luma * 4), *depth = malloc(luma), *planes = malloc(luma + 2 * chroma);
     unsigned char *outl = malloc(luma + 2 * chroma), *outr = malloc(luma + 2 * chroma);
     float *table = malloc(256 * sizeof(float));
-    stereo_dibr *d = stereo_dibr_alloc();
-    int ok = rgba && depth && planes && outl && outr && table && d;
+    struct cpu_timing t = { stereo_dibr_alloc(), table };
+    int ok = rgba && depth && planes && outl && outr && table && t.d;
+    int timed = 0;
     if (ok) {
         stereo_dibr_synthetic(width, height, rgba, depth);
         /* the picture as a player has it: YUV 4:2:0 planes (the luma from the green, neutral chroma) */
@@ -304,48 +393,18 @@ int stereo_dibr_measure_cpu(int width, int height, double *p95_ms, int n, int *m
             planes[i] = rgba[4 * i + 1];
         memset(planes + luma, 128, 2 * chroma);
         stereo_dibr_timing_table(width, table);
+        t.dep = (struct stereo_dibr_depth){ depth, width, 1, width, height };
+        t.in = (struct stereo_dibr_picture){ width, height, 3, { { planes, width, 1, 0, 0, 0 }, { planes + luma, cw, 1, 1, 1, 128 }, { planes + luma + chroma, cw, 1, 1, 1, 128 } } };
+        t.l = t.r = t.in;
+        t.l.plane[0].data = outl;
+        t.l.plane[1].data = outl + luma;
+        t.l.plane[2].data = outl + luma + chroma;
+        t.r.plane[0].data = outr;
+        t.r.plane[1].data = outr + luma;
+        t.r.plane[2].data = outr + luma + chroma;
+        ok = stereo_dibr_time_ladder(fps, time_one_cpu, &t, p95_ms, n, &timed) == 0;
     }
-    struct stereo_dibr_depth dep = { depth, width, 1, width, height };
-    struct stereo_dibr_picture in = { width, height, 3, { { planes, width, 1, 0, 0, 0 }, { planes + luma, cw, 1, 1, 1, 128 }, { planes + luma + chroma, cw, 1, 1, 1, 128 } } };
-    struct stereo_dibr_picture l = in, r = in;
-    if (ok) {
-        l.plane[0].data = outl;
-        l.plane[1].data = outl + luma;
-        l.plane[2].data = outl + luma + chroma;
-        r.plane[0].data = outr;
-        r.plane[1].data = outr + luma;
-        r.plane[2].data = outr + luma + chroma;
-    }
-    for (int i = 0; ok && i < NB_WAYS; i++) {
-        struct stereo_dibr_params p;
-        stereo_dibr_params_default(&p);
-        p.warp = ladder[i].warp;
-        p.fill = ladder[i].fill;
-        double ms[STEREO_DIBR_TIMED_FRAMES];
-        int count = 0;
-        /* a first frame to warm up; given up on at once when it is hopeless; then the timed frames, given up on after the first
-         * when it is */
-        for (int f = 0; f < STEREO_DIBR_TIMED_FRAMES + 1; f++) {
-            const double t0 = stereo_dibr_now_ms();
-            if (stereo_dibr_render(d, &p, table, 256, &in, &dep, &l, &r) < 0) {
-                ok = 0;
-                break;
-            }
-            const double t = stereo_dibr_now_ms() - t0;
-            if (f == 0) {
-                if (t > 2 * STEREO_DIBR_GIVE_UP_MS) {
-                    ms[count++] = t;
-                    break;
-                }
-                continue;
-            }
-            ms[count++] = t;
-            if (count == 1 && t > STEREO_DIBR_GIVE_UP_MS)
-                break;
-        }
-        p95_ms[i] = count ? stereo_dibr_p95(ms, count) : -1.0;
-    }
-    stereo_dibr_free(d);
+    stereo_dibr_free(t.d);
     free(rgba);
     free(depth);
     free(planes);
@@ -354,8 +413,9 @@ int stereo_dibr_measure_cpu(int width, int height, double *p95_ms, int n, int *m
     free(outr);
     if (!ok)
         return -1;
-    stereo_dibr_cache_store(key, width, height, p95_ms, n);
+    if (timed)
+        stereo_dibr_cache_store(key, width, height, p95_ms, n);
     if (measured)
-        *measured = 1;
+        *measured = timed > 0;
     return 0;
 }

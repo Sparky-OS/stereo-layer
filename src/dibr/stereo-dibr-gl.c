@@ -71,6 +71,7 @@ typedef long GLintptr; /* unused, for completeness of the signatures below */
 #define GL_ANY_SAMPLES_PASSED 0x8C2F
 #define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
 #define GL_FRAMEBUFFER_COMPLETE 0x8CD5
+#define GL_SCISSOR_TEST_ 0x0C11
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_COLOR_ATTACHMENT1 0x8CE1
 #define GL_FRAMEBUFFER 0x8D40
@@ -95,10 +96,12 @@ typedef long GLintptr; /* unused, for completeness of the signatures below */
     X(void, Disable, (GLenum))                                                                                                                       \
     X(void, DrawArrays, (GLenum, GLint, GLsizei))                                                                                                    \
     X(void, DrawBuffers, (GLsizei, const GLenum *))                                                                                                  \
+    X(void, Flush, (void))                                                                                                                           \
     X(void, Finish, (void))                                                                                                                          \
     X(const unsigned char *, GetString, (GLenum))                                                                                                    \
     X(void, ReadPixels, (GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void *))                                                                    \
     X(void, TexSubImage2D, (GLenum, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, const void *))                                            \
+    X(void, Scissor, (GLint, GLint, GLsizei, GLsizei))                                                                                               \
     X(void, Enable, (GLenum))                                                                                                                        \
     X(void, EndQuery, (GLenum))                                                                                                                      \
     X(void, FramebufferTexture2D, (GLenum, GLenum, GLenum, GLuint, GLint))                                                                           \
@@ -198,6 +201,10 @@ struct stereo_dibr_gl {
     GLuint fbo, vao, query;
     char error[512];
     char gpu[384];
+    /* a context that was reset (robustness), and how the passes are paced: bands of rows and a finish after each */
+    GLenum (*GetGraphicsResetStatus)(void);
+    GLenum lost;
+    int band_rows, sync_passes;
 };
 
 static void set_error(stereo_dibr_gl *gl, const char *what, const char *log)
@@ -272,6 +279,11 @@ stereo_dibr_gl *stereo_dibr_gl_create(stereo_dibr_gl_resolver resolve, int api)
         return NULL;                                                                                                                                 \
     }
     GLFUNCTIONS(RESOLVE)
+    {
+        static const char *const names[] = { "glGetGraphicsResetStatus", "glGetGraphicsResetStatusKHR", "glGetGraphicsResetStatusARB", "glGetGraphicsResetStatusEXT" };
+        for (int i = 0; i < 4 && !gl->GetGraphicsResetStatus; i++)
+            gl->GetGraphicsResetStatus = (GLenum(*)(void))resolve(names[i]);
+    }
 
 #define BUILD(name)                                                                                                                                  \
     if (!(gl->programs[P_##name] = program(gl, stereo_dibr_glsl_##name, NULL))) {                                                                    \
@@ -375,7 +387,23 @@ static int draw(struct pass *p, GLuint out0, GLuint out1, int x, int w, int h, i
     gl->BindVertexArray(gl->vao);
     if (query)
         gl->BeginQuery(GL_ANY_SAMPLES_PASSED, gl->query);
-    gl->DrawArrays(GL_TRIANGLES, 0, 3);
+    if (gl->band_rows > 0 && h > gl->band_rows) {
+        /* no single submission runs long: the pass in bands of rows, each finished before the next */
+        gl->Enable(GL_SCISSOR_TEST_);
+        for (int y = 0; y < h; y += gl->band_rows) {
+            gl->Scissor(x, y, w, h - y < gl->band_rows ? h - y : gl->band_rows);
+            gl->DrawArrays(GL_TRIANGLES, 0, 3);
+            if (gl->sync_passes)
+                gl->Finish();
+            else
+                gl->Flush();
+        }
+        gl->Disable(GL_SCISSOR_TEST_);
+    } else {
+        gl->DrawArrays(GL_TRIANGLES, 0, 3);
+        if (gl->sync_passes)
+            gl->Finish();
+    }
     if (query) {
         gl->EndQuery(GL_ANY_SAMPLES_PASSED);
         gl->GetQueryObjectuiv(gl->query, GL_QUERY_RESULT, &any);
@@ -635,6 +663,41 @@ static int pyramid(stereo_dibr_gl *gl, int w, int h, int *cur)
     return 0;
 }
 
+
+int stereo_dibr_gl_reset_status(stereo_dibr_gl *gl)
+{
+    if (!gl)
+        return 0;
+    if (!gl->lost && gl->GetGraphicsResetStatus)
+        gl->lost = gl->GetGraphicsResetStatus();
+    return (int)gl->lost;
+}
+
+
+double stereo_dibr_gl_free_memory(stereo_dibr_gl *gl)
+{
+    GLint v[4] = { 0, 0, 0, 0 };
+    if (!gl)
+        return -1.0;
+    while (gl->GetError() != GL_NO_ERROR) { }
+    gl->GetIntegerv(0x87FC /* GL_TEXTURE_FREE_MEMORY_ATI: kB free in the pool, largest block */, v);
+    if (gl->GetError() == GL_NO_ERROR && v[0] > 0)
+        return v[0] * 1024.0;
+    v[0] = 0;
+    gl->GetIntegerv(0x9049 /* GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX */, v);
+    if (gl->GetError() == GL_NO_ERROR && v[0] > 0)
+        return v[0] * 1024.0;
+    return -1.0;
+}
+
+void stereo_dibr_gl_set_limits(stereo_dibr_gl *gl, int band_rows, int sync_passes)
+{
+    if (!gl)
+        return;
+    gl->band_rows = band_rows < 0 ? 0 : band_rows;
+    gl->sync_passes = sync_passes != 0;
+}
+
 static int render(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, const float *table, int table_size, GLuint picture, int w, int h,
     GLuint depth, int dw, int dh, int integer, int role, GLuint layer, const float *ltable, int ltable_size, GLuint layer_depth, int ldw, int ldh,
     GLuint target, const float hole[4])
@@ -647,6 +710,10 @@ static int render(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, cons
             || ltable_size < 1 || ltable_size > 65536))
         return -1;
 
+    if (gl->lost) {
+        set_error(gl, "the GPU context was reset", NULL);
+        return -4;
+    }
     struct saved saved;
     int ret = 0;
     save(gl, &saved);
@@ -785,6 +852,10 @@ static int render(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, cons
         set_error(gl, "a GL error", NULL);
         ret = -3;
     }
+    if (stereo_dibr_gl_reset_status(gl)) {
+        set_error(gl, "the GPU context was reset while drawing", NULL);
+        ret = -4;
+    }
     restore(gl, &saved);
     return ret;
 
@@ -828,95 +899,132 @@ const char *stereo_dibr_gl_gpu(stereo_dibr_gl *gl)
     return gl->gpu;
 }
 
-int stereo_dibr_gl_measure(stereo_dibr_gl *gl, int w, int h, int with_transfer, double *p95_ms, int n, int *measured)
+struct gl_timing {
+    stereo_dibr_gl *gl;
+    int w, h, with_transfer;
+    unsigned char *rgba, *depth, *readback;
+    GLuint tex[3];
+    float table[256];
+    const struct stereo_dibr_way *ways;
+    const double *p95;
+    int n;
+};
+
+/* One rung of the ladder on the GPU: a warm-up frame, then the timed frames; a frame that comes back reset, or a context that is lost, stops it */
+static int time_one_gl(void *user, int rung, double *p95)
+{
+    struct gl_timing *t = user;
+    stereo_dibr_gl *gl = t->gl;
+    const float hole[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    struct stereo_dibr_params p;
+    double ms[STEREO_DIBR_TIMED_FRAMES];
+    int count = 0;
+
+    stereo_dibr_params_default(&p);
+    p.warp = t->ways[rung].warp;
+    p.fill = t->ways[rung].fill;
+    /* the first way run, and every way above one that took over 20 ms, is paced: bands of rows, each finished before the next, so that no
+     * single submission runs long on a slow GPU; the ways above a fast GPU's run as they run in a player */
+    {
+        /* the memory the way needs against what the GPU has free (GL_ATI_meminfo, GL_NVX_gpu_memory_info: kilobytes), when it says */
+        const double free_bytes = stereo_dibr_gl_free_memory(gl);
+        if (free_bytes >= 0.0 && stereo_dibr_way_memory(t->ways[rung].warp, t->ways[rung].fill, t->w, t->h) > 0.5 * free_bytes) {
+            set_error(gl, "a way needs more than half of the GPU's free memory", NULL);
+            return 1;
+        }
+    }
+    const int paced = rung == t->n - 1 || t->p95[rung + 1] > 20.0;
+    stereo_dibr_gl_set_limits(gl, paced ? 270 : 0, paced);
+    for (int f = 0; f < STEREO_DIBR_TIMED_FRAMES + 1; f++) {
+        const double t0 = stereo_dibr_now_ms();
+        if (t->with_transfer) {
+            gl->BindTexture(GL_TEXTURE_2D, t->tex[0]);
+            gl->TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, t->w, t->h, GL_RGBA, GL_UNSIGNED_BYTE, t->rgba);
+            gl->BindTexture(GL_TEXTURE_2D, t->tex[1]);
+            gl->TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, t->w, t->h, GL_RED, GL_UNSIGNED_BYTE, t->depth);
+        }
+        if (stereo_dibr_gl_render(gl, &p, t->table, 256, t->tex[0], t->w, t->h, t->tex[1], t->w, t->h, 0, t->tex[2], hole) < 0)
+            return -1;
+        if (t->with_transfer) {
+            gl->BindFramebuffer(GL_FRAMEBUFFER, gl->fbo);
+            gl->FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t->tex[2], 0);
+            gl->ReadPixels(0, 0, 2 * t->w, t->h, GL_RGBA, GL_UNSIGNED_BYTE, t->readback);
+        }
+        gl->Finish();
+        if (stereo_dibr_gl_reset_status(gl)) {
+            set_error(gl, "the GPU context was reset while timing", NULL);
+            return -1;
+        }
+        const double ft = stereo_dibr_now_ms() - t0;
+        if (f == 0) {
+            if (ft > 2 * STEREO_DIBR_GIVE_UP_MS) {
+                ms[count++] = ft;
+                break;
+            }
+            continue;
+        }
+        ms[count++] = ft;
+        if (count == 1 && ft > STEREO_DIBR_GIVE_UP_MS)
+            break;
+    }
+    *p95 = count ? stereo_dibr_p95(ms, count) : -1.0;
+    return 0;
+}
+
+int stereo_dibr_gl_measure(stereo_dibr_gl *gl, int w, int h, int with_transfer, double fps, double *p95_ms, int n, int *measured)
 {
     if (measured)
         *measured = 0;
-    if (!gl || w < 2 || h < 2 || w > 16384 || h > 16384 || !p95_ms)
+    if (!gl || gl->lost || w < 2 || h < 2 || w > 16384 || h > 16384 || !p95_ms || !(fps > 0.0))
         return -1;
     struct stereo_dibr_way ways[16];
     if (n != stereo_dibr_ways(ways, 16))
         return -1;
     char key[420];
     snprintf(key, sizeof(key), "%s%s", stereo_dibr_gl_gpu(gl), with_transfer ? " with transfer" : "");
-    if (stereo_dibr_cache_load(key, w, h, p95_ms, n))
-        return 0;
+    for (int i = 0; i < n; i++)
+        p95_ms[i] = -1.0;
+    stereo_dibr_cache_load(key, w, h, p95_ms, n);
 
     struct saved saved;
     save(gl, &saved);
     gl->error[0] = 0;
-    unsigned char *rgba = malloc((size_t)w * h * 4), *depth = malloc((size_t)w * h), *readback = with_transfer ? malloc((size_t)w * h * 8) : NULL;
-    float table[256];
-    GLuint tex[3] = { 0, 0, 0 };
-    int ok = rgba && depth && (!with_transfer || readback);
+    struct gl_timing t = { gl, w, h, with_transfer, malloc((size_t)w * h * 4), malloc((size_t)w * h), with_transfer ? malloc((size_t)w * h * 8) : NULL, { 0, 0, 0 }, { 0 }, ways, p95_ms, n };
+    int ok = t.rgba && t.depth && (!with_transfer || t.readback);
+    /* every pass in bands of 270 rows (1080p: four), each finished before the next: no single submission runs long on a slow GPU */
+    const int band = gl->band_rows, sync = gl->sync_passes;
+    int timed = 0;
     if (ok) {
-        stereo_dibr_synthetic(w, h, rgba, depth);
-        stereo_dibr_timing_table(w, table);
-        gl->GenTextures(3, tex);
+        stereo_dibr_synthetic(w, h, t.rgba, t.depth);
+        stereo_dibr_timing_table(w, t.table);
+        gl->GenTextures(3, t.tex);
         gl->PixelStorei(GL_UNPACK_ALIGNMENT, 1);
         for (int i = 0; i < 3; i++) {
-            gl->BindTexture(GL_TEXTURE_2D, tex[i]);
-            gl->TexImage2D(GL_TEXTURE_2D, 0, i == 1 ? GL_R8 : GL_RGBA8, i == 2 ? 2 * w : w, h, 0, i == 1 ? GL_RED : GL_RGBA, GL_UNSIGNED_BYTE, i == 2 ? NULL : i == 1 ? depth : rgba);
+            gl->BindTexture(GL_TEXTURE_2D, t.tex[i]);
+            gl->TexImage2D(GL_TEXTURE_2D, 0, i == 1 ? GL_R8 : GL_RGBA8, i == 2 ? 2 * w : w, h, 0, i == 1 ? GL_RED : GL_RGBA, GL_UNSIGNED_BYTE, i == 2 ? NULL : i == 1 ? t.depth : t.rgba);
             gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         }
-        ok = gl->GetError() == GL_NO_ERROR;
+        ok = gl->GetError() == GL_NO_ERROR && stereo_dibr_time_ladder(fps, time_one_gl, &t, p95_ms, n, &timed) == 0;
     }
-    const float hole[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-    for (int i = 0; ok && i < n; i++) {
-        struct stereo_dibr_params p;
-        stereo_dibr_params_default(&p);
-        p.warp = ways[i].warp;
-        p.fill = ways[i].fill;
-        double ms[STEREO_DIBR_TIMED_FRAMES];
-        int count = 0;
-        for (int f = 0; f < STEREO_DIBR_TIMED_FRAMES + 1; f++) {
-            const double t0 = stereo_dibr_now_ms();
-            if (with_transfer) {
-                gl->BindTexture(GL_TEXTURE_2D, tex[0]);
-                gl->TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
-                gl->BindTexture(GL_TEXTURE_2D, tex[1]);
-                gl->TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RED, GL_UNSIGNED_BYTE, depth);
-            }
-            if (stereo_dibr_gl_render(gl, &p, table, 256, tex[0], w, h, tex[1], w, h, 0, tex[2], hole) < 0) {
-                ok = 0;
-                break;
-            }
-            if (with_transfer) {
-                gl->BindFramebuffer(GL_FRAMEBUFFER, gl->fbo);
-                gl->FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex[2], 0);
-                gl->ReadPixels(0, 0, 2 * w, h, GL_RGBA, GL_UNSIGNED_BYTE, readback);
-            }
-            gl->Finish();
-            const double t = stereo_dibr_now_ms() - t0;
-            if (f == 0) {
-                if (t > 2 * STEREO_DIBR_GIVE_UP_MS) {
-                    ms[count++] = t;
-                    break;
-                }
-                continue;
-            }
-            ms[count++] = t;
-            if (count == 1 && t > STEREO_DIBR_GIVE_UP_MS)
-                break;
-        }
-        p95_ms[i] = count ? stereo_dibr_p95(ms, count) : -1.0;
-    }
-    if (tex[0])
-        gl->DeleteTextures(3, tex);
-    free(rgba);
-    free(depth);
-    free(readback);
+    gl->band_rows = band;
+    gl->sync_passes = sync;
+    if (t.tex[0])
+        gl->DeleteTextures(3, t.tex);
+    free(t.rgba);
+    free(t.depth);
+    free(t.readback);
     restore(gl, &saved);
     if (!ok) {
         if (!gl->error[0])
             set_error(gl, "the ways could not be timed", NULL);
         return -1;
     }
-    stereo_dibr_cache_store(key, w, h, p95_ms, n);
+    if (timed)
+        stereo_dibr_cache_store(key, w, h, p95_ms, n);
     if (measured)
-        *measured = 1;
+        *measured = timed > 0;
     return 0;
 }

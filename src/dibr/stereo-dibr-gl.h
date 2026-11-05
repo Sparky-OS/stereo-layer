@@ -63,15 +63,29 @@ STEREO_DIBR_EXPORT int stereo_dibr_gl_render_layer(stereo_dibr_gl *gl, const str
 STEREO_DIBR_EXPORT const char *stereo_dibr_gl_gpu(stereo_dibr_gl *gl);
 
 /*
- * The times of the ways of stereo_dibr_ways() (n of them) on this GPU at width x height, in the current context: the 95th
- * percentile of twelve frames each (a synthetic picture and its depth map, each frame to the end of its work), into p95_ms. With
- * with_transfer the frame's upload and the views' read back are in every frame's time, as a player that draws into memory pays
- * them. The person's cache is read first (stereo_dibr_cache_load() by the GPU's name and the size); *measured is 1 when this
- * call did the timing, which costs about a second on a GPU that draws a way in ten milliseconds and ten seconds on one that
- * takes a second. A way that takes more than a quarter of a second is given up on after its first frame. Returns 0, or -1 (the
- * times then hold nothing; stereo_dibr_gl_error()).
+ * The times of the ways of stereo_dibr_ways() (n of them) on this GPU at width x height, in the current context, for a video of
+ * fps frames a second: the ladder is timed from the cheapest way up (stereo_dibr_time_ladder()) and stops at the first way that
+ * misses the frame's budget, so the ways that cost seconds never run; ways not timed are -1 in p95_ms (they do not keep up). The
+ * 95th percentile of twelve frames each (a synthetic picture and its depth map), every pass in bands of rows and finished before the
+ * next. With with_transfer the frame's upload and the views' read back are in every frame's time. The person's cache is read first
+ * and added to; *measured is 1 when this call timed a way. A context that comes back reset (robustness) ends the timing with -1.
+ * Returns 0, or -1 (stereo_dibr_gl_error()).
  */
-STEREO_DIBR_EXPORT int stereo_dibr_gl_measure(stereo_dibr_gl *gl, int width, int height, int with_transfer, double *p95_ms, int n, int *measured);
+STEREO_DIBR_EXPORT int stereo_dibr_gl_measure(
+    stereo_dibr_gl *gl, int width, int height, int with_transfer, double fps, double *p95_ms, int n, int *measured);
+
+/*
+ * The context's reset status (glGetGraphicsResetStatus of KHR_robustness, when the context has it): 0 for none or unknown, else the
+ * status (GL_GUILTY_CONTEXT_RESET 0x8253, INNOCENT 0x8254, UNKNOWN 0x8255). Once a reset is seen the GL path refuses to draw
+ * (stereo_dibr_gl_render() returns -4) and the program says so: the caller draws elsewhere, never silently.
+ */
+STEREO_DIBR_EXPORT int stereo_dibr_gl_reset_status(stereo_dibr_gl *gl);
+
+/* The GPU memory the driver says is free, bytes (GL_ATI_meminfo or GL_NVX_gpu_memory_info); -1 when it does not say. */
+STEREO_DIBR_EXPORT double stereo_dibr_gl_free_memory(stereo_dibr_gl *gl);
+
+/* How the passes are paced: bands of band_rows rows (0: whole), each flushed, or finished with sync_passes. Timing sets its own. */
+STEREO_DIBR_EXPORT void stereo_dibr_gl_set_limits(stereo_dibr_gl *gl, int band_rows, int sync_passes);
 
 #ifdef __cplusplus
 }

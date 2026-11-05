@@ -146,3 +146,11 @@ msgstr "%1（%4%2無法維持每秒 %3 幀）"
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (the quickest: no way keeps %2 frames a second %3)"
 msgstr "%1（最快的方式：%3沒有任何方式能維持每秒 %2 幀）"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (the GPU was reset while drawing: the processor draws now)"
+msgstr "%1（繪製時 GPU 被重置：現在由處理器繪製）"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (%2 needs more of the GPU's memory than is free)"
+msgstr "%1（%2 需要的 GPU 記憶體超過可用量）"

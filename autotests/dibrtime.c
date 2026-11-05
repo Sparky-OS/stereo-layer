@@ -55,6 +55,15 @@ static void (*glPixelStorei)(GLenum, GLint);
 static void (*glFinish)(void);
 static const GLubyte *(*glGetString)(GLenum);
 
+static void debug_message(unsigned source, unsigned type, unsigned id, unsigned severity, int length, const char *message, const void *user)
+{
+    (void)source;
+    (void)id;
+    (void)length;
+    (void)user;
+    fprintf(stderr, "KHR_debug type 0x%x severity 0x%x: %s\n", type, severity, message);
+}
+
 static stereo_dibr_gl_function resolve(const char *name) { return (stereo_dibr_gl_function)eglGetProcAddress(name); }
 
 static double now_ms(void)
@@ -134,6 +143,8 @@ struct way {
     int is_default;
 };
 
+static int no_telea;
+
 static int list_ways(struct way *ways)
 {
     static const char *warps[] = { "forward", "backward", "layered" };
@@ -147,6 +158,8 @@ static int list_ways(struct way *ways)
     for (int warp = 0; warp < 3; ++warp)
         for (int fi = 0; fi < 4; ++fi) {
             const int fill = fill_enum[fi];
+            if (no_telea && fill == 2)
+                continue;
             struct way *w = &ways[n++];
             stereo_dibr_params_default(&w->p);
             w->p.warp = warp;
@@ -181,7 +194,12 @@ static void print_choice(const double *ms)
     struct stereo_dibr_way ways[8];
     const int n = stereo_dibr_ways(ways, 8);
     for (int i = 0; i < n; ++i)
-        printf("  rung %d  %-9s/%-11s %9.2f ms\n", i, warps[ways[i].warp], fills[ways[i].fill], ms[i]);
+        {
+        if (ms[i] < 0)
+            printf("  rung %d  %-9s/%-11s     not timed (a cheaper way missed the budget)\n", i, warps[ways[i].warp], fills[ways[i].fill]);
+        else
+            printf("  rung %d  %-9s/%-11s %9.2f ms\n", i, warps[ways[i].warp], fills[ways[i].fill], ms[i]);
+    }
     static const double rates[] = { 24, 30, 60 };
     for (int k = 0; k < 3; ++k) {
         struct stereo_dibr_choice c;
@@ -206,7 +224,7 @@ static void report(const char *name, double *t, int frames, int is_default)
 
 int main(int argc, char **argv)
 {
-    int gpu = -1, cpu = 0, list = 0, upload = 0, frames = 0, w = 1920, h = 1080, radius = 0, choose = 0;
+    int gpu = -1, cpu = 0, list = 0, upload = 0, frames = 0, w = 1920, h = 1080, radius = 0, choose = 0, paced = 0;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--list"))
             list = 1;
@@ -216,6 +234,10 @@ int main(int argc, char **argv)
             upload = 1;
         else if (!strcmp(argv[i], "--choose"))
             choose = 1;
+        else if (!strcmp(argv[i], "--paced"))
+            paced = 1;
+        else if (!strcmp(argv[i], "--no-telea"))
+            no_telea = 1;
         else if (!strcmp(argv[i], "--gpu") && i + 1 < argc)
             gpu = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--radius") && i + 1 < argc)
@@ -270,7 +292,7 @@ int main(int argc, char **argv)
         double ms[4];
         int measured = 0;
         double t0 = now_ms();
-        if (stereo_dibr_measure_cpu(w, h, ms, 4, &measured)) {
+        if (stereo_dibr_measure_cpu(w, h, 24.0, ms, 4, &measured)) {
             fprintf(stderr, "stereo_dibr_measure_cpu failed\n");
             return 3;
         }
@@ -330,14 +352,30 @@ int main(int argc, char **argv)
         return 3;
     }
     eglBindAPI(EGL_OPENGL_API);
+    /* a robust context (KHR_create_context: robust access, reset notification) with a debug context; the plain one when the driver refuses */
+    static const EGLint robust[] = { EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 3, EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
+        0x31B2 /* EGL_CONTEXT_OPENGL_ROBUST_ACCESS */, 1, 0x31BD /* EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY */, 0x31BF /* LOSE_CONTEXT_ON_RESET */,
+        0x31B0 /* EGL_CONTEXT_OPENGL_DEBUG */, 1, EGL_NONE };
     static const EGLint attribs[] = { EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 3, EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT, EGL_NONE };
-    EGLContext ctx = eglCreateContext(dpy, EGL_NO_CONFIG_KHR, EGL_NO_CONTEXT, attribs);
+    EGLContext ctx = eglCreateContext(dpy, EGL_NO_CONFIG_KHR, EGL_NO_CONTEXT, robust);
+    const int is_robust = ctx != EGL_NO_CONTEXT;
+    if (!is_robust)
+        ctx = eglCreateContext(dpy, EGL_NO_CONFIG_KHR, EGL_NO_CONTEXT, attribs);
     if (ctx == EGL_NO_CONTEXT || !eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx)) {
         fprintf(stderr, "no OpenGL 3.3 core context on device %d (0x%x)\n", gpu, eglGetError());
         return 3;
     }
 #define LOAD(f) *(void **)&f = (void *)eglGetProcAddress(#f)
     LOAD(glGenTextures); LOAD(glBindTexture); LOAD(glTexImage2D); LOAD(glTexSubImage2D); LOAD(glTexParameteri); LOAD(glPixelStorei); LOAD(glFinish); LOAD(glGetString);
+    {
+        /* KHR_debug: every message of the driver on stderr */
+        void (*debugCallback)(void *, const void *) = (void (*)(void *, const void *))eglGetProcAddress("glDebugMessageCallback");
+        if (debugCallback) {
+            debugCallback((void *)debug_message, NULL);
+            ((void (*)(unsigned))eglGetProcAddress("glEnable"))(0x92E0);
+        }
+    }
+    printf("# context: %s\n", is_robust ? "robust access, reset notification, debug" : "plain (the driver refused the robust one)");
     printf("# GL_RENDERER: %s, %s; %dx%d per eye%s\n", glGetString(GL_RENDERER), glGetString(GL_VERSION), w, h, upload ? ", with the upload of the frame" : "");
     GLuint tex[3];
     glGenTextures(3, tex);
@@ -364,7 +402,7 @@ int main(int argc, char **argv)
         for (int transfer = 0; transfer < 2; ++transfer) {
             int measured = 0;
             double t0 = now_ms();
-            if (stereo_dibr_gl_measure(gl, w, h, transfer, ms, 4, &measured)) {
+            if (stereo_dibr_gl_measure(gl, w, h, transfer, 24.0, ms, 4, &measured)) {
                 fprintf(stderr, "stereo_dibr_gl_measure failed: %s\n", stereo_dibr_gl_error(gl));
                 return 3;
             }
@@ -374,6 +412,8 @@ int main(int argc, char **argv)
         stereo_dibr_gl_free(gl);
         return 0;
     }
+    if (paced)
+        stereo_dibr_gl_set_limits(gl, 270, 1);
     const float hole[4] = { 0, 0, 0, 1 };
     int n = frames ? frames : 120;
     double *t = malloc(sizeof(double) * n);

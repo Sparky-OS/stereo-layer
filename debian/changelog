@@ -1,3 +1,23 @@
+stereo-layer (1.16.0-1) unstable; urgency=medium
+
+  * The GPU path is paced and watched (ORDER 411, step 2f; a GPU page fault and ring timeout on the station's Ryzen 5600G iGPU while the
+    ladder was timed). The ladder is timed from the cheapest way up and stops at the first way that misses the frame's budget
+    (stereo_dibr_time_ladder(); the ways are ordered by cost), so the ways that take seconds on a slow GPU never run during timing; a way
+    eight times dearer than a cheaper one that took over 125 ms is not run either; the first way run, and every way above one that took
+    over 20 ms, runs with its passes in bands of 270 rows, each finished before the next (stereo_dibr_gl_set_limits()). Ways not timed
+    stay -1 in the cache and are timed when a lower frame rate leaves room (stereo_dibr_gl_measure() and stereo_dibr_measure_cpu() take
+    the frame rate).
+  * A way whose float textures (stereo_dibr_way_memory(): 150 bytes a pixel for layered depth-aided, 309 MB at 1080p per eye) are over
+    half of what the driver says is free (GL_ATI_meminfo, GL_NVX_gpu_memory_info) is not run: -2 in the times, and the depth controls say
+    "needs more of the GPU's memory than is free". Out of GPU memory is the likeliest cause of the fault (amdgpu said -12, ENOMEM, in its
+    fault handler), but it was not reproduced: see REPORT-2f.md.
+  * The context's reset status is watched (glGetGraphicsResetStatus, KHR_robustness): after every timed frame and every drawing; a reset
+    ends the timing, the GL path refuses to draw (-4) and the controls say "the GPU was reset while drawing: the processor draws now".
+    dibrtime creates a robust, debug context and prints KHR_debug messages, with --paced and --no-telea.
+  * dibrchoosetest asserts the order and the stop of the timing on fixtures of times, the memory stop and the memory a way needs.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 05 Nov 2026 20:00:00 +0000
+
 stereo-layer (1.15.0-1) unstable; urgency=medium
 
   * A video is drawn the best way that keeps its frame rate (ORDER 411, group 2e; Daniel, 2026-11-05: "we choose the best default and

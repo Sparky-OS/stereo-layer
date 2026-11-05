@@ -13,7 +13,7 @@ struct DepthSettings::Private {
     // what the player's drawing chose for the video that plays
     bool hasChoice = false;
     int warp = 0, fill = 0, skippedWarp = -1, skippedFill = -1, fps = 0;
-    bool keepsUp = true, onGpu = true;
+    bool keepsUp = true, onGpu = true, gpuLost = false, skippedMemory = false;
 };
 
 DepthSettings::DepthSettings(QObject *parent)
@@ -178,7 +178,7 @@ void DepthSettings::setChoice(const QVariantMap &choice)
 {
     const bool had = d->hasChoice;
     const int warp = d->warp, fill = d->fill, sw = d->skippedWarp, sf = d->skippedFill, fps = d->fps;
-    const bool keeps = d->keepsUp, gpu = d->onGpu;
+    const bool keeps = d->keepsUp, gpu = d->onGpu, lost = d->gpuLost, memory = d->skippedMemory;
     d->hasChoice = choice.contains(QStringLiteral("warp")) && choice.contains(QStringLiteral("fill"));
     if (d->hasChoice) {
         d->warp = choice.value(QStringLiteral("warp")).toInt();
@@ -188,9 +188,12 @@ void DepthSettings::setChoice(const QVariantMap &choice)
         d->fps = qRound(choice.value(QStringLiteral("fps"), 0).toDouble());
         d->keepsUp = choice.value(QStringLiteral("keepsUp"), true).toBool();
         d->onGpu = choice.value(QStringLiteral("onGpu"), true).toBool();
+        d->gpuLost = choice.value(QStringLiteral("gpuLost"), false).toBool();
+        // -2: the way was not run, the GPU has not the memory for it
+        d->skippedMemory = choice.value(QStringLiteral("skippedMs"), 0).toDouble() < -1.5;
     }
     if (had != d->hasChoice || (d->hasChoice && (warp != d->warp || fill != d->fill || sw != d->skippedWarp || sf != d->skippedFill || fps != d->fps
-                                                  || keeps != d->keepsUp || gpu != d->onGpu)))
+                                                  || keeps != d->keepsUp || gpu != d->onGpu || lost != d->gpuLost || memory != d->skippedMemory)))
         Q_EMIT changed();
 }
 
@@ -211,8 +214,13 @@ QString DepthSettings::chosenText() const
     const QString where = d->onGpu ? QCoreApplication::translate(context, "on this GPU") : QCoreApplication::translate(context, "on this processor");
     const QString rate = QString::number(d->fps);
     const QString chosen = way(d->warp, d->fill);
+    // the GPU was reset (a driver or hardware fault): the GPU is not used again for this video, and it is said, never silently
+    if (d->gpuLost)
+        return QCoreApplication::translate(context, "%1 (the GPU was reset while drawing: the processor draws now)").arg(chosen);
     if (!d->keepsUp)
         return QCoreApplication::translate(context, "%1 (the quickest: no way keeps %2 frames a second %3)").arg(chosen, rate, where);
+    if (d->skippedMemory && d->skippedWarp >= 0 && d->skippedFill >= 0)
+        return QCoreApplication::translate(context, "%1 (%2 needs more of the GPU's memory than is free)").arg(chosen, way(d->skippedWarp, d->skippedFill));
     if (d->skippedWarp >= 0 && d->skippedFill >= 0)
         return QCoreApplication::translate(context, "%1 (%2 does not keep %3 frames a second %4)")
             .arg(chosen, way(d->skippedWarp, d->skippedFill), rate, where);

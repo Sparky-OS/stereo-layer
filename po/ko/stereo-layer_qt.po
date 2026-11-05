@@ -146,3 +146,11 @@ msgstr "%1 (%4 %2은(는) 초당 %3프레임을 유지하지 못함)"
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (the quickest: no way keeps %2 frames a second %3)"
 msgstr "%1 (가장 빠름: %3 초당 %2프레임을 유지하는 방법이 없음)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (the GPU was reset while drawing: the processor draws now)"
+msgstr "%1 (그리는 중에 GPU가 초기화되어 이제 프로세서가 그립니다)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (%2 needs more of the GPU's memory than is free)"
+msgstr "%1 (%2은(는) 남은 GPU 메모리보다 더 많이 필요함)"

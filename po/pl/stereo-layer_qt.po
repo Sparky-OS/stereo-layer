@@ -146,3 +146,11 @@ msgstr "%1 (%2 nie utrzymuje %3 klatek na sekundę %4)"
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (the quickest: no way keeps %2 frames a second %3)"
 msgstr "%1 (najszybsza: żadna metoda nie utrzymuje %2 klatek na sekundę %3)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (the GPU was reset while drawing: the processor draws now)"
+msgstr "%1 (GPU zostało zresetowane podczas rysowania: teraz rysuje procesor)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (%2 needs more of the GPU's memory than is free)"
+msgstr "%1 (%2 potrzebuje więcej pamięci GPU, niż jest wolne)"

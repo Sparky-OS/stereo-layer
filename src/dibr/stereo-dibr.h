@@ -352,11 +352,25 @@ struct stereo_dibr_choice {
 STEREO_DIBR_EXPORT int stereo_dibr_choose_from_times(const double *p95_ms, int n, double fps, struct stereo_dibr_choice *out);
 
 /*
+ * Times the ladder for a video of fps frames a second from the cheapest way up (the ladder is ordered by cost), calling time(user,
+ * rung, &p95) for each way whose p95_ms[rung] is not known (negative on input), and stops at the first way whose time misses the
+ * budget (four fifths of the frame's time): the dearer ways keep -1 and never run. A dearer way whose cheaper neighbour took more
+ * than 125 ms is not run either (it would take over a second: eight times the cheaper way's time). *timed counts the ways run. A
+ * callback that returns -1 ends it with -1. Returns 0, or -1.
+ */
+typedef int (*stereo_dibr_time_way)(void *user, int rung, double *p95_ms);
+/* (the callback returns 1 for a way it did not run, which gets -2 in p95_ms and ends the timing: the GPU has not the memory for it) */
+
+/* The GPU memory in bytes that a way needs at width x height (the float textures of its passes). */
+STEREO_DIBR_EXPORT double stereo_dibr_way_memory(int warp, int fill, int width, int height);
+STEREO_DIBR_EXPORT int stereo_dibr_time_ladder(double fps, stereo_dibr_time_way time, void *user, double *p95_ms, int n, int *timed);
+
+/*
  * The times of the ways on this CPU (stereo_dibr_render(), one thread) at width x height, into p95_ms (n values), kept in the
  * person's cache (XDG_CACHE_HOME/stereo-dibr/timings, else ~/.cache/stereo-dibr/timings: never in a media file) by the
  * processor and the size: the cache is read first, and *measured is 1 when this call timed the ways. Returns 0, or -1.
  */
-STEREO_DIBR_EXPORT int stereo_dibr_measure_cpu(int width, int height, double *p95_ms, int n, int *measured);
+STEREO_DIBR_EXPORT int stereo_dibr_measure_cpu(int width, int height, double fps, double *p95_ms, int n, int *measured);
 
 /* The cache by hand (for a GPU's key, and for tests): 1 when key has a line for width x height with n times, into p95_ms. */
 STEREO_DIBR_EXPORT int stereo_dibr_cache_load(const char *key, int width, int height, double *p95_ms, int n);
