@@ -18,7 +18,7 @@ enum class OutputMode { Unknown, Mono, Stereo, Anaglyph };
 struct DepthOptions {
     enum class View { Left, Center } view = View::Left;
     enum class Warp { Forward, Backward, Layered } warp = Warp::Layered;
-    enum class Fill { Background, DepthAided, Telea, None } fill = Fill::DepthAided;
+    enum class Fill { Background, DepthAided, Telea, None, Pyramid } fill = Fill::DepthAided;
     bool smooth = false;
     double sigmaH = 10.0, sigmaV = 30.0;
     int radius = 5;

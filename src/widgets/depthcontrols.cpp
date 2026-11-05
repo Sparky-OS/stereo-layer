@@ -19,7 +19,8 @@ struct DepthControls::Private {
     DepthSettings *settings;
     QDoubleSpinBox *strength, *zero, *shift, *nearest, *farthest;
     QComboBox *picture, *fill, *warp;
-    QCheckBox *smooth;
+    QCheckBox *smooth, *automatic;
+    QLabel *chosen;
     QSpinBox *reach;
     QPushButton *reset;
 };
@@ -60,6 +61,7 @@ DepthControls::DepthControls(DepthSettings *settings, QWidget *parent)
     d->fill = new QComboBox(this);
     d->fill->addItem(tr("fillBackground"), STEREO_DIBR_FILL_BACKGROUND);
     d->fill->addItem(tr("fillDepthAided"), STEREO_DIBR_FILL_DEPTH_AIDED);
+    d->fill->addItem(tr("fillPyramid"), STEREO_DIBR_FILL_PYRAMID);
     d->fill->addItem(tr("fillTelea"), STEREO_DIBR_FILL_TELEA);
     d->fill->addItem(tr("fillNone"), STEREO_DIBR_FILL_NONE);
     d->fill->setToolTip(tr("fillTip"));
@@ -68,6 +70,10 @@ DepthControls::DepthControls(DepthSettings *settings, QWidget *parent)
     d->warp->addItem(tr("warpBackward"), STEREO_DIBR_WARP_BACKWARD);
     d->warp->addItem(tr("warpLayered"), STEREO_DIBR_WARP_LAYERED);
     d->smooth = new QCheckBox(tr("smooth"), this);
+    d->automatic = new QCheckBox(tr("automatic"), this);
+    d->automatic->setToolTip(tr("automaticTip"));
+    d->chosen = new QLabel(this);
+    d->chosen->setWordWrap(true);
     d->reach = new QSpinBox(this);
     d->reach->setRange(1, DepthSettings::radiusMax());
     d->nearest = spin(1e9, 0, 2, 1);
@@ -78,6 +84,8 @@ DepthControls::DepthControls(DepthSettings *settings, QWidget *parent)
     form->addRow(tr("zero"), d->zero);
     form->addRow(tr("shift"), d->shift);
     form->addRow(tr("picture"), d->picture);
+    form->addRow(QString(), d->automatic);
+    form->addRow(QString(), d->chosen);
     form->addRow(tr("fill"), d->fill);
     form->addRow(tr("warp"), d->warp);
     form->addRow(QString(), d->smooth);
@@ -89,13 +97,16 @@ DepthControls::DepthControls(DepthSettings *settings, QWidget *parent)
     // the controls show the settings; a change of a control is a change of the settings, and the other way round
     auto show = [this] {
         const QSignalBlocker b1(d->strength), b2(d->zero), b3(d->shift), b4(d->picture), b5(d->fill), b6(d->warp), b7(d->smooth), b8(d->reach), b9(d->nearest),
-            b10(d->farthest);
+            b10(d->farthest), b11(d->automatic);
         d->strength->setValue(d->settings->strength());
         d->zero->setValue(d->settings->zero());
         d->shift->setValue(d->settings->shift());
         d->picture->setCurrentIndex(d->picture->findData(d->settings->view()));
-        d->fill->setCurrentIndex(d->fill->findData(d->settings->fill()));
-        d->warp->setCurrentIndex(d->warp->findData(d->settings->warp()));
+        d->fill->setCurrentIndex(d->fill->findData(d->settings->shownFill()));
+        d->warp->setCurrentIndex(d->warp->findData(d->settings->shownWarp()));
+        d->automatic->setChecked(d->settings->automatic());
+        d->chosen->setText(d->settings->chosenText());
+        d->chosen->setVisible(!d->settings->chosenText().isEmpty());
         d->smooth->setChecked(d->settings->smooth() == STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN);
         d->reach->setValue(d->settings->radius());
         d->nearest->setValue(d->settings->nearDistance());
@@ -108,8 +119,9 @@ DepthControls::DepthControls(DepthSettings *settings, QWidget *parent)
     connect(d->zero, &QDoubleSpinBox::valueChanged, settings, &DepthSettings::setZero);
     connect(d->shift, &QDoubleSpinBox::valueChanged, settings, &DepthSettings::setShift);
     connect(d->picture, &QComboBox::activated, settings, [this] { d->settings->setView(d->picture->currentData().toInt()); });
-    connect(d->fill, &QComboBox::activated, settings, [this] { d->settings->setFill(d->fill->currentData().toInt()); });
-    connect(d->warp, &QComboBox::activated, settings, [this] { d->settings->setWarp(d->warp->currentData().toInt()); });
+    connect(d->fill, &QComboBox::activated, settings, [this] { d->settings->useWay(d->settings->shownWarp(), d->fill->currentData().toInt()); });
+    connect(d->warp, &QComboBox::activated, settings, [this] { d->settings->useWay(d->warp->currentData().toInt(), d->settings->shownFill()); });
+    connect(d->automatic, &QCheckBox::toggled, settings, &DepthSettings::setAutomatic);
     connect(d->smooth, &QCheckBox::toggled, settings, [this](bool on) { d->settings->setSmooth(on ? STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN : STEREO_DIBR_SMOOTH_OFF); });
     connect(d->reach, &QSpinBox::valueChanged, settings, &DepthSettings::setRadius);
     connect(d->nearest, &QDoubleSpinBox::valueChanged, settings, &DepthSettings::setNearDistance);

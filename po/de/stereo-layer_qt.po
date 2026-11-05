@@ -114,3 +114,35 @@ msgstr "Größter Abstand"
 msgctxt "Stereo::DepthControls|"
 msgid "Back to the default"
 msgstr "Auf Standard zurücksetzen"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Pyramid"
+msgstr "Pyramide"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Automatic"
+msgstr "Automatisch"
+
+msgctxt "Stereo::DepthControls|"
+msgid "A still picture and a picture saved into a file are drawn the best way there is. A video is drawn the best way that keeps its frame rate on this machine, timed once for each GPU and picture size. Choosing a warping or a gap filling yourself turns this off: your choice then holds for everything, the slowest way included."
+msgstr "Ein Standbild und ein in eine Datei gespeichertes Bild werden auf die beste vorhandene Art gezeichnet. Ein Video wird auf die beste Art gezeichnet, die auf diesem Rechner seine Bildrate hält, einmal für jede GPU und Bildgröße gemessen. Wählen Sie selbst eine Verzerrung oder eine Lückenfüllung, ist das abgeschaltet: Ihre Wahl gilt dann für alles, auch für die langsamste Art."
+
+msgctxt "Stereo::DepthControls|"
+msgid "on this GPU"
+msgstr "auf dieser GPU"
+
+msgctxt "Stereo::DepthControls|"
+msgid "on this processor"
+msgstr "auf diesem Prozessor"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (keeps %2 frames a second %3)"
+msgstr "%1 (hält %2 Bilder pro Sekunde %3)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (%2 does not keep %3 frames a second %4)"
+msgstr "%1 (%2 hält %3 Bilder pro Sekunde %4 nicht)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (the quickest: no way keeps %2 frames a second %3)"
+msgstr "%1 (die schnellste: keine Art hält %2 Bilder pro Sekunde %3)"

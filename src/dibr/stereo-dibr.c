@@ -44,6 +44,8 @@ struct stereo_dibr {
     float *lpar, *lmap, *lzt, *lval; /* the second layer: its parallax, its view, its samples */
     uint8_t *lhole;
     int *heap, *heap_pos, *list;
+    float *pyr;                 /* the pyramid fill's levels */
+    size_t pyr_size;
 };
 
 /* Grows d->field to need elements; 0, or -1 when out of memory (the old buffer kept, freed with the context). */
@@ -83,6 +85,7 @@ void stereo_dibr_free(stereo_dibr *d)
     free(d->heap);
     free(d->heap_pos);
     free(d->list);
+    free(d->pyr);
     free(d->lpar);
     free(d->lmap);
     free(d->lzt);
@@ -93,13 +96,10 @@ void stereo_dibr_free(stereo_dibr *d)
 
 void stereo_dibr_params_default(struct stereo_dibr_params *p)
 {
-    p->view = STEREO_DIBR_VIEW_LEFT;
-    p->warp = STEREO_DIBR_WARP_FORWARD;
-    p->fill = STEREO_DIBR_FILL_BACKGROUND;
-    p->smooth = STEREO_DIBR_SMOOTH_OFF;
-    p->sigma_h = 10.0;
-    p->sigma_v = 30.0;
-    p->radius = 5;
+    /* the one default of the library */
+    struct stereo_dibr_options o;
+    stereo_dibr_options_default(&o);
+    stereo_dibr_options_apply(&o, NULL, p);
 }
 
 static int buffers(stereo_dibr *d, size_t size, size_t row, size_t depth, size_t plane)
@@ -573,6 +573,146 @@ static void fill_depth_aided(stereo_dibr *d, float *val, float *vz, uint8_t *hol
     fill_background(val, vz, hole, pw, ph);
 }
 
+/*
+ * Pyramid: the depth-aided fill in a number of steps that grows with the logarithm of the hole, not with its width. The
+ * picture is reduced by halves, each texel of a level the mean of the pixels of its four children that are as far as
+ * the farthest of them (the background of what the texel covers; a texel keeps that parallax); a hole's texel keeps the
+ * background parallax of its holes. Then, from the smallest level down, every hole takes the mean of the four texels of
+ * the level above that are nearest to it (weights 9, 3, 3, 1 of 16), those that are as far as its background only. The
+ * same idea as depth-aided (a hole is filled from the background around it, never from the foreground), with a wider
+ * and smoother reach (the push-pull of Gortler et al. 1996, doi:10.1145/237170.237200, with the weights of depth-aided).
+ */
+static int fill_pyramid(stereo_dibr *d, float *val, float *vz, uint8_t *hole, int pw, int ph)
+{
+    float *bgz = d->bgz;
+    int levels = 1, lw[32], lh[32];
+    size_t off[32], total = 0;
+
+    hole_background(vz, hole, pw, ph, bgz, NULL);
+    lw[0] = pw;
+    lh[0] = ph;
+    while ((lw[levels - 1] > 1 || lh[levels - 1] > 1) && levels < 32) {
+        lw[levels] = (lw[levels - 1] + 1) / 2;
+        lh[levels] = (lh[levels - 1] + 1) / 2;
+        levels++;
+    }
+    /* level 0 is the plane itself: val (colour), bgz (parallax) and hole (weight 0); levels above hold colour, parallax, weight */
+    for (int k = 1; k < levels; k++) {
+        off[k] = total;
+        total += (size_t)lw[k] * lh[k] * 3;
+    }
+    if (total > d->pyr_size) {
+        float *grown = realloc(d->pyr, total * sizeof(float));
+        if (!grown)
+            return -1;
+        d->pyr = grown;
+        d->pyr_size = total;
+    }
+#define PC(k, i) d->pyr[off[k] + 3 * (size_t)(i)]
+#define PZ(k, i) d->pyr[off[k] + 3 * (size_t)(i) + 1]
+#define PW(k, i) d->pyr[off[k] + 3 * (size_t)(i) + 2]
+    for (int k = 1; k < levels; k++) {
+        for (int y = 0; y < lh[k]; y++)
+            for (int x = 0; x < lw[k]; x++) {
+                float c[4], z[4], w[4], zmax = -FLT_MAX, zhole = -FLT_MAX;
+                int n = 0, any = 0;
+                for (int j = 0; j < 4; j++) {
+                    const int cx = 2 * x + (j & 1), cy = 2 * y + (j >> 1);
+                    if (cx >= lw[k - 1] || cy >= lh[k - 1])
+                        continue;
+                    const size_t i = (size_t)cy * lw[k - 1] + cx;
+                    if (k == 1) {
+                        c[n] = val[i];
+                        z[n] = bgz[i];
+                        w[n] = hole[i] ? 0.0f : 1.0f;
+                    } else {
+                        c[n] = PC(k - 1, i);
+                        z[n] = PZ(k - 1, i);
+                        w[n] = PW(k - 1, i);
+                    }
+                    if (w[n] > 0.0f) {
+                        any = 1;
+                        zmax = fmaxf(zmax, z[n]);
+                    } else {
+                        zhole = fmaxf(zhole, z[n]);
+                    }
+                    n++;
+                }
+                float acc = 0.0f, ws = 0.0f;
+                if (any)
+                    for (int j = 0; j < n; j++)
+                        if (w[j] > 0.0f && z[j] >= zmax - EDGE_STEP) {
+                            acc += w[j] * c[j];
+                            ws += w[j];
+                        }
+                const size_t o = (size_t)y * lw[k] + x;
+                PC(k, o) = ws > 0.0f ? acc / ws : 0.0f;
+                PZ(k, o) = any ? zmax : zhole;
+                PW(k, o) = ws;
+            }
+    }
+    for (int k = levels - 1; k >= 1; k--) {
+        /* the holes of level k take from level k + 1 (the top level has no parent: it stays as it is) */
+        if (k == levels - 1)
+            continue;
+        for (int y = 0; y < lh[k]; y++)
+            for (int x = 0; x < lw[k]; x++) {
+                const size_t o = (size_t)y * lw[k] + x;
+                if (PW(k, o) > 0.0f)
+                    continue;
+                const int px = x >> 1, py = y >> 1, sx = (x & 1) ? 1 : -1, sy = (y & 1) ? 1 : -1;
+                float acc = 0.0f, ws = 0.0f;
+                for (int j = 0; j < 4; j++) {
+                    const int qx = px + (j & 1 ? sx : 0), qy = py + (j & 2 ? sy : 0);
+                    if (qx < 0 || qy < 0 || qx >= lw[k + 1] || qy >= lh[k + 1])
+                        continue;
+                    const size_t q = (size_t)qy * lw[k + 1] + qx;
+                    if (PW(k + 1, q) <= 0.0f || PZ(k + 1, q) < PZ(k, o) - EDGE_STEP)
+                        continue;
+                    const float wq = ((j & 1) ? 1.0f : 3.0f) * ((j & 2) ? 1.0f : 3.0f);
+                    acc += wq * PC(k + 1, q);
+                    ws += wq;
+                }
+                if (ws > 0.0f) {
+                    PC(k, o) = acc / ws;
+                    PW(k, o) = 1.0f;
+                }
+            }
+    }
+    /* level 0 */
+    if (levels > 1) {
+        for (int y = 0; y < ph; y++)
+            for (int x = 0; x < pw; x++) {
+                const size_t o = (size_t)y * pw + x;
+                if (!hole[o])
+                    continue;
+                const int px = x >> 1, py = y >> 1, sx = (x & 1) ? 1 : -1, sy = (y & 1) ? 1 : -1;
+                float acc = 0.0f, ws = 0.0f;
+                for (int j = 0; j < 4; j++) {
+                    const int qx = px + (j & 1 ? sx : 0), qy = py + (j & 2 ? sy : 0);
+                    if (qx < 0 || qy < 0 || qx >= lw[1] || qy >= lh[1])
+                        continue;
+                    const size_t q = (size_t)qy * lw[1] + qx;
+                    if (PW(1, q) <= 0.0f || PZ(1, q) < bgz[o] - EDGE_STEP)
+                        continue;
+                    const float wq = ((j & 1) ? 1.0f : 3.0f) * ((j & 2) ? 1.0f : 3.0f);
+                    acc += wq * PC(1, q);
+                    ws += wq;
+                }
+                if (ws > 0.0f) {
+                    val[o] = acc / ws;
+                    vz[o] = bgz[o];
+                    hole[o] = 0;
+                }
+            }
+    }
+#undef PC
+#undef PZ
+#undef PW
+    fill_background(val, vz, hole, pw, ph);
+    return 0;
+}
+
 /* A binary heap of plane positions by Telea's T. */
 static void heap_swap(int *heap, int *pos, int a, int b)
 {
@@ -870,6 +1010,10 @@ static int render(stereo_dibr *d, const struct stereo_dibr_params *p, const floa
             case STEREO_DIBR_FILL_DEPTH_AIDED:
                 fill_depth_aided(d, d->val, d->vz, d->hole, pw, ph, p->radius < 1 ? 1 : p->radius);
                 break;
+            case STEREO_DIBR_FILL_PYRAMID:
+                if (fill_pyramid(d, d->val, d->vz, d->hole, pw, ph))
+                    return -2;
+                break;
             case STEREO_DIBR_FILL_TELEA:
                 fill_telea(d, d->val, d->vz, d->hole, pw, ph, p->radius < 1 ? 1 : p->radius);
                 fill_background(d->val, d->vz, d->hole, pw, ph);
@@ -1032,6 +1176,7 @@ void stereo_dibr_options_default(struct stereo_dibr_options *o)
     o->radius = 5;
     o->strength = 58.0;
     o->zero = 0.5;
+    o->automatic = 1;
 }
 
 static double clampd(double v, double lo, double hi, int *changed)
@@ -1058,7 +1203,7 @@ int stereo_dibr_options_clamp(struct stereo_dibr_options *o)
         o->warp = STEREO_DIBR_WARP_FORWARD;
         changed = 1;
     }
-    if (o->fill < STEREO_DIBR_FILL_BACKGROUND || o->fill > STEREO_DIBR_FILL_NONE) {
+    if (o->fill < STEREO_DIBR_FILL_BACKGROUND || o->fill > STEREO_DIBR_FILL_PYRAMID) {
         o->fill = STEREO_DIBR_FILL_BACKGROUND;
         changed = 1;
     }
@@ -1077,6 +1222,10 @@ int stereo_dibr_options_clamp(struct stereo_dibr_options *o)
     o->shift = clampd(o->shift, -STEREO_DIBR_SHIFT_MAX, STEREO_DIBR_SHIFT_MAX, &changed);
     o->z_near = clampd(o->z_near, 0.0, 1e12, &changed);
     o->z_far = clampd(o->z_far, 0.0, 1e12, &changed);
+    if (o->automatic != 0 && o->automatic != 1) {
+        o->automatic = 1;
+        changed = 1;
+    }
     return changed;
 }
 
@@ -1085,7 +1234,7 @@ int stereo_dibr_options_is_default(const struct stereo_dibr_options *o)
     struct stereo_dibr_options d;
     stereo_dibr_options_default(&d);
     return o->view == d.view && o->warp == d.warp && o->fill == d.fill && o->smooth == d.smooth && o->sigma_h == d.sigma_h && o->sigma_v == d.sigma_v
-        && o->radius == d.radius && o->strength == d.strength && o->zero == d.zero && o->shift == d.shift && o->z_near == d.z_near && o->z_far == d.z_far;
+        && o->radius == d.radius && o->strength == d.strength && o->zero == d.zero && o->shift == d.shift && o->z_near == d.z_near && o->z_far == d.z_far && o->automatic == d.automatic;
 }
 
 void stereo_dibr_options_apply(const struct stereo_dibr_options *o, struct stereo_depth_convention *c, struct stereo_dibr_params *p)

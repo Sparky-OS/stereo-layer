@@ -20,7 +20,8 @@ ColumnLayout {
     // the library's values of stereo_dibr_view, _warp, _fill and _smooth
     readonly property var pictureModel: [{text: word("pictureLeft"), value: 0}, {text: word("pictureMiddle"), value: 1}]
     readonly property var fillModel: [{text: word("fillBackground"), value: 0}, {text: word("fillDepthAided"), value: 1},
-                                      {text: word("fillTelea"), value: 2}, {text: word("fillNone"), value: 3}]
+                                      {text: word("fillPyramid"), value: 4}, {text: word("fillTelea"), value: 2},
+                                      {text: word("fillNone"), value: 3}]
     readonly property var warpModel: [{text: word("warpForward"), value: 0}, {text: word("warpBackward"), value: 1}, {text: word("warpLayered"), value: 2}]
 
     Controls.Label {
@@ -78,14 +79,33 @@ ColumnLayout {
             Controls.ToolTip.visible: hovered
         }
 
+        Item { width: 1; height: 1 }
+        ColumnLayout {
+            Controls.CheckBox {
+                objectName: "automatic"
+                text: root.word("automatic")
+                checked: root.settings.automatic
+                onToggled: root.settings.automatic = checked
+                Controls.ToolTip.text: root.word("automaticTip")
+                Controls.ToolTip.visible: hovered
+            }
+            Controls.Label {
+                objectName: "chosen"
+                visible: text.length > 0
+                text: root.settings.chosenText
+                wrapMode: Text.Wrap
+                Layout.maximumWidth: 320
+            }
+        }
+
         Controls.Label { text: root.word("fill") }
         Controls.ComboBox {
             objectName: "fill"
             model: root.fillModel
             textRole: "text"
             valueRole: "value"
-            currentIndex: count > 0 ? indexOfValue(root.settings.fill) : -1
-            onActivated: root.settings.fill = currentValue
+            currentIndex: count > 0 ? indexOfValue(root.settings.shownFill) : -1
+            onActivated: root.settings.useWay(root.settings.shownWarp, currentValue)
             Controls.ToolTip.text: root.word("fillTip")
             Controls.ToolTip.visible: hovered
         }
@@ -96,8 +116,8 @@ ColumnLayout {
             model: root.warpModel
             textRole: "text"
             valueRole: "value"
-            currentIndex: count > 0 ? indexOfValue(root.settings.warp) : -1
-            onActivated: root.settings.warp = currentValue
+            currentIndex: count > 0 ? indexOfValue(root.settings.shownWarp) : -1
+            onActivated: root.settings.useWay(currentValue, root.settings.shownFill)
         }
 
         Item { width: 1; height: 1 }

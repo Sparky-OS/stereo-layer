@@ -114,3 +114,35 @@ msgstr "가장 먼 거리"
 msgctxt "Stereo::DepthControls|"
 msgid "Back to the default"
 msgstr "기본값으로 되돌리기"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Pyramid"
+msgstr "피라미드"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Automatic"
+msgstr "자동"
+
+msgctxt "Stereo::DepthControls|"
+msgid "A still picture and a picture saved into a file are drawn the best way there is. A video is drawn the best way that keeps its frame rate on this machine, timed once for each GPU and picture size. Choosing a warping or a gap filling yourself turns this off: your choice then holds for everything, the slowest way included."
+msgstr "정지 이미지와 파일로 저장하는 이미지는 가장 좋은 방법으로 그려집니다. 동영상은 이 컴퓨터에서 프레임 속도를 유지하는 가장 좋은 방법으로 그려지며, GPU와 이미지 크기마다 한 번 측정합니다. 워핑이나 빈 곳 채우기를 직접 고르면 이 설정이 꺼지고, 고른 방법이 가장 느린 것까지 모든 경우에 쓰입니다."
+
+msgctxt "Stereo::DepthControls|"
+msgid "on this GPU"
+msgstr "이 GPU에서"
+
+msgctxt "Stereo::DepthControls|"
+msgid "on this processor"
+msgstr "이 프로세서에서"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (keeps %2 frames a second %3)"
+msgstr "%1 (%3 초당 %2프레임 유지)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (%2 does not keep %3 frames a second %4)"
+msgstr "%1 (%4 %2은(는) 초당 %3프레임을 유지하지 못함)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (the quickest: no way keeps %2 frames a second %3)"
+msgstr "%1 (가장 빠름: %3 초당 %2프레임을 유지하는 방법이 없음)"

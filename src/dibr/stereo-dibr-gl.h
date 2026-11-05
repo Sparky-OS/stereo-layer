@@ -59,6 +59,20 @@ STEREO_DIBR_EXPORT int stereo_dibr_gl_render_layer(stereo_dibr_gl *gl, const str
     const float *layer_table, int layer_table_size, unsigned layer_depth, int layer_depth_width, int layer_depth_height, unsigned target,
     const float hole[4]);
 
+/* The GPU's name, as the cache of timings keys it (the context's vendor, renderer and version strings). */
+STEREO_DIBR_EXPORT const char *stereo_dibr_gl_gpu(stereo_dibr_gl *gl);
+
+/*
+ * The times of the ways of stereo_dibr_ways() (n of them) on this GPU at width x height, in the current context: the 95th
+ * percentile of twelve frames each (a synthetic picture and its depth map, each frame to the end of its work), into p95_ms. With
+ * with_transfer the frame's upload and the views' read back are in every frame's time, as a player that draws into memory pays
+ * them. The person's cache is read first (stereo_dibr_cache_load() by the GPU's name and the size); *measured is 1 when this
+ * call did the timing, which costs about a second on a GPU that draws a way in ten milliseconds and ten seconds on one that
+ * takes a second. A way that takes more than a quarter of a second is given up on after its first frame. Returns 0, or -1 (the
+ * times then hold nothing; stereo_dibr_gl_error()).
+ */
+STEREO_DIBR_EXPORT int stereo_dibr_gl_measure(stereo_dibr_gl *gl, int width, int height, int with_transfer, double *p95_ms, int n, int *measured);
+
 #ifdef __cplusplus
 }
 #endif

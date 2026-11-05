@@ -8,6 +8,7 @@
  */
 
 #include "stereo-dibr-gl.h"
+#include "stereo-dibr-private.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -38,6 +39,13 @@ typedef long GLintptr; /* unused, for completeness of the signatures below */
 #define GL_TEXTURE_2D 0x0DE1
 #define GL_FLOAT 0x1406
 #define GL_RGBA 0x1908
+#define GL_RED 0x1903
+#define GL_UNSIGNED_BYTE 0x1401
+#define GL_RGBA8 0x8058
+#define GL_R8 0x8229
+#define GL_VENDOR 0x1F00
+#define GL_RENDERER 0x1F01
+#define GL_VERSION 0x1F02
 #define GL_NEAREST 0x2600
 #define GL_TEXTURE_MAG_FILTER 0x2800
 #define GL_TEXTURE_MIN_FILTER 0x2801
@@ -87,6 +95,10 @@ typedef long GLintptr; /* unused, for completeness of the signatures below */
     X(void, Disable, (GLenum))                                                                                                                       \
     X(void, DrawArrays, (GLenum, GLint, GLsizei))                                                                                                    \
     X(void, DrawBuffers, (GLsizei, const GLenum *))                                                                                                  \
+    X(void, Finish, (void))                                                                                                                          \
+    X(const unsigned char *, GetString, (GLenum))                                                                                                    \
+    X(void, ReadPixels, (GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void *))                                                                    \
+    X(void, TexSubImage2D, (GLenum, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, const void *))                                            \
     X(void, Enable, (GLenum))                                                                                                                        \
     X(void, EndQuery, (GLenum))                                                                                                                      \
     X(void, FramebufferTexture2D, (GLenum, GLenum, GLenum, GLuint, GLint))                                                                           \
@@ -130,6 +142,8 @@ typedef long GLintptr; /* unused, for completeness of the signatures below */
     X(fill_rest_frag)                                                                                                                                \
     X(hole_background_frag)                                                                                                                          \
     X(fill_depth_aided_frag)                                                                                                                         \
+    X(pyramid_push_frag)                                                                                                                             \
+    X(pyramid_pull_frag)                                                                                                                             \
     X(telea_init_frag)                                                                                                                               \
     X(telea_distance_frag)                                                                                                                           \
     X(telea_fill_frag)                                                                                                                               \
@@ -147,6 +161,9 @@ enum {
     SHADERS(PROGRAM_INDEX) P_depth_integer,
     NB_PROGRAMS
 };
+
+/* the levels of the pyramid fill above the picture (pictures up to 16384 wide or high) */
+#define NB_PYRAMID_LEVELS 15
 
 /* the working textures */
 enum {
@@ -167,7 +184,8 @@ enum {
     T_STATE0,
     T_COLOR1,
     T_STATE1,
-    NB_TEXTURES
+    T_PYRAMID, /* the pyramid fill: for each level, the colour and state going up, then coming down */
+    NB_TEXTURES = T_PYRAMID + 4 * NB_PYRAMID_LEVELS
 };
 
 struct stereo_dibr_gl {
@@ -179,6 +197,7 @@ struct stereo_dibr_gl {
     int tex_w[NB_TEXTURES], tex_h[NB_TEXTURES];
     GLuint fbo, vao, query;
     char error[512];
+    char gpu[384];
 };
 
 static void set_error(stereo_dibr_gl *gl, const char *what, const char *log)
@@ -561,6 +580,61 @@ static int upload_table(stereo_dibr_gl *gl, int t, const float *table, int size,
     return 0;
 }
 
+/* The pyramid fill's levels (fill_pyramid() of stereo-dibr.c): the textures of level k, 1 or more */
+#define PYR_UP(k) (T_PYRAMID + 4 * (k))
+#define PYR_DOWN(k) (T_PYRAMID + 4 * (k) + 2)
+
+static int pyramid(stereo_dibr_gl *gl, int w, int h, int *cur)
+{
+    int lw[NB_PYRAMID_LEVELS + 1], lh[NB_PYRAMID_LEVELS + 1], levels = 1;
+    lw[0] = w;
+    lh[0] = h;
+    while ((lw[levels - 1] > 1 || lh[levels - 1] > 1) && levels < NB_PYRAMID_LEVELS) {
+        lw[levels] = (lw[levels - 1] + 1) / 2;
+        lh[levels] = (lh[levels - 1] + 1) / 2;
+        levels++;
+    }
+    if (levels < 2)
+        return 0;
+    for (int k = 1; k < levels; k++) {
+        texture(gl, PYR_UP(k), GL_RGBA32F, lw[k], lh[k], NULL);
+        texture(gl, PYR_UP(k) + 1, GL_RGBA32F, lw[k], lh[k], NULL);
+        if (k < levels - 1) {
+            texture(gl, PYR_DOWN(k), GL_RGBA32F, lw[k], lh[k], NULL);
+            texture(gl, PYR_DOWN(k) + 1, GL_RGBA32F, lw[k], lh[k], NULL);
+        }
+    }
+    for (int k = 1; k < levels; k++) {
+        struct pass p = use(gl, P_pyramid_push_frag);
+        bind_t(&p, "u_color", k == 1 ? (*cur ? T_COLOR1 : T_COLOR0) : PYR_UP(k - 1));
+        bind_t(&p, "u_state", k == 1 ? (*cur ? T_STATE1 : T_STATE0) : PYR_UP(k - 1) + 1);
+        set_2i(&p, "u_size", lw[k - 1], lh[k - 1]);
+        set_i(&p, "u_first", k == 1);
+        if (draw_t(&p, PYR_UP(k), PYR_UP(k) + 1, lw[k], lh[k], 0) < 0)
+            return -1;
+    }
+    for (int k = levels - 2; k >= 0; k--) {
+        /* the parent: the pushed top level, or the level above after its own pull */
+        const int parent = k + 1 == levels - 1 ? PYR_UP(k + 1) : PYR_DOWN(k + 1);
+        const int to = !*cur;
+        struct pass p = use(gl, P_pyramid_pull_frag);
+        bind_t(&p, "u_color", k == 0 ? (*cur ? T_COLOR1 : T_COLOR0) : PYR_UP(k));
+        bind_t(&p, "u_state", k == 0 ? (*cur ? T_STATE1 : T_STATE0) : PYR_UP(k) + 1);
+        bind_t(&p, "u_pcolor", parent);
+        bind_t(&p, "u_pstate", parent + 1);
+        set_2i(&p, "u_psize", lw[k + 1], lh[k + 1]);
+        set_i(&p, "u_first", k == 0);
+        if (k == 0) {
+            if (draw_t(&p, to ? T_COLOR1 : T_COLOR0, to ? T_STATE1 : T_STATE0, w, h, 0) < 0)
+                return -1;
+            *cur = to;
+        } else if (draw_t(&p, PYR_DOWN(k), PYR_DOWN(k) + 1, lw[k], lh[k], 0) < 0) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 static int render(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, const float *table, int table_size, GLuint picture, int w, int h,
     GLuint depth, int dw, int dh, int integer, int role, GLuint layer, const float *ltable, int ltable_size, GLuint layer_depth, int ldw, int ldh,
     GLuint target, const float hole[4])
@@ -658,6 +732,9 @@ static int render(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, cons
                 if (!any)
                     break;
             }
+        } else if (prm->fill == STEREO_DIBR_FILL_PYRAMID) {
+            if ((cur = step(gl, P_hole_background_frag, cur, w, h, 0, NULL, NULL, NULL)) < 0 || pyramid(gl, w, h, &cur) < 0)
+                goto fail;
         } else if (prm->fill == STEREO_DIBR_FILL_TELEA) {
             if ((cur = step(gl, P_hole_background_frag, cur, w, h, 0, NULL, NULL, NULL)) < 0
                 || (cur = step(gl, P_telea_init_frag, cur, w, h, 0, NULL, NULL, NULL)) < 0)
@@ -733,4 +810,113 @@ int stereo_dibr_gl_render_layer(stereo_dibr_gl *gl, const struct stereo_dibr_par
         return -1;
     return render(gl, p, table, table_size, picture, width, height, depth, depth_width, depth_height, depth_integer, role, layer, layer_table,
         layer_table_size, layer_depth, layer_depth_width, layer_depth_height, target, hole);
+}
+
+/* ---- the times of the ways on this GPU ------------------------------------------------------------------------------ */
+
+const char *stereo_dibr_gl_gpu(stereo_dibr_gl *gl)
+{
+    if (!gl)
+        return "";
+    if (!gl->gpu[0]) {
+        const char *v = (const char *)gl->GetString(GL_VENDOR), *r = (const char *)gl->GetString(GL_RENDERER), *n = (const char *)gl->GetString(GL_VERSION);
+        snprintf(gl->gpu, sizeof(gl->gpu), "gl %s %s %s", v ? v : "?", r ? r : "?", n ? n : "?");
+        for (char *c = gl->gpu; *c; c++)
+            if (*c == '\t' || *c == '\n')
+                *c = ' ';
+    }
+    return gl->gpu;
+}
+
+int stereo_dibr_gl_measure(stereo_dibr_gl *gl, int w, int h, int with_transfer, double *p95_ms, int n, int *measured)
+{
+    if (measured)
+        *measured = 0;
+    if (!gl || w < 2 || h < 2 || w > 16384 || h > 16384 || !p95_ms)
+        return -1;
+    struct stereo_dibr_way ways[16];
+    if (n != stereo_dibr_ways(ways, 16))
+        return -1;
+    char key[420];
+    snprintf(key, sizeof(key), "%s%s", stereo_dibr_gl_gpu(gl), with_transfer ? " with transfer" : "");
+    if (stereo_dibr_cache_load(key, w, h, p95_ms, n))
+        return 0;
+
+    struct saved saved;
+    save(gl, &saved);
+    gl->error[0] = 0;
+    unsigned char *rgba = malloc((size_t)w * h * 4), *depth = malloc((size_t)w * h), *readback = with_transfer ? malloc((size_t)w * h * 8) : NULL;
+    float table[256];
+    GLuint tex[3] = { 0, 0, 0 };
+    int ok = rgba && depth && (!with_transfer || readback);
+    if (ok) {
+        stereo_dibr_synthetic(w, h, rgba, depth);
+        stereo_dibr_timing_table(w, table);
+        gl->GenTextures(3, tex);
+        gl->PixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        for (int i = 0; i < 3; i++) {
+            gl->BindTexture(GL_TEXTURE_2D, tex[i]);
+            gl->TexImage2D(GL_TEXTURE_2D, 0, i == 1 ? GL_R8 : GL_RGBA8, i == 2 ? 2 * w : w, h, 0, i == 1 ? GL_RED : GL_RGBA, GL_UNSIGNED_BYTE, i == 2 ? NULL : i == 1 ? depth : rgba);
+            gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        }
+        ok = gl->GetError() == GL_NO_ERROR;
+    }
+    const float hole[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    for (int i = 0; ok && i < n; i++) {
+        struct stereo_dibr_params p;
+        stereo_dibr_params_default(&p);
+        p.warp = ways[i].warp;
+        p.fill = ways[i].fill;
+        double ms[STEREO_DIBR_TIMED_FRAMES];
+        int count = 0;
+        for (int f = 0; f < STEREO_DIBR_TIMED_FRAMES + 1; f++) {
+            const double t0 = stereo_dibr_now_ms();
+            if (with_transfer) {
+                gl->BindTexture(GL_TEXTURE_2D, tex[0]);
+                gl->TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+                gl->BindTexture(GL_TEXTURE_2D, tex[1]);
+                gl->TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RED, GL_UNSIGNED_BYTE, depth);
+            }
+            if (stereo_dibr_gl_render(gl, &p, table, 256, tex[0], w, h, tex[1], w, h, 0, tex[2], hole) < 0) {
+                ok = 0;
+                break;
+            }
+            if (with_transfer) {
+                gl->BindFramebuffer(GL_FRAMEBUFFER, gl->fbo);
+                gl->FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex[2], 0);
+                gl->ReadPixels(0, 0, 2 * w, h, GL_RGBA, GL_UNSIGNED_BYTE, readback);
+            }
+            gl->Finish();
+            const double t = stereo_dibr_now_ms() - t0;
+            if (f == 0) {
+                if (t > 2 * STEREO_DIBR_GIVE_UP_MS) {
+                    ms[count++] = t;
+                    break;
+                }
+                continue;
+            }
+            ms[count++] = t;
+            if (count == 1 && t > STEREO_DIBR_GIVE_UP_MS)
+                break;
+        }
+        p95_ms[i] = count ? stereo_dibr_p95(ms, count) : -1.0;
+    }
+    if (tex[0])
+        gl->DeleteTextures(3, tex);
+    free(rgba);
+    free(depth);
+    free(readback);
+    restore(gl, &saved);
+    if (!ok) {
+        if (!gl->error[0])
+            set_error(gl, "the ways could not be timed", NULL);
+        return -1;
+    }
+    stereo_dibr_cache_store(key, w, h, p95_ms, n);
+    if (measured)
+        *measured = 1;
+    return 0;
 }

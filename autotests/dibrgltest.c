@@ -235,10 +235,10 @@ int main(void)
     GLuint depth = upload(GL_R8UI, W, H, GL_RED_INTEGER, GL_UNSIGNED_BYTE, depth8);
 
     static const char *const views[] = { "left", "center" }, *const warps[] = { "forward", "backward", "layered" },
-                              *const fills[] = { "background", "depth-aided", "telea", "none" };
+                              *const fills[] = { "background", "depth-aided", "telea", "none", "pyramid" };
     for (int view = 0; view < 2; view++)
         for (int warp = 0; warp < 3; warp++)
-            for (int fill = 0; fill < 4; fill++)
+            for (int fill = 0; fill < 5; fill++)
                 for (int smooth = 0; smooth < 2; smooth++) {
                     struct stereo_dibr_params prm;
                     char what[96];

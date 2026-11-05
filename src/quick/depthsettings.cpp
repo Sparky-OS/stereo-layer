@@ -10,6 +10,10 @@ namespace Stereo
 {
 struct DepthSettings::Private {
     stereo_dibr_options o;
+    // what the player's drawing chose for the video that plays
+    bool hasChoice = false;
+    int warp = 0, fill = 0, skippedWarp = -1, skippedFill = -1, fps = 0;
+    bool keepsUp = true, onGpu = true;
 };
 
 DepthSettings::DepthSettings(QObject *parent)
@@ -43,8 +47,26 @@ DepthSettings::~DepthSettings()
     }
 
 SETTER(setView, view, int, view)
-SETTER(setWarp, warp, int, warp)
-SETTER(setFill, fill, int, fill)
+#define OWN_SETTER(Setter, Field, Member)                                                                                                            \
+    void DepthSettings::Setter(int value)                                                                                                            \
+    {                                                                                                                                                \
+        stereo_dibr_options next = d->o;                                                                                                             \
+        next.Member = value;                                                                                                                         \
+        next.automatic = 0;                                                                                                                          \
+        stereo_dibr_options_clamp(&next);                                                                                                            \
+        if (!memcmp(&next, &d->o, sizeof(next)))                                                                                                     \
+            return;                                                                                                                                  \
+        d->o = next;                                                                                                                                 \
+        Q_EMIT changed();                                                                                                                            \
+    }                                                                                                                                                \
+    int DepthSettings::Field() const                                                                                                                 \
+    {                                                                                                                                                \
+        return d->o.Member;                                                                                                                          \
+    }
+
+// the person's own warping or gap filling: the way is theirs from then on
+OWN_SETTER(setWarp, warp, warp)
+OWN_SETTER(setFill, fill, fill)
 SETTER(setSmooth, smooth, int, smooth)
 SETTER(setSigmaH, sigmaH, double, sigma_h)
 SETTER(setSigmaV, sigmaV, double, sigma_v)
@@ -103,6 +125,100 @@ void DepthSettings::reset()
     setText(QString());
 }
 
+bool DepthSettings::automatic() const
+{
+    return d->o.automatic;
+}
+
+void DepthSettings::setAutomatic(bool value)
+{
+    stereo_dibr_options next = d->o;
+    next.automatic = value ? 1 : 0;
+    if (!value) {
+        // the way that is drawn becomes the person's
+        next.warp = shownWarp();
+        next.fill = shownFill();
+    } else {
+        // the way is the library's again
+        stereo_dibr_options def;
+        stereo_dibr_options_default(&def);
+        next.warp = def.warp;
+        next.fill = def.fill;
+    }
+    if (!memcmp(&next, &d->o, sizeof(next)))
+        return;
+    d->o = next;
+    Q_EMIT changed();
+}
+
+int DepthSettings::shownWarp() const
+{
+    return d->o.automatic && d->hasChoice ? d->warp : d->o.warp;
+}
+
+int DepthSettings::shownFill() const
+{
+    return d->o.automatic && d->hasChoice ? d->fill : d->o.fill;
+}
+
+void DepthSettings::useWay(int warp, int fill)
+{
+    stereo_dibr_options next = d->o;
+    next.warp = warp;
+    next.fill = fill;
+    next.automatic = 0;
+    stereo_dibr_options_clamp(&next);
+    if (!memcmp(&next, &d->o, sizeof(next)))
+        return;
+    d->o = next;
+    Q_EMIT changed();
+}
+
+void DepthSettings::setChoice(const QVariantMap &choice)
+{
+    const bool had = d->hasChoice;
+    const int warp = d->warp, fill = d->fill, sw = d->skippedWarp, sf = d->skippedFill, fps = d->fps;
+    const bool keeps = d->keepsUp, gpu = d->onGpu;
+    d->hasChoice = choice.contains(QStringLiteral("warp")) && choice.contains(QStringLiteral("fill"));
+    if (d->hasChoice) {
+        d->warp = choice.value(QStringLiteral("warp")).toInt();
+        d->fill = choice.value(QStringLiteral("fill")).toInt();
+        d->skippedWarp = choice.value(QStringLiteral("skippedWarp"), -1).toInt();
+        d->skippedFill = choice.value(QStringLiteral("skippedFill"), -1).toInt();
+        d->fps = qRound(choice.value(QStringLiteral("fps"), 0).toDouble());
+        d->keepsUp = choice.value(QStringLiteral("keepsUp"), true).toBool();
+        d->onGpu = choice.value(QStringLiteral("onGpu"), true).toBool();
+    }
+    if (had != d->hasChoice || (d->hasChoice && (warp != d->warp || fill != d->fill || sw != d->skippedWarp || sf != d->skippedFill || fps != d->fps
+                                                  || keeps != d->keepsUp || gpu != d->onGpu)))
+        Q_EMIT changed();
+}
+
+QString DepthSettings::chosenText() const
+{
+    if (!d->o.automatic || !d->hasChoice)
+        return QString();
+    static const char *context = "Stereo::DepthControls";
+    auto way = [](int warp, int fill) {
+        const char *w = warp == STEREO_DIBR_WARP_LAYERED ? "warpLayered" : warp == STEREO_DIBR_WARP_BACKWARD ? "warpBackward" : "warpForward";
+        const char *f = fill == STEREO_DIBR_FILL_DEPTH_AIDED ? "fillDepthAided"
+            : fill == STEREO_DIBR_FILL_PYRAMID               ? "fillPyramid"
+            : fill == STEREO_DIBR_FILL_TELEA                 ? "fillTelea"
+            : fill == STEREO_DIBR_FILL_NONE                  ? "fillNone"
+                                                             : "fillBackground";
+        return DepthSettings::label(QLatin1String(w)) + QStringLiteral(", ") + DepthSettings::label(QLatin1String(f));
+    };
+    const QString where = d->onGpu ? QCoreApplication::translate(context, "on this GPU") : QCoreApplication::translate(context, "on this processor");
+    const QString rate = QString::number(d->fps);
+    const QString chosen = way(d->warp, d->fill);
+    if (!d->keepsUp)
+        return QCoreApplication::translate(context, "%1 (the quickest: no way keeps %2 frames a second %3)").arg(chosen, rate, where);
+    if (d->skippedWarp >= 0 && d->skippedFill >= 0)
+        return QCoreApplication::translate(context, "%1 (%2 does not keep %3 frames a second %4)")
+            .arg(chosen, way(d->skippedWarp, d->skippedFill), rate, where);
+    return QCoreApplication::translate(context, "%1 (keeps %2 frames a second %3)").arg(chosen, rate, where);
+}
+
 Picture::DepthOptions DepthSettings::toOptions() const
 {
     Picture::DepthOptions out;
@@ -113,7 +229,23 @@ Picture::DepthOptions DepthSettings::toOptions() const
     out.fill = d->o.fill == STEREO_DIBR_FILL_DEPTH_AIDED ? Picture::DepthOptions::Fill::DepthAided
         : d->o.fill == STEREO_DIBR_FILL_TELEA            ? Picture::DepthOptions::Fill::Telea
         : d->o.fill == STEREO_DIBR_FILL_NONE             ? Picture::DepthOptions::Fill::None
+        : d->o.fill == STEREO_DIBR_FILL_PYRAMID          ? Picture::DepthOptions::Fill::Pyramid
                                                          : Picture::DepthOptions::Fill::Background;
+    if (d->o.automatic) {
+        // a still picture, and the saving into a file, have no time limit: the best way there is
+        out.warp = Picture::DepthOptions::Warp::Layered;
+        out.fill = Picture::DepthOptions::Fill::DepthAided;
+        stereo_dibr_options def;
+        stereo_dibr_options_default(&def);
+        out.warp = def.warp == STEREO_DIBR_WARP_BACKWARD ? Picture::DepthOptions::Warp::Backward
+            : def.warp == STEREO_DIBR_WARP_LAYERED       ? Picture::DepthOptions::Warp::Layered
+                                                         : Picture::DepthOptions::Warp::Forward;
+        out.fill = def.fill == STEREO_DIBR_FILL_PYRAMID ? Picture::DepthOptions::Fill::Pyramid
+            : def.fill == STEREO_DIBR_FILL_TELEA        ? Picture::DepthOptions::Fill::Telea
+            : def.fill == STEREO_DIBR_FILL_BACKGROUND   ? Picture::DepthOptions::Fill::Background
+            : def.fill == STEREO_DIBR_FILL_NONE         ? Picture::DepthOptions::Fill::None
+                                                        : Picture::DepthOptions::Fill::DepthAided;
+    }
     out.smooth = d->o.smooth == STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN;
     out.sigmaH = d->o.sigma_h;
     out.sigmaV = d->o.sigma_v;
@@ -159,6 +291,13 @@ QString DepthSettings::label(const QString &key)
         {"fillDepthAided", QCoreApplication::translate(context, "Depth-aided")},
         {"fillTelea", QCoreApplication::translate(context, "Inpainting")},
         {"fillNone", QCoreApplication::translate(context, "None")},
+        {"fillPyramid", QCoreApplication::translate(context, "Pyramid")},
+        {"automatic", QCoreApplication::translate(context, "Automatic")},
+        {"automaticTip",
+         QCoreApplication::translate(context,
+                                     "A still picture and a picture saved into a file are drawn the best way there is. A video is drawn the best way that keeps "
+                                     "its frame rate on this machine, timed once for each GPU and picture size. Choosing a warping or a gap filling yourself "
+                                     "turns this off: your choice then holds for everything, the slowest way included.")},
         {"warp", QCoreApplication::translate(context, "Warping")},
         {"warpForward", QCoreApplication::translate(context, "Forward")},
         {"warpBackward", QCoreApplication::translate(context, "Backward")},

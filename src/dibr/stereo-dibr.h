@@ -148,6 +148,8 @@ enum stereo_dibr_fill {
     STEREO_DIBR_FILL_DEPTH_AIDED = 1,
     STEREO_DIBR_FILL_TELEA = 2,
     STEREO_DIBR_FILL_NONE = 3,
+    /* depth-aided in a number of steps that grows with the logarithm of the hole: the background around it, by halves */
+    STEREO_DIBR_FILL_PYRAMID = 4,
 };
 
 enum stereo_dibr_smooth {
@@ -164,7 +166,8 @@ struct stereo_dibr_params {
     int radius; /* depth-aided and Telea: the neighbourhood, pixels (Telea's epsilon) */
 };
 
-/* The default parameters: left eye, forward warping, background extension, no smoothing; sigma 10 and 30, radius 5. */
+/* The default parameters: those of stereo_dibr_options_default(), the one default of the library (left eye, layered warping,
+ * depth-aided fill, no smoothing; sigma 10 and 30, radius 5). */
 STEREO_DIBR_EXPORT void stereo_dibr_params_default(struct stereo_dibr_params *p);
 
 /* One plane of a planar picture. The first plane is luma (or green, or the only one); the others may be subsampled. */
@@ -278,7 +281,11 @@ STEREO_DIBR_EXPORT int stereo_dibr_unpack(
  *   zero      where the screen is, 0 the farthest samples to 1 the nearest: what is in front of the screen and what behind;
  *   shift     a parallax added to every point, pixels of a view 1920 wide;
  *   z_near, z_far  the depth range of a depth map whose samples are distances, in the unit the map has (0 for both: what the
- *             file says).
+ *             file says);
+ *   automatic the way of drawing (warp and fill) is not the person's: a still picture and the saving into a file use the best
+ *             measured way (warp and fill as stereo_dibr_options_default() holds them), a video the best way that keeps its
+ *             frame rate on the GPU that draws it (stereo_dibr_gl_choose(), stereo_dibr_choose_from_times()); 0 when the
+ *             person picked a way: it is then the way of everything, the slowest included.
  */
 struct stereo_dibr_options {
     int view, warp, fill, smooth;
@@ -286,6 +293,7 @@ struct stereo_dibr_options {
     int radius;
     double strength, zero, shift;
     double z_near, z_far;
+    int automatic;
 };
 
 /* The limits a control offers; stereo_dibr_options_clamp() holds a set within them (returns 1 when it changed one). */
@@ -302,13 +310,58 @@ STEREO_DIBR_EXPORT int stereo_dibr_options_is_default(const struct stereo_dibr_o
  * both are given); its kind, bits and the rest stay as the caller (the depth map's mark) set them. */
 STEREO_DIBR_EXPORT void stereo_dibr_options_apply(const struct stereo_dibr_options *o, struct stereo_depth_convention *c, struct stereo_dibr_params *p);
 /*
- * The text of a set: "view=left warp=forward fill=background smooth=off sigmaH=10 sigmaV=30 radius=5 strength=58 zero=0.5
- * shift=0 near=0 far=0", numbers in the C locale's notation. stereo_dibr_options_read() starts from the default, takes the
+ * The text of a set: "view=left warp=layered fill=depthAided smooth=off sigmaH=10 sigmaV=30 radius=5 strength=58 zero=0.5
+ * shift=0 near=0 far=0 way=auto" (way=own for a way the person picked; a text without the key and with a warp or a fill other
+ * than the default's is the person's), numbers in the C locale's notation. stereo_dibr_options_read() starts from the default, takes the
  * keys it knows, skips the others, and returns 1, or -1 for a malformed pair or a word that is not one of the key's;
  * stereo_dibr_options_write() returns the length, or -1 when buf is too small.
  */
 STEREO_DIBR_EXPORT int stereo_dibr_options_read(const char *text, struct stereo_dibr_options *o);
 STEREO_DIBR_EXPORT int stereo_dibr_options_write(const struct stereo_dibr_options *o, char *buf, size_t size);
+
+
+/*
+ * The ways of drawing a video that can keep up with its frame rate, best first (what dibrbench measures: the mean error against
+ * the true views of the ways of the ladder is not decreasing from one to the next). A video is drawn with the first way of the
+ * ladder that the GPU (or the CPU) draws within the frame's time, measured on that GPU at that size; the best, the first, is
+ * the options' default. The person's own way, and a still picture or the saving into a file, need no ladder.
+ */
+struct stereo_dibr_way {
+    int warp, fill; /* an enum stereo_dibr_warp and an enum stereo_dibr_fill */
+};
+
+/* The ladder, into ways (up to max); returns how many ways it has. */
+STEREO_DIBR_EXPORT int stereo_dibr_ways(struct stereo_dibr_way *ways, int max);
+
+struct stereo_dibr_choice {
+    int warp, fill; /* the way chosen */
+    int rank; /* its place in the ladder, 0 the best */
+    int keeps_up; /* 1 when it is drawn within the budget; 0 when no way is: the least costly is chosen, and the program says so */
+    double ms, budget_ms; /* its 95th percentile (the slowest of twelve frames), and the time a frame of the video may take */
+    /* when the way chosen is not the first of the ladder, the best way that does not keep up and its time; else -1 */
+    int skipped_warp, skipped_fill;
+    double skipped_ms;
+};
+
+/*
+ * The way for a video of fps frames a second from the 95th percentile times p95_ms[i] of the n ways of stereo_dibr_ways(),
+ * each in milliseconds a frame drawn (a negative time is a way that was not timed: it does not keep up): the first way whose
+ * time is within four fifths of the frame's time (a fifth is left for the rest of the player), else the quickest. Returns 0,
+ * or -1 for a bad argument.
+ */
+STEREO_DIBR_EXPORT int stereo_dibr_choose_from_times(const double *p95_ms, int n, double fps, struct stereo_dibr_choice *out);
+
+/*
+ * The times of the ways on this CPU (stereo_dibr_render(), one thread) at width x height, into p95_ms (n values), kept in the
+ * person's cache (XDG_CACHE_HOME/stereo-dibr/timings, else ~/.cache/stereo-dibr/timings: never in a media file) by the
+ * processor and the size: the cache is read first, and *measured is 1 when this call timed the ways. Returns 0, or -1.
+ */
+STEREO_DIBR_EXPORT int stereo_dibr_measure_cpu(int width, int height, double *p95_ms, int n, int *measured);
+
+/* The cache by hand (for a GPU's key, and for tests): 1 when key has a line for width x height with n times, into p95_ms. */
+STEREO_DIBR_EXPORT int stereo_dibr_cache_load(const char *key, int width, int height, double *p95_ms, int n);
+/* Sets the line of key for width x height; 0, or -1 when the cache cannot be written (the caller says so). */
+STEREO_DIBR_EXPORT int stereo_dibr_cache_store(const char *key, int width, int height, const double *p95_ms, int n);
 
 #ifdef __cplusplus
 }

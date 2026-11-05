@@ -77,7 +77,7 @@ file(GLOB STEREO_DIBR_GLSL CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/dib
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr-glsl.c
     COMMAND ${CMAKE_COMMAND} -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr-glsl.c "-DFILES=${STEREO_DIBR_GLSL}" -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedGlsl.cmake
     DEPENDS ${STEREO_DIBR_GLSL} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedGlsl.cmake VERBATIM)
-add_library(StereoDibr SHARED src/dibr/stereo-dibr.c src/dibr/stereo-depth.c src/dibr/stereo-dibr.h src/dibr/stereo-dibr-gl.c src/dibr/stereo-dibr-gl.h
+add_library(StereoDibr SHARED src/dibr/stereo-dibr.c src/dibr/stereo-dibr-choose.c src/dibr/stereo-dibr-private.h src/dibr/stereo-depth.c src/dibr/stereo-dibr.h src/dibr/stereo-dibr-gl.c src/dibr/stereo-dibr-gl.h
     ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr-glsl.c)
 add_library(Stereo::Dibr ALIAS StereoDibr)
 set_target_properties(StereoDibr PROPERTIES OUTPUT_NAME stereo-dibr VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Dibr

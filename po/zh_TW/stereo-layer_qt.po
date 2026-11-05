@@ -114,3 +114,35 @@ msgstr "最遠距離"
 msgctxt "Stereo::DepthControls|"
 msgid "Back to the default"
 msgstr "恢復預設"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Pyramid"
+msgstr "金字塔"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Automatic"
+msgstr "自動"
+
+msgctxt "Stereo::DepthControls|"
+msgid "A still picture and a picture saved into a file are drawn the best way there is. A video is drawn the best way that keeps its frame rate on this machine, timed once for each GPU and picture size. Choosing a warping or a gap filling yourself turns this off: your choice then holds for everything, the slowest way included."
+msgstr "靜態畫面和儲存到檔案的畫面使用最好的方式繪製。影片使用在這台機器上能跟上其幀率的最好方式繪製，每個 GPU 和畫面尺寸測量一次。自己選擇扭曲方式或空洞填補會關閉此項：您的選擇隨後適用於一切，包括最慢的方式。"
+
+msgctxt "Stereo::DepthControls|"
+msgid "on this GPU"
+msgstr "在此 GPU 上"
+
+msgctxt "Stereo::DepthControls|"
+msgid "on this processor"
+msgstr "在此處理器上"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (keeps %2 frames a second %3)"
+msgstr "%1（%3可維持每秒 %2 幀）"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (%2 does not keep %3 frames a second %4)"
+msgstr "%1（%4%2無法維持每秒 %3 幀）"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (the quickest: no way keeps %2 frames a second %3)"
+msgstr "%1（最快的方式：%3沒有任何方式能維持每秒 %2 幀）"

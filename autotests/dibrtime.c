@@ -137,14 +137,16 @@ struct way {
 static int list_ways(struct way *ways)
 {
     static const char *warps[] = { "forward", "backward", "layered" };
-    static const char *fills[] = { "background", "depth-aided", "telea" };
+    static const char *fills[] = { "background", "depth-aided", "telea", "none", "pyramid" };
+    static const int fill_enum[] = { 0, 1, 4, 2 };
     struct stereo_dibr_options def;
     struct stereo_dibr_params defp;
     stereo_dibr_options_default(&def);
     stereo_dibr_options_apply(&def, NULL, &defp);
     int n = 0;
     for (int warp = 0; warp < 3; ++warp)
-        for (int fill = 0; fill < 3; ++fill) {
+        for (int fi = 0; fi < 4; ++fi) {
+            const int fill = fill_enum[fi];
             struct way *w = &ways[n++];
             stereo_dibr_params_default(&w->p);
             w->p.warp = warp;
@@ -154,14 +156,19 @@ static int list_ways(struct way *ways)
         }
     struct way *w = &ways[n++];
     stereo_dibr_params_default(&w->p);
+    w->p.warp = STEREO_DIBR_WARP_FORWARD;
+    w->p.fill = STEREO_DIBR_FILL_BACKGROUND;
     w->p.smooth = STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN;
     snprintf(w->name, sizeof(w->name), "left/forward/background/smooth");
     w = &ways[n++];
     stereo_dibr_params_default(&w->p);
+    w->p.warp = STEREO_DIBR_WARP_FORWARD;
+    w->p.fill = STEREO_DIBR_FILL_BACKGROUND;
     w->p.view = STEREO_DIBR_VIEW_CENTER;
     snprintf(w->name, sizeof(w->name), "centre/forward/background");
     w = &ways[n++];
     stereo_dibr_params_default(&w->p);
+    w->p.warp = STEREO_DIBR_WARP_FORWARD;
     w->p.view = STEREO_DIBR_VIEW_CENTER;
     w->p.fill = STEREO_DIBR_FILL_DEPTH_AIDED;
     snprintf(w->name, sizeof(w->name), "centre/forward/depth-aided");

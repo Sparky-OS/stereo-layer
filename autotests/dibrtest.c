@@ -795,7 +795,7 @@ static void options(void)
     /* text: the default writes, reads back, and any set round trips exactly */
     char text[512];
     CHECK(stereo_dibr_options_write(&d, text, sizeof(text)) > 0);
-    CHECK(!strcmp(text, "view=left warp=layered fill=depthAided smooth=off sigmaH=10 sigmaV=30 radius=5 strength=58 zero=0.5 shift=0 near=0 far=0"));
+    CHECK(!strcmp(text, "view=left warp=layered fill=depthAided smooth=off sigmaH=10 sigmaV=30 radius=5 strength=58 zero=0.5 shift=0 near=0 far=0 way=auto"));
     o = d;
     o.view = STEREO_DIBR_VIEW_CENTER;
     o.warp = STEREO_DIBR_WARP_BACKWARD;

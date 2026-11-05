@@ -4,6 +4,7 @@
 #include "picture.h"
 #include <QObject>
 #include <QString>
+#include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
 namespace Stereo
@@ -34,6 +35,17 @@ class STEREO_LAYER_EXPORT DepthSettings : public QObject
     // the set as text, to keep and to give back; empty for the default
     Q_PROPERTY(QString text READ text WRITE setText NOTIFY changed)
     Q_PROPERTY(bool isDefault READ isDefault NOTIFY changed)
+    // The way of drawing is not the person's: a still picture and the saving into a file use the best way, a video the best way
+    // that keeps its frame rate on the GPU that draws it (the player gives the choice with setChoice()). Choosing a warping or a
+    // gap filling turns it off, and the choice then holds for everything.
+    Q_PROPERTY(bool automatic READ automatic WRITE setAutomatic NOTIFY changed)
+    // The warping and the gap filling the controls show: what the video is drawn with while the way is automatic and the player has
+    // told the choice, else warp and fill
+    Q_PROPERTY(int shownWarp READ shownWarp NOTIFY changed)
+    Q_PROPERTY(int shownFill READ shownFill NOTIFY changed)
+    // What was chosen and why, as a sentence in the person's language ("Layered, Pyramid (Layered, Depth-aided does not keep 30
+    // frames a second on this GPU)"); empty when the way is the person's or no video is drawing
+    Q_PROPERTY(QString chosenText READ chosenText NOTIFY changed)
     Q_PROPERTY(double strengthMax READ strengthMax CONSTANT)
     Q_PROPERTY(double shiftMax READ shiftMax CONSTANT)
     Q_PROPERTY(int radiusMax READ radiusMax CONSTANT)
@@ -76,12 +88,23 @@ public:
     static double shiftMax();
     static int radiusMax();
 
+    bool automatic() const;
+    void setAutomatic(bool value);
+    int shownWarp() const;
+    int shownFill() const;
+    QString chosenText() const;
+    // The person picks a way: both the warping and the gap filling are theirs from now on, even when they are the ones shown
+    Q_INVOKABLE void useWay(int warp, int fill);
+    // What the player's drawing chose for the video: the map of QQuickVideoOutput::stereoDepthChoice (warp, fill, keepsUp, fps,
+    // skippedWarp, skippedFill, onGpu); an empty map says no video is drawing
+    Q_INVOKABLE void setChoice(const QVariantMap &choice);
     Q_INVOKABLE void reset();
     // The options as the picture drawing takes them
     Picture::DepthOptions toOptions() const;
 
     // The words of the controls, translated, one source for the widgets and the QML: key is one of strength, zero, shift,
-    // picture, pictureLeft, pictureMiddle, fill, fillBackground, fillDepthAided, fillTelea, fillNone, warp, warpForward,
+    // picture, pictureLeft, pictureMiddle, fill, fillBackground, fillDepthAided, fillTelea, fillNone, fillPyramid, automatic,
+    // automaticTip, warp, warpForward,
     // warpBackward, warpLayered, smooth, reach, nearest, farthest, reset, title and the tip of strength, zero, picture, fill
     // (strengthTip...)
     Q_INVOKABLE static QString label(const QString &key);

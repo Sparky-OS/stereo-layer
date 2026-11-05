@@ -336,7 +336,8 @@ int stereo_depth_write_mark(const struct stereo_depth_convention *c, const uint1
 
 static const char *const k_view_words[] = { "left", "middle" };
 static const char *const k_warp_words[] = { "forward", "backward", "layered" };
-static const char *const k_fill_words[] = { "background", "depthAided", "telea", "none" };
+static const char *const k_fill_words[] = { "background", "depthAided", "telea", "none", "pyramid" };
+static const char *const k_way_words[] = { "auto", "own" };
 static const char *const k_smooth_words[] = { "off", "asymmetricGaussian" };
 
 static int word_index(const char *const *words, int n, const char *s, size_t len)
@@ -350,6 +351,7 @@ static int word_index(const char *const *words, int n, const char *s, size_t len
 int stereo_dibr_options_read(const char *text, struct stereo_dibr_options *o)
 {
     stereo_dibr_options_default(o);
+    int seen_way = 0;
     if (!text)
         return -1;
     const char *p = text;
@@ -379,9 +381,14 @@ int stereo_dibr_options_read(const char *text, struct stereo_dibr_options *o)
                 return -1;
             o->warp = i;
         } else if (klen == 4 && !strncmp(key, "fill", 4)) {
-            if ((i = word_index(k_fill_words, 4, val, vlen)) < 0)
+            if ((i = word_index(k_fill_words, 5, val, vlen)) < 0)
                 return -1;
             o->fill = i;
+        } else if (klen == 3 && !strncmp(key, "way", 3)) {
+            if ((i = word_index(k_way_words, 2, val, vlen)) < 0)
+                return -1;
+            o->automatic = i == 0;
+            seen_way = 1;
         } else if (klen == 6 && !strncmp(key, "smooth", 6)) {
             if ((i = word_index(k_smooth_words, 2, val, vlen)) < 0)
                 return -1;
@@ -410,6 +417,13 @@ int stereo_dibr_options_read(const char *text, struct stereo_dibr_options *o)
                 return -1;
         }
     }
+    /* a text that does not say whether the way is the person's, and has a way that is not the default's, is the person's */
+    if (!seen_way) {
+        struct stereo_dibr_options def;
+        stereo_dibr_options_default(&def);
+        if (o->warp != def.warp || o->fill != def.fill)
+            o->automatic = 0;
+    }
     stereo_dibr_options_clamp(o);
     return 1;
 }
@@ -424,8 +438,8 @@ int stereo_dibr_options_write(const struct stereo_dibr_options *o, char *buf, si
     write_number(n[4], sizeof(n[4]), o->shift);
     write_number(n[5], sizeof(n[5]), o->z_near);
     write_number(n[6], sizeof(n[6]), o->z_far);
-    int len = snprintf(buf, size, "view=%s warp=%s fill=%s smooth=%s sigmaH=%s sigmaV=%s radius=%d strength=%s zero=%s shift=%s near=%s far=%s",
-        k_view_words[o->view == STEREO_DIBR_VIEW_CENTER], k_warp_words[o->warp >= 0 && o->warp <= 2 ? o->warp : 0], k_fill_words[o->fill >= 0 && o->fill <= 3 ? o->fill : 0],
-        k_smooth_words[o->smooth == STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN], n[0], n[1], o->radius, n[2], n[3], n[4], n[5], n[6]);
+    int len = snprintf(buf, size, "view=%s warp=%s fill=%s smooth=%s sigmaH=%s sigmaV=%s radius=%d strength=%s zero=%s shift=%s near=%s far=%s way=%s",
+        k_view_words[o->view == STEREO_DIBR_VIEW_CENTER], k_warp_words[o->warp >= 0 && o->warp <= 2 ? o->warp : 0], k_fill_words[o->fill >= 0 && o->fill <= 4 ? o->fill : 0],
+        k_smooth_words[o->smooth == STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN], n[0], n[1], o->radius, n[2], n[3], n[4], n[5], n[6], k_way_words[o->automatic ? 0 : 1]);
     return len < 0 || (size_t)len >= size ? -1 : len;
 }

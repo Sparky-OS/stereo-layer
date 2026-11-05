@@ -265,11 +265,11 @@ int main(int argc, char **argv)
     struct way ways[26];
     int nways = 0;
     static const char *warp_name[] = { "forward", "backward", "layered" };
-    static const char *fill_name[] = { "background", "depth-aided", "telea", "none" };
+    static const char *fill_name[] = { "background", "depth-aided", "telea", "none", "pyramid" };
     static const char *view_name[] = { "left", "centre" };
     for (int view = 0; view < 2; ++view)
         for (int warp = 0; warp < 3; ++warp)
-            for (int fill = 0; fill < 4; ++fill)
+            for (int fill = 0; fill < 5; ++fill)
                 for (int smooth = 0; smooth < 2; ++smooth) {
                     if (view == 1 && warp != 0)
                         continue; /* the picture as the middle with the other warps is a matrix of its own: forward only */
@@ -412,6 +412,38 @@ int main(int argc, char **argv)
     if (default_index < 0) {
         printf("the library's default is not among the ways measured\n");
         return 1;
+    }
+    /* the ladder of the ways a video chooses from (stereo_dibr_ways()): the best first, the error not decreasing from one way to the
+     * next beyond the noise of the bench, and the first of them the default */
+    {
+        struct stereo_dibr_way ladder[8];
+        const int nl = stereo_dibr_ways(ladder, 8);
+        double previous = -1.0;
+        int ranking_ok = ladder[0].warp == defp.warp && ladder[0].fill == defp.fill;
+        printf("\nthe ladder of a video (best first): mean error over both eyes\n");
+        for (int i = 0; i < nl; ++i) {
+            int found = -1;
+            for (int k = 0; k < nways; ++k)
+                if (!ways[k].on_middle && ways[k].p.view == STEREO_DIBR_VIEW_LEFT && ways[k].p.smooth == STEREO_DIBR_SMOOTH_OFF && ways[k].p.warp == ladder[i].warp
+                    && ways[k].p.fill == ladder[i].fill)
+                    found = k;
+            if (found < 0) {
+                printf("  rung %d is not a way measured\n", i);
+                ranking_ok = 0;
+                continue;
+            }
+            printf("  %d  %-28s %.3f  holes %.3f\n", i, ways[found].name, all[found][nscenes], holes[found][nscenes]);
+            if (all[found][nscenes] < previous - 0.02) {
+                printf("  rung %d has a lower error than the rung before it: the ladder is not in order\n", i);
+                ranking_ok = 0;
+            }
+            previous = all[found][nscenes] > previous ? all[found][nscenes] : previous;
+        }
+        /* every way that costs no less than a rung and has more error than it is left out on purpose; the best way of all is the first rung */
+        if (!ranking_ok) {
+            printf("the ladder does not follow the measured ranking\n");
+            return 1;
+        }
     }
     int ok = all[default_index][nscenes] <= best_all + 0.02 && holes[default_index][nscenes] <= best_hole + 0.05;
     printf("default: mean all %.3f (best %.3f), mean holes %.3f (best %.3f): %s\n", all[default_index][nscenes], best_all, holes[default_index][nscenes], best_hole,
