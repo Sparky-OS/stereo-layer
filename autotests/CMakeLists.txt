@@ -48,6 +48,12 @@ target_compile_definitions(avtest PRIVATE FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/m
 target_link_libraries(avtest PRIVATE StereoAv PkgConfig::STEREO_AV PkgConfig::AVFORMAT)
 add_test(NAME avtest COMMAND avtest)
 
+# The writers of the 3D layout into Matroska, WebM and MP4 need ffmpeg and mkvtoolnix to make and judge their files
+add_executable(marktest marktest.c)
+target_link_libraries(marktest PRIVATE StereoAv PkgConfig::STEREO_AV PkgConfig::AVFORMAT)
+target_include_directories(marktest PRIVATE ${CMAKE_SOURCE_DIR}/src/policy)
+add_test(NAME marktest COMMAND marktest)
+
 add_executable(anaglyphtransformtest anaglyphtransformtest.cpp)
 target_link_libraries(anaglyphtransformtest PRIVATE StereoLayer)
 add_test(NAME anaglyphtransformtest COMMAND anaglyphtransformtest)
