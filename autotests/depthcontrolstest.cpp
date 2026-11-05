@@ -37,6 +37,10 @@ private Q_SLOTS:
         const Picture::DepthOptions o = s.toOptions();
         QVERIFY(o.warp == Picture::DepthOptions::Warp::Layered && o.fill == Picture::DepthOptions::Fill::DepthAided && !o.smooth);
         QCOMPARE(o.range, 58.0);
+        // and the pictures' own defaults are the same set
+        const Picture::DepthOptions plain;
+        QVERIFY(o.view == plain.view && o.warp == plain.warp && o.fill == plain.fill && o.smooth == plain.smooth && o.radius == plain.radius && o.zero == plain.zero
+                && o.shift == plain.shift && o.range == plain.range);
     }
 
     void aChoiceKeepsAsTextAndComesBack()

@@ -12,12 +12,13 @@ namespace Stereo
 {
 enum class OutputMode { Unknown, Mono, Stereo, Anaglyph };
 
-// How the views are drawn from a picture and its depth (libstereo-dibr, stereo-dibr.h): every path a choice. range,
+// How the views are drawn from a picture and its depth (libstereo-dibr, stereo-dibr.h): every path a choice; the defaults are the
+// library's stereo_dibr_options_default(), the best way measured (docs/depth-defaults.md). range,
 // zero and shift are for depth whose mark gives none (pixels of a view 1920 wide; zero from 0, the farthest, to 1).
 struct DepthOptions {
     enum class View { Left, Center } view = View::Left;
-    enum class Warp { Forward, Backward, Layered } warp = Warp::Forward;
-    enum class Fill { Background, DepthAided, Telea, None } fill = Fill::Background;
+    enum class Warp { Forward, Backward, Layered } warp = Warp::Layered;
+    enum class Fill { Background, DepthAided, Telea, None } fill = Fill::DepthAided;
     bool smooth = false;
     double sigmaH = 10.0, sigmaV = 30.0;
     int radius = 5;

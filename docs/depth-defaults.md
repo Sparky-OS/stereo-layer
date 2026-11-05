@@ -22,6 +22,6 @@ The test fails when the library's default is not the best of the ways measured.
 | forward, holes left black (control) | 8.753 | 69.919 | 32 ms |
 
 - Smoothing the depth is worse when the depth is exact and no better when it is noisy, so it is off.
-- The picture as the left eye keeps that eye exact; a picture that is really the middle one, taken for the left eye, costs 12.3 instead of 0.8: which eye the picture is belongs to where the picture came from, so it is an option the person can set, and the left eye is the default.
+- The picture as the left eye keeps that eye exact; a picture that is really the middle one, taken for the left eye, costs 12.3 instead of 0.7: which eye the picture is belongs to where the picture came from, so it is an option the person can set, and the left eye is the default.
 - Strength is the picture's parallax budget, in pixels of a picture 1920 wide: 58 pixels is 1.03 degrees of visual angle for a viewer three picture heights from the screen, and the area the picture does not show grows with it (1.2 % of the right eye at 20 pixels, 3.8 % at 58, 8.0 % at 120).
 - The cost is time: layered warping with depth-aided filling takes about three times as long as the earlier default; every way remains a choice.
