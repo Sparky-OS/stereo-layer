@@ -89,6 +89,40 @@ STEREO_POLICY_EXPORT int stereo_policy_site_mark_list(const char *keywords, int 
  */
 STEREO_POLICY_EXPORT int stereo_policy_site_mark_word(int layout, int order, const char **word);
 
+/*
+ * The depth of a display: the one source of how much a stereo output may sink and pop, for every program that puts depth on it
+ * (the desktop's windows, the browser's WebXR pages and, after them, the CSS depth levels sunk, screen and popped). Read in this
+ * order of importance: (1) the person's choice, built on (2) the display. The display's default is what is comfortable on it:
+ *   - an angular budget, the same on every display of one kind, so a framed screen of any size and any viewing distance gets the
+ *     parallax that looks alike: the sunk limit 0.198 degrees and the popped limit 0.079 degrees of disparity at the eyes (the
+ *     desktop's defaults of 10 and 4 pixels on a 24 inch monitor of 1920 pixels, seen from 0.8 m);
+ *   - the viewing distance of the display, from its physical size: 0.6 m up to a diagonal of 0.5 m, then 1.8 m more for each
+ *     metre of diagonal (a 24 inch monitor 0.8 m, a 46 inch television 1.8 m, a 65 inch one 2.7 m);
+ *   - the kind: a framed screen seen through glasses 1.0; a screen shown in colours (anaglyph) 0.7, as ghosting grows with
+ *     parallax; a headset (a flat headset, or a phone in one) 2.5, which shows the screen as a window in a virtual room and
+ *     takes more separation, at a fixed window distance of 0.7 m whatever the size.
+ * The limits are in pixels of a view 1920 pixels wide (the unit of the desktop's "3D Depth" settings, scaled to each screen by
+ * its view's width). The person's choice is a strength in percent (100: the display's default) and, for each limit, an absolute
+ * value in pixels that replaces it (0: none). A size that is not known (a width or height of 0 or less) is taken for the
+ * 24 inch monitor and size_known says so, so a program can tell the person instead of guessing silently.
+ */
+enum stereo_policy_display_kind {
+    STEREO_POLICY_DISPLAY_FRAMED = 0,
+    STEREO_POLICY_DISPLAY_ANAGLYPH = 1,
+    STEREO_POLICY_DISPLAY_HEADSET = 2,
+};
+
+struct stereo_policy_depth {
+    double sunk_px;            /* how far behind the screen, pixels at a view width of 1920 */
+    double popped_px;          /* how far in front of it */
+    int viewing_distance_mm;   /* where the viewer sits, the distance the screen is seen from */
+    int size_known;            /* 1 when the physical size was given, 0 when the reference monitor stood in */
+};
+
+/* Returns 0, or -1 for a bad argument (a kind that is not listed, a strength under 0 or over 1000, a negative override). */
+STEREO_POLICY_EXPORT int stereo_policy_display_depth(int kind, int width_mm, int height_mm, double strength_percent,
+    double sunk_override_px, double popped_override_px, struct stereo_policy_depth *out);
+
 /* A value of user_layout for stereo_policy_video_layout(): the user says the video is not 3D, whatever its mark says. */
 #define STEREO_POLICY_USER_FORCE_2D (-1)
 
