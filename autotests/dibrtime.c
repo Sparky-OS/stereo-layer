@@ -175,6 +175,26 @@ static int list_ways(struct way *ways)
     return n;
 }
 
+static void print_choice(const double *ms)
+{
+    static const char *warps[] = { "forward", "backward", "layered" }, *fills[] = { "background", "depth-aided", "telea", "none", "pyramid" };
+    struct stereo_dibr_way ways[8];
+    const int n = stereo_dibr_ways(ways, 8);
+    for (int i = 0; i < n; ++i)
+        printf("  rung %d  %-9s/%-11s %9.2f ms\n", i, warps[ways[i].warp], fills[ways[i].fill], ms[i]);
+    static const double rates[] = { 24, 30, 60 };
+    for (int k = 0; k < 3; ++k) {
+        struct stereo_dibr_choice c;
+        if (stereo_dibr_choose_from_times(ms, n, rates[k], &c))
+            continue;
+        printf("  %2.0f fps (budget %.1f ms): %s/%s, %.2f ms, %s", rates[k], c.budget_ms, warps[c.warp], fills[c.fill], c.ms, c.keeps_up ? "keeps up" : "the quickest, does NOT keep up");
+        if (c.skipped_warp >= 0)
+            printf("; %s/%s does not (%.2f ms)", warps[c.skipped_warp], fills[c.skipped_fill], c.skipped_ms);
+        printf("\n");
+    }
+    fflush(stdout);
+}
+
 static void report(const char *name, double *t, int frames, int is_default)
 {
     qsort(t, frames, sizeof(double), cmp_double);
@@ -186,7 +206,7 @@ static void report(const char *name, double *t, int frames, int is_default)
 
 int main(int argc, char **argv)
 {
-    int gpu = -1, cpu = 0, list = 0, upload = 0, frames = 0, w = 1920, h = 1080, radius = 0;
+    int gpu = -1, cpu = 0, list = 0, upload = 0, frames = 0, w = 1920, h = 1080, radius = 0, choose = 0;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--list"))
             list = 1;
@@ -194,6 +214,8 @@ int main(int argc, char **argv)
             cpu = 1;
         else if (!strcmp(argv[i], "--upload"))
             upload = 1;
+        else if (!strcmp(argv[i], "--choose"))
+            choose = 1;
         else if (!strcmp(argv[i], "--gpu") && i + 1 < argc)
             gpu = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--radius") && i + 1 < argc)
@@ -203,7 +225,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--size") && i + 1 < argc)
             sscanf(argv[++i], "%dx%d", &w, &h);
         else {
-            fprintf(stderr, "usage: dibrtime --list | --gpu N [--size WxH] [--frames N] [--upload] [--radius N] | --cpu [--size WxH] [--frames N] [--radius N]\n");
+            fprintf(stderr, "usage: dibrtime --list | --gpu N [--size WxH] [--frames N] [--upload] [--radius N] [--choose] | --cpu [--size WxH] [--frames N] [--radius N] [--choose]\n");
             return 2;
         }
     }
@@ -243,6 +265,19 @@ int main(int argc, char **argv)
     float table[256];
     stereo_depth_parallax_table(&c, w, table);
 
+    if (choose && cpu) {
+        /* what a player does on the processor: the library times the ladder (or has the person's cache) and chooses */
+        double ms[4];
+        int measured = 0;
+        double t0 = now_ms();
+        if (stereo_dibr_measure_cpu(w, h, ms, 4, &measured)) {
+            fprintf(stderr, "stereo_dibr_measure_cpu failed\n");
+            return 3;
+        }
+        printf("# the processor, %dx%d: %s in %.0f ms (cache: XDG_CACHE_HOME=%s)\n", w, h, measured ? "timed" : "from the cache", now_ms() - t0, getenv("XDG_CACHE_HOME") ? getenv("XDG_CACHE_HOME") : "-");
+        print_choice(ms);
+        return 0;
+    }
     printf("%-30s %8s %8s   %8s   rates kept by the 95th percentile\n", "way", "median", "p95 ms", "fps");
     if (cpu) {
         /* a player's frame is YUV 4:2:0: three planes, the chroma at half size */
@@ -323,6 +358,21 @@ int main(int argc, char **argv)
     if (!gl) {
         fprintf(stderr, "the GLSL passes did not compile on device %d\n", gpu);
         return 3;
+    }
+    if (choose) {
+        double ms[4];
+        for (int transfer = 0; transfer < 2; ++transfer) {
+            int measured = 0;
+            double t0 = now_ms();
+            if (stereo_dibr_gl_measure(gl, w, h, transfer, ms, 4, &measured)) {
+                fprintf(stderr, "stereo_dibr_gl_measure failed: %s\n", stereo_dibr_gl_error(gl));
+                return 3;
+            }
+            printf("# %s, %dx%d, %s: %s in %.0f ms\n", stereo_dibr_gl_gpu(gl), w, h, transfer ? "with the frame's upload and the views' read back" : "the passes alone", measured ? "timed" : "from the cache", now_ms() - t0);
+            print_choice(ms);
+        }
+        stereo_dibr_gl_free(gl);
+        return 0;
     }
     const float hole[4] = { 0, 0, 0, 1 };
     int n = frames ? frames : 120;

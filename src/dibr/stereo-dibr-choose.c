@@ -10,6 +10,7 @@
 #include "stereo-dibr-private.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -220,9 +221,13 @@ int stereo_dibr_cache_store(const char *key, int width, int height, const double
     if (!key || n != NB_WAYS || !p95_ms || strchr(key, '\t') || strchr(key, '\n') || cache_path(path, sizeof(path), 1))
         return -1;
     snprintf(tmp, sizeof(tmp), "%s.%d", path, (int)getpid());
-    FILE *out = fopen(tmp, "w");
-    if (!out)
+    const int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    FILE *out = fd >= 0 ? fdopen(fd, "w") : NULL;
+    if (!out) {
+        if (fd >= 0)
+            close(fd);
         return -1;
+    }
     ladder_text(lad, sizeof(lad));
     snprintf(want, sizeof(want), "%dx%d", width, height);
     fprintf(out, CACHE_HEADER "\n");

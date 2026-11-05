@@ -1,3 +1,25 @@
+stereo-layer (1.15.0-1) unstable; urgency=medium
+
+  * A video is drawn the best way that keeps its frame rate (ORDER 411, group 2e; Daniel, 2026-11-05: "we choose the best default and
+    left options to the user"). libstereo-dibr: stereo_dibr_ways() is the ladder of four ways that no other way beats at its cost
+    (layered warping with depth-aided filling, layered with the pyramid fill, forward with the pyramid fill, forward with background
+    filling), stereo_dibr_choose_from_times() takes the first that fits four fifths of the frame's time, stereo_dibr_gl_measure()
+    and stereo_dibr_measure_cpu() time the ladder once for each GPU (or processor) and picture size, kept in the person's cache
+    (XDG_CACHE_HOME/stereo-dibr/timings, mode 0600, never in a media file). The options carry whether the way is automatic or the
+    person's (way=auto, way=own in the text); stills and the saving into a file use the best way, the options' default, which is
+    also stereo_dibr_params_default(): the library has one default.
+  * A new fill, the pyramid: the depth-aided idea (a hole is filled from the background around it, never from the foreground) in
+    passes by halves of the picture, so that the work grows with the logarithm of the hole and not with its width. C and GLSL give
+    the same views (dibrgltest: no pixel differs by more than one). Over both eyes its error is 0.746, depth-aided's 0.736 and
+    background filling's 0.789 (layered warp, autotests/dibrbench.c); at 1920x1080 per eye on an RTX 3060 it takes 15 ms with the
+    layered warp and 6.6 ms with the forward warp, against 72 and 52 ms for depth-aided.
+  * Depth controls: Automatic (the way is chosen for a video), the way chosen and why in the person's language, the pyramid;
+    picking a warping or a gap filling turns automatic off and the pick holds for everything, the slowest way included.
+    dibrbench asserts that the ladder follows the measured ranking, dibrchoosetest asserts the choice on fixtures of times (the
+    budget of a GPU) and the cache, dibrtime times every way on a GPU or the processor and, with --choose, what a player chooses.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 05 Nov 2026 17:00:00 +0000
+
 stereo-layer (1.14.0-1) unstable; urgency=medium
 
   * Picture plus depth has one set of options for every program (ORDER 411, group 2c; Daniel, 2026-11-05: where the assembly of

@@ -330,6 +330,7 @@ int main(int argc, char **argv)
         /* the places the picture shows nothing of: the holes of a plain forward warp of the left eye */
         struct stereo_dibr_params none;
         stereo_dibr_params_default(&none);
+        none.warp = STEREO_DIBR_WARP_FORWARD; /* a plain forward warp: the places the picture shows nothing of */
         none.fill = STEREO_DIBR_FILL_NONE;
         draw(&sc, &none, &picL, picL.depth, &holeL, &holeR, 1);
         for (long i = 0; i < (long)W * H; ++i)

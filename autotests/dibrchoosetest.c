@@ -150,7 +150,9 @@ static void cache(void)
     /* a key with a tab or a bad count is refused */
     CHECK(stereo_dibr_cache_store("gl\tA", 1920, 1080, card, 4) == -1);
     CHECK(stereo_dibr_cache_store("gl A", 1920, 1080, card, 5) == -1);
-    /* the cache is the person's: directory 0700 */
+    /* the cache is the person's: directory 0700, file 0600 */
+    snprintf(cmd, sizeof(cmd), "test \"$(stat -c %%a %s/stereo-dibr/timings)\" = 600", dir);
+    CHECK(system(cmd) == 0);
     snprintf(cmd, sizeof(cmd), "test \"$(stat -c %%a %s/stereo-dibr)\" = 700", dir);
     CHECK(system(cmd) == 0);
     /* unwritable: said by the return value */
