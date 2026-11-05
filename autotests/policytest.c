@@ -598,6 +598,21 @@ static void siteMarks(void)
     }
 }
 
+/* ORDER 193: the shape rule's 2.40:1 false positive. A mono scope film is no pair: an unmarked frame is side by side only
+ * from three times as wide as high (two 16:9 pictures are 3.56:1), never at 2.35, 2.39 or 2.40. */
+static void scopeFilm(void)
+{
+    int layout, order, source;
+    static const int sizes[][2] = { { 1920, 800 }, { 2048, 858 }, { 1920, 804 }, { 2560, 1080 }, { 3840, 1600 }, { 2880, 1080 } };
+    for (size_t i = 0; i < sizeof(sizes) / sizeof(sizes[0]); ++i) {
+        CHECK(stereo_policy_video_layout(sizes[i][0], sizes[i][1], NULL, STEREO_POLICY_LAYOUT_NONE, 0, 0, &layout, &order, &source) == 0);
+        CHECK(layout == STEREO_POLICY_LAYOUT_NONE && source == STEREO_POLICY_SOURCE_NONE);
+    }
+    CHECK(stereo_policy_video_layout(3840, 1080, NULL, STEREO_POLICY_LAYOUT_NONE, 0, 0, &layout, &order, &source) == 0);
+    CHECK(layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE && source == STEREO_POLICY_SOURCE_SHAPE);
+    CHECK(stereo_policy_video_layout(2400, 800, NULL, STEREO_POLICY_LAYOUT_NONE, 0, 0, &layout, &order, &source) == 0 && layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE);
+}
+
 int main(void)
 {
     marks();
@@ -613,6 +628,7 @@ int main(void)
     shapes();
     contents();
     siteMarks();
+    scopeFilm();
     if (failures)
         fprintf(stderr, "%d check(s) failed\n", failures);
     else
