@@ -55,6 +55,8 @@ typedef long GLintptr; /* unused, for completeness of the signatures below */
 #define GL_CLAMP_TO_EDGE 0x812F
 #define GL_RG 0x8227
 #define GL_RG32F 0x8230
+#define GL_RG16F 0x822F
+#define GL_RGBA16F 0x881A
 #define GL_TEXTURE_BINDING_2D 0x8069
 #define GL_TEXTURE0 0x84C0
 #define GL_ACTIVE_TEXTURE 0x84E0
@@ -198,6 +200,9 @@ struct stereo_dibr_gl {
     GLuint programs[NB_PROGRAMS];
     GLuint textures[NB_TEXTURES];
     int tex_w[NB_TEXTURES], tex_h[NB_TEXTURES];
+    double tex_bytes[NB_TEXTURES];
+    GLint color_format; /* the colour textures: half float for content of 10 bits or less, float above */
+    int bits;
     GLuint fbo, vao, query;
     char error[512];
     char gpu[384];
@@ -272,6 +277,8 @@ stereo_dibr_gl *stereo_dibr_gl_create(stereo_dibr_gl_resolver resolve, int api)
     if (!gl)
         return NULL;
     gl->api = api;
+    gl->color_format = GL_RGBA16F;
+    gl->bits = 8;
 #define RESOLVE(ret, name, args)                                                                                                                     \
     if (!(gl->name = (ret(*) args)resolve("gl" #name))) {                                                                                            \
         fprintf(stderr, "stereo-dibr-gl: gl" #name " is missing\n");                                                                                 \
@@ -331,7 +338,8 @@ static void texture(stereo_dibr_gl *gl, int t, GLint format, int w, int h, const
 {
     gl->BindTexture(GL_TEXTURE_2D, gl->textures[t]);
     if (gl->tex_w[t] != w || gl->tex_h[t] != h || data) {
-        gl->TexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format == GL_RG32F ? GL_RG : GL_RGBA, GL_FLOAT, data);
+        gl->TexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format == GL_RG32F || format == GL_RG16F ? GL_RG : GL_RGBA, GL_FLOAT, data);
+        gl->tex_bytes[t] = (double)w * h * (format == GL_RGBA32F ? 16 : format == GL_RG32F || format == GL_RGBA16F ? 8 : 4);
         gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -339,6 +347,18 @@ static void texture(stereo_dibr_gl *gl, int t, GLint format, int w, int h, const
         gl->tex_w[t] = w;
         gl->tex_h[t] = h;
     }
+}
+
+/* A working texture's storage handed back (it is made again at the next use). */
+static void release(stereo_dibr_gl *gl, int t)
+{
+    if (gl->tex_w[t] <= 0 && !gl->tex_bytes[t])
+        return;
+    gl->BindTexture(GL_TEXTURE_2D, gl->textures[t]);
+    gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, 1, 1, 0, GL_RG, GL_FLOAT, NULL);
+    gl->tex_w[t] = 0;
+    gl->tex_h[t] = 0;
+    gl->tex_bytes[t] = 0;
 }
 
 /* Draws a pass of program prog into the textures out (one or two, -1 for none; a raw GL name when raw is set) with a
@@ -625,10 +645,10 @@ static int pyramid(stereo_dibr_gl *gl, int w, int h, int *cur)
     if (levels < 2)
         return 0;
     for (int k = 1; k < levels; k++) {
-        texture(gl, PYR_UP(k), GL_RGBA32F, lw[k], lh[k], NULL);
+        texture(gl, PYR_UP(k), gl->color_format, lw[k], lh[k], NULL);
         texture(gl, PYR_UP(k) + 1, GL_RGBA32F, lw[k], lh[k], NULL);
         if (k < levels - 1) {
-            texture(gl, PYR_DOWN(k), GL_RGBA32F, lw[k], lh[k], NULL);
+            texture(gl, PYR_DOWN(k), gl->color_format, lw[k], lh[k], NULL);
             texture(gl, PYR_DOWN(k) + 1, GL_RGBA32F, lw[k], lh[k], NULL);
         }
     }
@@ -671,6 +691,34 @@ int stereo_dibr_gl_reset_status(stereo_dibr_gl *gl)
     if (!gl->lost && gl->GetGraphicsResetStatus)
         gl->lost = gl->GetGraphicsResetStatus();
     return (int)gl->lost;
+}
+
+
+void stereo_dibr_gl_set_precision(stereo_dibr_gl *gl, int bits)
+{
+    if (!gl)
+        return;
+    /* half float holds every code of 10 bits exactly (11 bits of mantissa), float every code of 16: the colour textures never hold less than the source */
+    const GLint f = bits > 10 ? GL_RGBA32F : GL_RGBA16F;
+    if (f != gl->color_format) {
+        gl->color_format = f;
+        for (int t = T_COLOR0; t <= T_COLOR1; t++)
+            gl->tex_w[t] = -1; /* made again */
+        for (int k = 1; k < NB_PYRAMID_LEVELS; k++) {
+            gl->tex_w[PYR_UP(k)] = -1;
+            gl->tex_w[PYR_DOWN(k)] = -1;
+        }
+    }
+    gl->bits = bits;
+}
+
+double stereo_dibr_gl_memory_used(stereo_dibr_gl *gl)
+{
+    double sum = 0.0;
+    if (gl)
+        for (int i = 0; i < NB_TEXTURES; i++)
+            sum += gl->tex_bytes[i];
+    return sum;
 }
 
 
@@ -729,6 +777,9 @@ static int render(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, cons
 
     if (parallax(gl, T_TABLE, table_size, depth, dw, dh, integer, w, h, 1, T_PAR) < 0)
         goto fail;
+    /* the depth-sized intermediates are not needed again this frame: handed back, so that the peak of the passes is lower */
+    release(gl, T_DPAR0);
+    release(gl, T_DPAR1);
     const int smooth = prm->smooth == STEREO_DIBR_SMOOTH_ASYMMETRIC_GAUSSIAN;
     if (smooth) {
         const float per_1920 = (float)(w / 1920.0);
@@ -750,9 +801,6 @@ static int render(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, cons
     }
     if (layer && parallax(gl, T_LTABLE, ltable_size, layer_depth, ldw, ldh, integer, w, h, 0, T_LPAR) < 0)
         goto fail;
-
-    for (int i = T_COLOR0; i <= T_STATE1; i++)
-        texture(gl, i, GL_RGBA32F, w, h, NULL);
 
     for (int eye = 0; eye < 2; eye++) {
         if (!eye && prm->view == STEREO_DIBR_VIEW_LEFT && (!layer || role == STEREO_DIBR_LAYER_BACKGROUND)) {
@@ -778,6 +826,13 @@ static int render(stereo_dibr_gl *gl, const struct stereo_dibr_params *prm, cons
             if (view_map(gl, &lp, w, h, s, 2.0f, T_LPAR, 0, lo, hi, T_LSPLAT, T_LMAP) < 0)
                 goto fail;
         }
+
+        /* the splat and the band are not needed any more: handed back before the colour and the state are made, so that the passes' peak is lower */
+        release(gl, T_SPLAT);
+        release(gl, T_BAND);
+        release(gl, T_LSPLAT);
+        for (int i = T_COLOR0; i <= T_STATE1; i++)
+            texture(gl, i, i == T_COLOR0 || i == T_COLOR1 ? gl->color_format : GL_RGBA32F, w, h, NULL);
 
         struct pass p = use(gl, P_sample_frag);
         bind(&p, "u_picture", picture);
@@ -926,8 +981,9 @@ static int time_one_gl(void *user, int rung, double *p95)
     {
         /* the memory the way needs against what the GPU has free (GL_ATI_meminfo, GL_NVX_gpu_memory_info: kilobytes), when it says */
         const double free_bytes = stereo_dibr_gl_free_memory(gl);
-        if (free_bytes >= 0.0 && stereo_dibr_way_memory(t->ways[rung].warp, t->ways[rung].fill, t->w, t->h) > 0.5 * free_bytes) {
-            set_error(gl, "a way needs more than half of the GPU's free memory", NULL);
+        /* the cheapest way is always run: something must draw, and the ladder says when nothing fits */
+        if (rung != t->n - 1 && !stereo_dibr_way_fits(t->ways[rung].warp, t->ways[rung].fill, t->w, t->h, gl->bits, free_bytes)) {
+            set_error(gl, "a way needs more of the GPU's memory than is free", NULL);
             return 1;
         }
     }
@@ -987,7 +1043,8 @@ int stereo_dibr_gl_measure(stereo_dibr_gl *gl, int w, int h, int with_transfer, 
     if (n != stereo_dibr_ways(ways, 16))
         return -1;
     char key[420];
-    snprintf(key, sizeof(key), "%s%s", stereo_dibr_gl_gpu(gl), with_transfer ? " with transfer" : "");
+    /* the times are the passes' at the depth of the content: 16 bit content (float textures) is its own entry */
+    snprintf(key, sizeof(key), "%s%s%s", stereo_dibr_gl_gpu(gl), with_transfer ? " with transfer" : "", gl->bits > 10 ? " 16 bit" : gl->bits > 8 ? " 10 bit" : "");
     for (int i = 0; i < n; i++)
         p95_ms[i] = -1.0;
     stereo_dibr_cache_load(key, w, h, p95_ms, n);

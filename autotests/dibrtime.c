@@ -224,7 +224,7 @@ static void report(const char *name, double *t, int frames, int is_default)
 
 int main(int argc, char **argv)
 {
-    int gpu = -1, cpu = 0, list = 0, upload = 0, frames = 0, w = 1920, h = 1080, radius = 0, choose = 0, paced = 0;
+    int gpu = -1, cpu = 0, list = 0, upload = 0, frames = 0, w = 1920, h = 1080, radius = 0, choose = 0, paced = 0, memory = 0, only = -1;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--list"))
             list = 1;
@@ -236,6 +236,10 @@ int main(int argc, char **argv)
             choose = 1;
         else if (!strcmp(argv[i], "--paced"))
             paced = 1;
+        else if (!strcmp(argv[i], "--memory"))
+            memory = 1;
+        else if (!strcmp(argv[i], "--only") && i + 1 < argc)
+            only = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--no-telea"))
             no_telea = 1;
         else if (!strcmp(argv[i], "--gpu") && i + 1 < argc)
@@ -414,11 +418,16 @@ int main(int argc, char **argv)
     }
     if (paced)
         stereo_dibr_gl_set_limits(gl, 270, 1);
+    if (getenv("DIBRTIME_BITS"))
+        stereo_dibr_gl_set_precision(gl, atoi(getenv("DIBRTIME_BITS")));
     const float hole[4] = { 0, 0, 0, 1 };
     int n = frames ? frames : 120;
     double *t = malloc(sizeof(double) * n);
     for (int k = 0; k < nways; ++k) {
         int bad = 0;
+        if (only >= 0 && k != only)
+            continue;
+        const double free_before = stereo_dibr_gl_free_memory(gl);
         for (int i = -5; i < n; ++i) {
             double t0 = now_ms();
             if (upload) {
@@ -429,6 +438,11 @@ int main(int argc, char **argv)
             }
             int r = stereo_dibr_gl_render(gl, &ways[k].p, table, 256, tex[0], w, h, tex[1], w, h, 0, tex[2], hole);
             glFinish();
+            if (memory && i == -5 && free_before >= 0)
+                printf("# driver memory of %s: %.1f MB taken by the first drawing (free %.1f MB before, %.1f MB after)\n", ways[k].name, (free_before - stereo_dibr_gl_free_memory(gl)) / 1e6, free_before / 1e6, stereo_dibr_gl_free_memory(gl) / 1e6);
+            if (memory && i == -5)
+                printf("# memory of %s: %.1f MB held after the drawing (model, peak with the caller's textures: %.1f MB)\n", ways[k].name, stereo_dibr_gl_memory_used(gl) / 1e6,
+                    stereo_dibr_way_memory(ways[k].p.warp, ways[k].p.fill, w, h, getenv("DIBRTIME_BITS") ? atoi(getenv("DIBRTIME_BITS")) : 8) / 1e6);
             if (r != 0) {
                 bad = r;
                 break;

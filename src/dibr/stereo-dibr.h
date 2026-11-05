@@ -361,8 +361,11 @@ STEREO_DIBR_EXPORT int stereo_dibr_choose_from_times(const double *p95_ms, int n
 typedef int (*stereo_dibr_time_way)(void *user, int rung, double *p95_ms);
 /* (the callback returns 1 for a way it did not run, which gets -2 in p95_ms and ends the timing: the GPU has not the memory for it) */
 
-/* The GPU memory in bytes that a way needs at width x height (the float textures of its passes). */
-STEREO_DIBR_EXPORT double stereo_dibr_way_memory(int warp, int fill, int width, int height);
+/* The GPU memory in bytes that a way needs at width x height for content of bits bits (the float textures of its passes). */
+STEREO_DIBR_EXPORT double stereo_dibr_way_memory(int warp, int fill, int width, int height, int bits);
+/* 1 when a way fits in free_bytes of the GPU's memory (stereo_dibr_gl_free_memory(), or what a player makes of it), or when free_bytes is negative (not said);
+ * the one rule of the guard of the automatic choice and of the sentence beside a way in the controls. */
+STEREO_DIBR_EXPORT int stereo_dibr_way_fits(int warp, int fill, int width, int height, int bits, double free_bytes);
 STEREO_DIBR_EXPORT int stereo_dibr_time_ladder(double fps, stereo_dibr_time_way time, void *user, double *p95_ms, int n, int *timed);
 
 /*

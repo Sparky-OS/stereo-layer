@@ -191,11 +191,20 @@ static void ladder_timing(void)
     struct stereo_dibr_way w[4];
     stereo_dibr_ways(w, 4);
     /* (the layered pyramid needs more than the layered depth-aided, though it costs less time: the order that matters is the pyramid's) */
-    CHECK(stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080) > stereo_dibr_way_memory(w[3].warp, w[3].fill, 1920, 1080));
+    CHECK(stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080, 8) > stereo_dibr_way_memory(w[3].warp, w[3].fill, 1920, 1080, 8));
     for (int i = 1; i < 3; i++)
-        CHECK(stereo_dibr_way_memory(w[i].warp, w[i].fill, 1920, 1080) > stereo_dibr_way_memory(w[i + 1].warp, w[i + 1].fill, 1920, 1080));
-    CHECK(stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080) > 250e6 && stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080) < 500e6);
-    CHECK(stereo_dibr_way_memory(w[0].warp, w[0].fill, 3840, 2160) > 3.9 * stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080));
+        CHECK(stereo_dibr_way_memory(w[i].warp, w[i].fill, 1920, 1080, 8) > stereo_dibr_way_memory(w[i + 1].warp, w[i + 1].fill, 1920, 1080, 8));
+    CHECK(stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080, 8) > 150e6 && stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080, 8) < 289e6 /* beside a desktop on a 512 MB carve-out */);
+    CHECK(stereo_dibr_way_memory(w[0].warp, w[0].fill, 3840, 2160, 8) > 3.9 * stereo_dibr_way_memory(w[0].warp, w[0].fill, 1920, 1080, 8));
+    /* the guard and the controls' sentence are one rule: the layered depth-aided way fits beside a two-screen desktop on a 512 MB carve-out (289 MB free),
+     * the layered pyramid does not; a GPU that does not say (negative) holds nothing back; the driver's 4K takes far more */
+    CHECK(stereo_dibr_way_fits(STEREO_DIBR_WARP_LAYERED, STEREO_DIBR_FILL_DEPTH_AIDED, 1920, 1080, 8, 289e6));
+    CHECK(!stereo_dibr_way_fits(STEREO_DIBR_WARP_LAYERED, STEREO_DIBR_FILL_PYRAMID, 1920, 1080, 8, 289e6));
+    CHECK(stereo_dibr_way_fits(STEREO_DIBR_WARP_LAYERED, STEREO_DIBR_FILL_PYRAMID, 1920, 1080, 8, -1.0));
+    CHECK(stereo_dibr_way_fits(STEREO_DIBR_WARP_FORWARD, STEREO_DIBR_FILL_BACKGROUND, 1920, 1080, 8, 289e6));
+    CHECK(!stereo_dibr_way_fits(STEREO_DIBR_WARP_FORWARD, STEREO_DIBR_FILL_BACKGROUND, 3840, 2160, 8, 289e6));
+    /* 16 bit content holds float colour: a way needs more of it */
+    CHECK(stereo_dibr_way_memory(STEREO_DIBR_WARP_LAYERED, STEREO_DIBR_FILL_DEPTH_AIDED, 1920, 1080, 16) > stereo_dibr_way_memory(STEREO_DIBR_WARP_LAYERED, STEREO_DIBR_FILL_DEPTH_AIDED, 1920, 1080, 8));
     /* a failing timer ends it, a bad argument is refused */
     CHECK(stereo_dibr_time_ladder(24.0, NULL, &f, p, 4, &timed) == -1);
     CHECK(stereo_dibr_time_ladder(0.0, fixture_time, &f, p, 4, &timed) == -1);

@@ -77,19 +77,32 @@ int stereo_dibr_choose_from_times(const double *p95_ms, int n, double fps, struc
     return 0;
 }
 
-/* The GPU memory a way needs at width x height, bytes: the 32 bit float textures of its passes (positions, splats, colour and state twice over,
- * the layered warp's band and boundary, the pyramid's levels), counted from the passes. */
-double stereo_dibr_way_memory(int warp, int fill, int width, int height)
+/* What the driver takes beyond the passes' textures: measured as the driver's free memory before and after the first drawing of each way at 1920x1080 a
+ * view in its own process (GL_NVX_gpu_memory_info on the GeForce RTX 3060, GL_ATI_meminfo on the Radeon R5 M330): 1.13 to 1.39 times the peak counted here
+ * (evidence/2g/gpu-memory-*). One number for the guard of the automatic choice and for the sentence beside a way in the list. */
+#define DRIVER_OVERHEAD 1.35
+
+/* The GPU memory a way needs at width x height, bytes, as the driver takes it: the textures of its passes (positions, splats, colour and state twice over,
+ * the layered warp's band and boundary, the pyramid's levels), counted from the passes at their peak, times what the driver adds. */
+double stereo_dibr_way_memory(int warp, int fill, int width, int height, int bits)
 {
     const double px = (double)width * height;
-    double bytes = px * (8 + 8 + 4 * 16 + 8);        /* parallax at the depth's and the picture's size, colour and state twice, the map */
-    bytes += px * 16;                                 /* the splat */
-    if (warp == STEREO_DIBR_WARP_LAYERED)
-        bytes += px * (16 + 16);                      /* the band and the boundary */
+    const double color = bits > 10 ? 16.0 : 8.0; /* RGBA float or half float */
+    /* the passes' textures at their peak, two phases: while the view's map is made (parallax 8, splat 16, map 8, the layered warp's band and boundary 32), and
+     * after the splat and the band are handed back (parallax, map, colour twice, state twice 32, the boundary, the pyramid's levels) */
+    const double phase1 = 8 + 16 + 8 + (warp == STEREO_DIBR_WARP_LAYERED ? 32 : 0);
+    double phase2 = 8 + 8 + 2 * color + 32 + (warp == STEREO_DIBR_WARP_LAYERED ? 16 : 0);
     if (fill == STEREO_DIBR_FILL_PYRAMID)
-        bytes += px * 16 * 4 / 3;                     /* the levels of the pyramid, up and down: a third of the picture, four textures */
-    bytes += px * (4 + 1 + 8);                        /* the picture, its depth, the views */
-    return bytes;
+        phase2 += (2 * color + 32) / 3.0; /* a third of the picture: the levels up and down, colour and state */
+    double bytes = px * (phase1 > phase2 ? phase1 : phase2);
+    bytes += px * (4 + 1 + 8); /* the picture, its depth, the views (8 bit; the caller's) */
+    return bytes * DRIVER_OVERHEAD;
+}
+
+/* Whether a way fits in free_bytes of GPU memory (a negative free_bytes is the driver not saying: it fits). */
+int stereo_dibr_way_fits(int warp, int fill, int width, int height, int bits, double free_bytes)
+{
+    return free_bytes < 0.0 || stereo_dibr_way_memory(warp, fill, width, height, bits) <= free_bytes;
 }
 
 /* ---- the clock, the statistics and the synthetic picture ------------------------------------------------------------ */

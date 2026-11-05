@@ -81,6 +81,12 @@ STEREO_DIBR_EXPORT int stereo_dibr_gl_measure(
  */
 STEREO_DIBR_EXPORT int stereo_dibr_gl_reset_status(stereo_dibr_gl *gl);
 
+/* The bit depth of the content the next drawings handle (8 to 16): the colour textures of the passes are half float up to 10 bits and float above, so
+ * that they never hold less than the source. Default 8. */
+STEREO_DIBR_EXPORT void stereo_dibr_gl_set_precision(stereo_dibr_gl *gl, int bits);
+/* The bytes of the working textures now (what the passes hold between drawings). */
+STEREO_DIBR_EXPORT double stereo_dibr_gl_memory_used(stereo_dibr_gl *gl);
+
 /* The GPU memory the driver says is free, bytes (GL_ATI_meminfo or GL_NVX_gpu_memory_info); -1 when it does not say. */
 STEREO_DIBR_EXPORT double stereo_dibr_gl_free_memory(stereo_dibr_gl *gl);
 
