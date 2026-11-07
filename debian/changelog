@@ -7,6 +7,8 @@ stereo-layer (1.17.2-1) unstable; urgency=medium
     gains failure() and failureChanged() (and sets the area's stereoLayerFailure property), and the QML StereoPicture the stereoFailure property:
     empty, or the one message every player shows, "the compositor's stereo content declaration failed (why): the picture is shown flat, one eye,
     not in 3D". A compositor with no stereo global is a 2D desktop, not a failure.
+  * WidgetLayer drew a stereo pair that is not shown in its surface (the declaration refused, say) as the whole file, both views side by side in the
+    area, the picture flat and packed; it now draws the left view, as PictureItem does.
 
  -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sat, 07 Nov 2026 18:00:00 +0000
 

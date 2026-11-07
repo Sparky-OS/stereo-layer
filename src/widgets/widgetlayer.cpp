@@ -157,7 +157,10 @@ void WidgetLayer::paint(QPainter *painter)
         painter->fillRect(d->shown, Qt::transparent);
     } else {
         const QSize pixels = d->area->size();
-        painter->drawImage(d->area->rect(), renderMono(d->picture.original, pixels, d->zoom, d->pan));
+        // drawn flat (the surface is not shown: a screen with one eye, or a declaration the compositor did not take), a pair shows its left view, as the
+        // file's flat picture; never both views side by side
+        const QImage &flat = d->picture.isStereo() ? d->picture.left : d->picture.original;
+        painter->drawImage(d->area->rect(), renderMono(flat, pixels, d->zoom, d->pan));
     }
 }
 bool WidgetLayer::eventFilter(QObject *object, QEvent *event)
