@@ -36,6 +36,7 @@ struct PictureItem::Private {
     qreal zoom = 1;
     QPointF pan;
     bool active = false;
+    QString failure;
 };
 PictureItem::PictureItem(QQuickItem *parent)
     : QQuickItem(parent)
@@ -165,6 +166,7 @@ void PictureItem::setPan(const QPointF &pan)
     }
 }
 bool PictureItem::stereoActive() const { return d->active; }
+QString PictureItem::stereoFailure() const { return d->failure; }
 bool PictureItem::isStereo() const { return d->picture.isStereo(); }
 QSize PictureItem::pictureSize() const { return d->picture.isStereo() ? d->picture.left.size() : d->picture.original.size(); }
 bool PictureItem::approximateColor() const { return d->picture.approximateColor; }
@@ -208,6 +210,11 @@ void PictureItem::updatePolish()
         active = d->surface.show(window(), d->shown.translated(mapped.topLeft()).toAlignedRect(), d->packed);
     } else {
         d->surface.reset();
+    }
+    const QString failure = d->surface.failure();
+    if (failure != d->failure) {
+        d->failure = failure;
+        Q_EMIT stereoFailureChanged();
     }
     if (active != d->active) {
         d->active = active;

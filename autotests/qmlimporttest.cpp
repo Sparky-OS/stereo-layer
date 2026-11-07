@@ -19,6 +19,8 @@ private Q_SLOTS:
         QCOMPARE(item->property("zoom").toReal(), qreal(1));
         QCOMPARE(item->property("width").toReal(), qreal(16));
         QVERIFY(!item->property("stereoActive").toBool());
+        QVERIFY(item->property("stereoFailure").isValid());
+        QCOMPARE(item->property("stereoFailure").toString(), QString());
         QVERIFY(item->property("colorDisclaimer").toString().contains(QStringLiteral("never changed")));
     }
 };

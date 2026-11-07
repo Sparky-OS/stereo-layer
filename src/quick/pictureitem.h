@@ -22,6 +22,8 @@ class STEREO_LAYER_EXPORT PictureItem : public QQuickItem
     Q_PROPERTY(qreal zoom READ zoom WRITE setZoom NOTIFY transformChanged)
     Q_PROPERTY(QPointF pan READ pan WRITE setPan NOTIFY transformChanged)
     Q_PROPERTY(bool stereoActive READ stereoActive NOTIFY stereoActiveChanged)
+    // Empty, or why the compositor announces stereo and the picture is still shown flat (the declaration of its surface failed)
+    Q_PROPERTY(QString stereoFailure READ stereoFailure NOTIFY stereoFailureChanged)
     Q_PROPERTY(bool stereo READ isStereo NOTIFY pictureChanged)
     Q_PROPERTY(QSize pictureSize READ pictureSize NOTIFY pictureChanged)
     Q_PROPERTY(bool approximateColor READ approximateColor NOTIFY pictureChanged)
@@ -47,6 +49,7 @@ public:
     QPointF pan() const;
     void setPan(const QPointF &pan);
     bool stereoActive() const;
+    QString stereoFailure() const;
     // Whether the policy made a pair of the source, on any output; one view's size, or the picture's.
     bool isStereo() const;
     QSize pictureSize() const;
@@ -58,6 +61,7 @@ Q_SIGNALS:
     void transformChanged();
     void pictureChanged();
     void stereoActiveChanged();
+    void stereoFailureChanged();
 
 protected:
     void updatePolish() override;

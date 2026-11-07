@@ -3,6 +3,7 @@
 #include "surface_p.h"
 #include "wayland-viewporter-client-protocol.h"
 #include <QGuiApplication>
+#include <QLoggingCategory>
 #include <QPainter>
 #include <QPointer>
 #include <QThread>
@@ -14,10 +15,17 @@
 #include <unistd.h>
 #include <wayland-client.h>
 
+Q_LOGGING_CATEGORY(qLcLayer, "org.sparky.stereo.layer")
+
 namespace Stereo
 {
 namespace
 {
+// The message every player shows: what failed, and that the picture is then shown flat
+QString failureMessage(const QString &what)
+{
+    return QStringLiteral("the compositor's stereo content declaration failed (%1): the picture is shown flat, one eye, not in 3D").arg(what);
+}
 struct Globals {
     wl_compositor *compositor = nullptr;
     wl_subcompositor *subcompositor = nullptr;
@@ -148,6 +156,8 @@ struct Connection {
     wl_registry *registry = nullptr;
     Globals globals;
     bool initialized = false;
+    bool announced = false; // the compositor announces the stereo global
+    int initError = 0;
     Connection()
     {
         Q_ASSERT(QThread::currentThread() == qGuiApp->thread());
@@ -157,7 +167,9 @@ struct Connection {
         queue = wl_display_create_queue(display);
         registry = readGlobals(display, queue, globals);
         if (globals.compositor && globals.subcompositor && globals.shm && globals.viewporter && globals.stereo) {
-            initialized = stereo_declare_wayland_init(display, queue) == 0;
+            announced = true;
+            initError = -stereo_declare_wayland_init(display, queue);
+            initialized = initError == 0;
             if (initialized)
                 wl_display_roundtrip_queue(display, queue);
         }
@@ -175,6 +187,15 @@ struct Connection {
             wl_display_flush(display);
     }
     bool supported() const { return initialized && stereo_supported_wayland(); }
+    // The compositor announces the stereo global and the library still cannot declare: said, never a silent flat picture
+    QString failure() const
+    {
+        if (!announced || supported())
+            return QString();
+        if (!initialized)
+            return failureMessage(QStringLiteral("the declaration library could not start: %1").arg(QString::fromLocal8Bit(strerror(initError))));
+        return failureMessage(QStringLiteral("the library did not take the compositor's stereo global"));
+    }
 };
 std::shared_ptr<Connection> connection()
 {
@@ -197,10 +218,17 @@ struct Surface::Private {
     wp_viewport *viewport = nullptr;
     Buffer buffers[3];
     bool declared = false;
+    QString failureText;
     bool shown = false;
     QRect placed;
     bool alpha = false;
 };
+void Surface::fail(const QString &what)
+{
+    d->failureText = failureMessage(what);
+    qCWarning(qLcLayer).noquote() << d->failureText;
+}
+QString Surface::failure() const { return d->failureText; }
 Surface::Surface()
     : d(std::make_unique<Private>())
 {
@@ -241,15 +269,27 @@ bool Surface::show(QWindow *parent, const QRect &rect, const QImage &packed)
     }
     if (QGuiApplication::platformName() != QLatin1String("wayland"))
         return false;
-    auto *native = parent->nativeInterface<QNativeInterface::Private::QWaylandWindow>();
-    if (!native || !native->surface())
+    if (!d->failureText.isEmpty() && d->parent == parent)
         return false;
+    auto *native = parent->nativeInterface<QNativeInterface::Private::QWaylandWindow>();
+    if (!native || !native->surface()) {
+        d->parent = parent;
+        fail(QStringLiteral("the window has no wl_surface"));
+        return false;
+    }
     if (d->parent != parent || d->parentSurface != native->surface())
         reset();
     if (!d->surface) {
         d->connection = connection();
-        if (!d->connection->supported())
+        if (!d->connection->supported()) {
+            const QString text = d->connection->failure();
+            if (!text.isEmpty()) {
+                d->parent = parent;
+                d->failureText = text;
+                qCWarning(qLcLayer).noquote() << text;
+            }
             return false;
+        }
         d->parent = parent;
         d->parentSurface = native->surface();
         auto &globals = d->connection->globals;
@@ -300,8 +340,11 @@ bool Surface::show(QWindow *parent, const QRect &rect, const QImage &packed)
     }
     if (!d->declared) {
         const int result = stereo_declare_wayland(d->surface, STEREO_SBS_FULL, STEREO_CLASS_NONE, STEREO_SUBCLASS_UNSPECIFIED);
-        if (result < 0)
+        if (result < 0) {
+            // nothing is attached to a surface the compositor did not take as stereo content, and it is not tried again until reset()
+            fail(QString::fromLocal8Bit(strerror(-result)));
             return false;
+        }
         d->declared = true;
     }
     buffer->busy = true;

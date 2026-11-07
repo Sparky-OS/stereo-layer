@@ -1,3 +1,15 @@
+stereo-layer (1.17.2-1) unstable; urgency=medium
+
+  * A compositor that announces the stereo global and does not take the declaration of a picture's surface is said, never a silent flat picture
+    (ORDER 448b). The surface keeps the failure (the declaration
+    refused, the library not started although the global is announced, the window without a wl_surface), logs it once (category
+    org.sparky.stereo.layer), shows nothing and does not try again until the surface is let go (it asked again at every update before). WidgetLayer
+    gains failure() and failureChanged() (and sets the area's stereoLayerFailure property), and the QML StereoPicture the stereoFailure property:
+    empty, or the one message every player shows, "the compositor's stereo content declaration failed (why): the picture is shown flat, one eye,
+    not in 3D". A compositor with no stereo global is a 2D desktop, not a failure.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sat, 07 Nov 2026 18:00:00 +0000
+
 stereo-layer (1.17.1-1) unstable; urgency=medium
 
   * stereo_dibr_way_memory() counts the picture, its depth and the views at the content's depth (ORDER 411, step 2h; found in the review of

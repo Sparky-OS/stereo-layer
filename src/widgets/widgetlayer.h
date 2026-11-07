@@ -25,10 +25,14 @@ public:
     // adapter that gives each eye a whole view of its area, clear outside its stereo pictures; off by default.
     void setKeepTransparency(bool keep);
     bool isActive() const;
+    // Empty, or why the compositor announces stereo and the picture is still shown flat: the declaration of its surface failed (also logged once,
+    // category org.sparky.stereo.layer). The one message every player shows; a compositor with no stereo is no failure.
+    QString failure() const;
     bool approximateColor() const;
     void paint(QPainter *painter);
 Q_SIGNALS:
     void activeChanged();
+    void failureChanged();
 
 protected:
     bool eventFilter(QObject *object, QEvent *event) override;

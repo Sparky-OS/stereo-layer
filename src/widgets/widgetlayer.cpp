@@ -53,6 +53,7 @@ struct WidgetLayer::Private {
     qreal zoom = 1;
     QPointF pan;
     bool active = false;
+    QString failure;
     bool paintArea = true;
     bool keepTransparency = false;
     QImage packed;
@@ -143,6 +144,7 @@ void WidgetLayer::setKeepTransparency(bool keep)
     update();
 }
 bool WidgetLayer::isActive() const { return d->active; }
+QString WidgetLayer::failure() const { return d->failure; }
 bool WidgetLayer::approximateColor() const { return d->picture.approximateColor; }
 void WidgetLayer::paint(QPainter *painter)
 {
@@ -214,6 +216,14 @@ void WidgetLayer::update()
         d->surface.reset();
     } else {
         d->surface.reset();
+    }
+    // read after the surface was shown or let go: a surface that was reset (the picture hidden, another window) forgets its failure
+    const QString failure = d->surface.failure();
+    if (failure != d->failure) {
+        d->failure = failure;
+        if (d->area)
+            d->area->setProperty("stereoLayerFailure", failure);
+        Q_EMIT failureChanged();
     }
     if (active != d->active) {
         d->active = active;
