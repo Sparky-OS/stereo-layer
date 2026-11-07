@@ -37,6 +37,9 @@ public:
         } else {
             layer = new WidgetLayer(area);
             layer->setSource(file);
+            // the proof rigs whose screen the shared output reader cannot name give the layer the stereo picture itself
+            if (qEnvironmentVariableIntValue("STEREO_DEMO_FORCE_STEREO"))
+                layer->setPicture(picture);
             // what a player would tell the person (the proof of ORDER 448b reads these lines)
             connect(layer, &WidgetLayer::activeChanged, this, [this] { qInfo().noquote() << "widget: active" << layer->isActive() << "failure" << layer->failure(); });
             connect(layer, &WidgetLayer::failureChanged, this, [this] { qInfo().noquote() << "widget: active" << layer->isActive() << "failure" << layer->failure(); });
