@@ -16,6 +16,8 @@ Window {
         id: photo
         x: 40; y: 90; width: 640; height: 360
         source: root.pictureSource
+        onStereoActiveChanged: console.log("picture: stereoActive", stereoActive, "stereoFailure", stereoFailure)
+        onStereoFailureChanged: console.log("picture: stereoActive", stereoActive, "stereoFailure", stereoFailure)
         focus: true
         Keys.onPressed: event => {
             if (event.key === Qt.Key_F1) { zoom = 1; pan = Qt.point(0, 0); }

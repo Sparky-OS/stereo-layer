@@ -37,6 +37,9 @@ public:
         } else {
             layer = new WidgetLayer(area);
             layer->setSource(file);
+            // what a player would tell the person (the proof of ORDER 448b reads these lines)
+            connect(layer, &WidgetLayer::activeChanged, this, [this] { qInfo().noquote() << "widget: active" << layer->isActive() << "failure" << layer->failure(); });
+            connect(layer, &WidgetLayer::failureChanged, this, [this] { qInfo().noquote() << "widget: active" << layer->isActive() << "failure" << layer->failure(); });
             if (doubleArea) {
                 area->setGeometry(40, 90, 300, 360);
                 auto *secondArea = new QWidget(this);
