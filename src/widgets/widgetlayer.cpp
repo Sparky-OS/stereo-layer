@@ -28,8 +28,11 @@ public:
         auto *window = static_cast<QWidget *>(object);
         QRegion region = static_cast<QPaintEvent *>(event)->region();
         for (auto *widget : window->findChildren<QWidget *>()) {
-            if (widget->property("stereoLayerActive").toBool() && widget->isVisible())
-                region -= QRect(widget->mapTo(window, QPoint()), widget->size());
+            if (widget->property("stereoLayerActive").toBool() && widget->isVisible()) {
+                // the hole is where the picture shows, the rest of the area is the window's own
+                const QRect shown = widget->property("stereoLayerShown").toRect();
+                region -= (shown.isValid() ? shown : widget->rect()).translated(widget->mapTo(window, QPoint()));
+            }
         }
         QPainter painter(window);
         painter.setClipRegion(region);
@@ -58,6 +61,7 @@ struct WidgetLayer::Private {
     bool keepTransparency = false;
     QImage packed;
     QRect shown; // where the picture shows in the area, the rest of it the window's own
+    QRect announced; // shown while the layer is active, what shownRect() says and the area's property holds
     QSize pixels;
     bool dirty = true;
 };
@@ -86,6 +90,7 @@ WidgetLayer::~WidgetLayer()
 {
     if (d->area) {
         d->area->setProperty("stereoLayerActive", false);
+        d->area->setProperty("stereoLayerShown", QRect());
         d->area->window()->update();
     }
 }
@@ -144,6 +149,7 @@ void WidgetLayer::setKeepTransparency(bool keep)
     update();
 }
 bool WidgetLayer::isActive() const { return d->active; }
+QRect WidgetLayer::shownRect() const { return d->active ? d->shown : QRect(); }
 QString WidgetLayer::failure() const { return d->failure; }
 bool WidgetLayer::approximateColor() const { return d->picture.approximateColor; }
 void WidgetLayer::paint(QPainter *painter)
@@ -236,6 +242,16 @@ void WidgetLayer::update()
             d->area->window()->update();
         }
         Q_EMIT activeChanged();
+    }
+    const QRect announced = shownRect();
+    if (announced != d->announced) {
+        d->announced = announced;
+        if (d->area) {
+            d->area->setProperty("stereoLayerShown", announced);
+            d->area->update();
+            d->area->window()->update();
+        }
+        Q_EMIT shownChanged();
     }
 }
 }

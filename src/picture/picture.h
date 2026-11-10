@@ -106,9 +106,10 @@ public:
     static bool anaglyphTransform(AnaglyphColorPair pair, bool left, int weights[9], int divisors[3]);
     static Picture fromAnaglyph(const QImage &image, AnaglyphColorPair pair);
     static AnaglyphColorPair detectAnaglyph(const QImage &image);
-    // Whether the two halves of an unmarked picture are views of one scene, by its pixels, on a reduced copy
-    // (stereo_policy_picture_pair_by_content()). Shape only says a picture may be a pair: an unmarked picture is one
-    // unless this says it is.
+    // Whether the two halves of an unmarked picture look like views of one scene, by its pixels, on a reduced copy
+    // (stereo_policy_picture_pair_by_content()). For a program that wants the comparison: the decision of load(),
+    // loadPair() and fromImages() does not ask it, an unmarked picture within the shape of a pair (2:1 to 3.6:1) is a
+    // pair, as the last safety net (a pair with little or no depth is not told from two pictures by it).
     static bool pairByContent(const QImage &image);
     static QString colorDisclaimer();
     // The user's correction stored with a file whose mark has its eyes the wrong way round (stereo-policy.h,

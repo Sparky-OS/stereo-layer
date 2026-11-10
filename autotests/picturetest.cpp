@@ -20,6 +20,8 @@ private Q_SLOTS:
     void marksAndChoices();
     void mpoFallback();
     void padding();
+    void sterPadding_data();
+    void sterPadding();
     void outputPolicy();
     void viewControls();
     void detector_data();
@@ -33,7 +35,8 @@ private Q_SLOTS:
     void panorama();
     void shape_data();
     void shape();
-    void shapeAloneIsNotEnough();
+    void shapeIsEnough();
+    void unmarkedSunkTexture();
     void readerIntegration_data();
     void readerIntegration();
     void loadPair_data();
@@ -57,6 +60,7 @@ private Q_SLOTS:
     void depthReaderControls_data();
     void depthReaderControls();
 };
+static QByteArray pngChunk(const QByteArray &type, const QByteArray &data);
 // A scene of smooth texture, sums of waves, one set per seed (the same as policytest.c).
 static double scene(double x, double y, int seed)
 {
@@ -123,8 +127,8 @@ void PictureTest::marksAndChoices()
         QCOMPARE(picture.isStereo(), layout != QLatin1String("mono"));
     }
     options = {};
-    // Shape alone is not a pair: flat red and blue halves are in the shape range, and say nothing
-    QVERIFY(!Picture::fromImages(image, {}, {}, "png", {}, options, OutputMode::Stereo).isStereo());
+    // Shape alone is a pair (ORDER 504): flat red and blue halves in the shape range, with no mark, are the last safety net's pair
+    QCOMPARE(Picture::fromImages(image, {}, {}, "png", {}, options, OutputMode::Stereo).source, Picture::Source::Shape);
     const auto ratio = Picture::fromImages(picture(QSize(300, 100), Content::Pair), {}, {}, "png", {}, options, OutputMode::Stereo);
     QCOMPARE(ratio.source, Picture::Source::Shape);
     QCOMPARE(ratio.layout, Picture::Layout::SideBySide);
@@ -171,6 +175,58 @@ void PictureTest::padding()
     QCOMPARE(picture.left.pixelColor(4, 4), QColor(Qt::red));
     QCOMPARE(picture.right.pixelColor(0, 0), QColor(Qt::blue));
     QCOMPARE(picture.original, image);
+}
+// PNG Extensions 1.4.0, 3.6: "The left edge of the right subimage must be on a column that is evenly divisible by eight ... Padding columns
+// between the two subimages must be introduced by the encoder if necessary", and a decoder takes "padding := 15 - ((W - 1) mod 16);
+// if (padding > 7) then error; subimage_width := (W - padding) / 2". The padding is dropped, never shown as a line down the middle.
+void PictureTest::sterPadding_data()
+{
+    QTest::addColumn<int>("width");
+    QTest::addColumn<int>("padding");
+    QTest::newRow("none, 1920 per eye") << 3840 << 0;
+    QTest::newRow("none, 1024 per eye") << 2048 << 0;
+    QTest::newRow("7 columns, 2713 wide (1353 per eye)") << 2713 << 7;
+    QTest::newRow("6 columns, 2762 wide (1378 per eye)") << 2762 << 6;
+    QTest::newRow("1 column") << 1199 << 1;
+}
+void PictureTest::sterPadding()
+{
+    QFETCH(int, width);
+    QFETCH(int, padding);
+    const int eye = (width - padding) / 2;
+    QCOMPARE(2 * eye + padding, width);
+    QCOMPARE(15 - ((width - 1) % 16), padding);
+    QImage image(width, 12, QImage::Format_RGB32);
+    image.fill(Qt::black);
+    QPainter painter(&image);
+    painter.fillRect(0, 0, eye, 12, Qt::red);
+    painter.fillRect(eye + padding, 0, eye, 12, Qt::blue);
+    painter.end();
+    QCOMPARE((eye + padding) % 8, 0);
+    const auto picture = Picture::fromImages(image, {}, QStringLiteral("sideBySideLeftFirst"), "pns", {}, {}, OutputMode::Stereo);
+    QVERIFY(picture.isStereo());
+    QCOMPARE(picture.left.size(), QSize(eye, 12));
+    QCOMPARE(picture.right.size(), QSize(eye, 12));
+    for (const int x : { 0, eye - 1 }) {
+        QCOMPARE(picture.left.pixelColor(x, 6), QColor(Qt::red));
+        QCOMPARE(picture.right.pixelColor(x, 6), QColor(Qt::blue));
+    }
+    // loaded from a file with the chunk, as Dolphin's thumbnailer and Gwenview read it
+    QByteArray png;
+    QBuffer buffer(&png);
+    buffer.open(QIODevice::WriteOnly);
+    QVERIFY(image.save(&buffer, "PNG"));
+    png.insert(8 + 25, pngChunk("sTER", QByteArray(1, '\x01')));
+    QTemporaryDir dir;
+    QFile file(dir.filePath(QStringLiteral("pair.pns")));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(png);
+    file.close();
+    const auto loaded = Picture::loadPair(file.fileName(), QSize(width * 2, 100), {});
+    QVERIFY(loaded.isStereo());
+    QCOMPARE(loaded.left.size(), QSize(eye, 12));
+    QCOMPARE(loaded.right.pixelColor(0, 6), QColor(Qt::blue));
+    QCOMPARE(loaded.left.pixelColor(eye - 1, 6), QColor(Qt::red));
 }
 void PictureTest::outputPolicy()
 {
@@ -478,33 +534,74 @@ void PictureTest::shape()
         QCOMPARE(picture.layout, Picture::Layout::SideBySide);
     }
 }
-// The shape of a pair is not the proof of one (a phone photo is 20:9, two monitors 2:1 to 3.3:1): an unmarked picture is
-// a pair only when its halves are views of one scene. A mark or the user's choice is not asked for pixels.
-void PictureTest::shapeAloneIsNotEnough()
+// An unmarked picture within the shape of a pair (2:1 to 3.6:1) is a pair, whatever its pixels say: the last safety net for files
+// that say nothing (Daniel, 2026-10-13). Two views with little or no depth are not told from two unrelated pictures by a comparison, and
+// a comparison that said "not a pair" left a real pair flat (ORDER 504). A mark or the user's choice still comes first, and outside the
+// shape nothing makes a pair.
+void PictureTest::shapeIsEnough()
 {
-    const QList<QSize> sizes { QSize(4640 / 4, 2088 / 4), QSize(1484, 720), QSize(400, 200), QSize(2400 / 2, 1000 / 2), QSize(2710, 1000),
-        QSize(3200, 900) };
-    for (const QSize &size : sizes) {
-        for (const Content content : { Content::OneScene, Content::Unrelated, Content::Flat }) {
+    const QList<QSize> inside { QSize(4640 / 4, 2088 / 4), QSize(1484, 720), QSize(400, 200), QSize(2400 / 2, 1000 / 2), QSize(2710, 1000),
+        QSize(3200, 900), QSize(3840, 1080) };
+    for (const QSize &size : inside) {
+        for (const Content content : { Content::Pair, Content::OneScene, Content::Unrelated, Content::Flat }) {
+            const QString row = QStringLiteral("%1x%2 content %3").arg(size.width()).arg(size.height()).arg(int(content));
             const QImage image = ::picture(size, content);
-            const auto picture = Picture::fromImages(image, {}, {}, "jpg", {}, {}, OutputMode::Stereo);
-            QVERIFY2(!picture.isStereo(), qPrintable(QStringLiteral("%1x%2 content %3").arg(size.width()).arg(size.height()).arg(int(content))));
-            QCOMPARE(picture.source, Picture::Source::None);
-            QVERIFY(!picture.original.isNull());
-            // the user's choice and the file's marks still make it a pair
-            Picture::Options options;
-            options.inputLayout = Picture::Layout::SideBySide;
-            QVERIFY2(Picture::fromImages(image, {}, {}, "jpg", {}, options, OutputMode::Stereo).isStereo(),
-                qPrintable(QStringLiteral("%1x%2 content %3").arg(size.width()).arg(size.height()).arg(int(content))));
-            const auto marked = Picture::fromImages(image, {}, QStringLiteral("sideBySideLeftFirst"), "jpg", {}, {}, OutputMode::Stereo);
-            QVERIFY(marked.isStereo());
+            const auto picture = Picture::fromImages(image, {}, {}, "png", {}, {}, OutputMode::Stereo);
+            QVERIFY2(picture.isStereo(), qPrintable(row));
+            QCOMPARE(picture.source, Picture::Source::Shape);
+            QCOMPARE(picture.layout, Picture::Layout::SideBySide);
+            QCOMPARE(picture.left.size(), QSize(size.width() / 2, size.height()));
+            // the user's choice of one picture and a mark that says so come first
+            Picture::Options mono;
+            mono.view = Picture::View::Mono;
+            QVERIFY2(!Picture::fromImages(image, {}, {}, "png", {}, mono, OutputMode::Stereo).isStereo(), qPrintable(row));
+            const auto marked = Picture::fromImages(image, {}, QStringLiteral("mono"), "png", {}, {}, OutputMode::Stereo);
+            QVERIFY2(!marked.isStereo(), qPrintable(row));
             QCOMPARE(marked.source, Picture::Source::FileMark);
         }
-        QVERIFY2(Picture::fromImages(::picture(size, Content::Pair), {}, {}, "jpg", {}, {}, OutputMode::Stereo).isStereo()
-                == Picture::pairByContent(::picture(size, Content::Pair)),
-            "the twin and the decision agree");
     }
+    const QList<QSize> outside { QSize(198, 100), QSize(400, 100), QSize(3200, 800), QSize(1080, 2340), QSize(100, 200) };
+    for (const QSize &size : outside) {
+        const auto picture = Picture::fromImages(::picture(size, Content::Pair), {}, {}, "png", {}, {}, OutputMode::Stereo);
+        QVERIFY2(!picture.isStereo(), qPrintable(QStringLiteral("%1x%2").arg(size.width()).arg(size.height())));
+        QCOMPARE(picture.source, Picture::Source::None);
+    }
+    // the comparison stays for a program that wants it
+    QVERIFY(Picture::pairByContent(::picture(QSize(1200, 500), Content::Pair)));
+    QVERIFY(!Picture::pairByContent(::picture(QSize(1200, 500), Content::Unrelated)));
     QVERIFY(!Picture::pairByContent(QImage()));
+}
+// A sunk texture, as the edition's stereo texture generator draws it (a bark, 3840x1080 full side by side, here at a quarter of the size):
+// every view holds the same texture with a parallax of a few pixels and its own shading. The comparison of the halves told it from two
+// pictures at no size (it found 4 matched blocks of 48 at the size of the thumbnailer's comparison), so without a mark neither Dolphin
+// nor Gwenview showed it in 3D. The same pixels at 4:3 (one view alone) are one picture.
+void PictureTest::unmarkedSunkTexture()
+{
+    const QString path = QFINDTESTDATA(QStringLiteral("readers/unmarked-sbs-sunk-texture-960x270.png"));
+    QVERIFY(!path.isEmpty());
+    const auto pair = Picture::loadPair(path, QSize(256, 256), {});
+    QVERIFY(pair.isStereo());
+    QCOMPARE(pair.source, Picture::Source::Shape);
+    QCOMPARE(pair.layout, Picture::Layout::SideBySide);
+    QVERIFY(pair.left.size() == pair.right.size());
+    QCOMPARE(pair.left.size(), QSize(480, 270).scaled(QSize(128, 256), Qt::KeepAspectRatio));
+    const auto viewer = Picture::load(path, {}, OutputMode::Stereo);
+    QVERIFY(viewer.isStereo());
+    QCOMPARE(viewer.source, Picture::Source::Shape);
+    QCOMPARE(viewer.left.size(), QSize(480, 270));
+    QCOMPARE(viewer.right.size(), QSize(480, 270));
+    // a reader that has the file's pixels already, as Gwenview's adapter
+    QImageReader reader(path);
+    const QImage image = reader.read();
+    const auto fromReader = Picture::fromReader(reader, image, {}, "png", {}, {}, OutputMode::Stereo);
+    QVERIFY(fromReader.isStereo());
+    QCOMPARE(fromReader.source, Picture::Source::Shape);
+    // one view alone at 4:3 is one picture
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QVERIFY(image.copy(0, 0, 360, 270).save(dir.filePath(QStringLiteral("mono.png"))));
+    QVERIFY(!Picture::loadPair(dir.filePath(QStringLiteral("mono.png")), QSize(256, 256), {}).isStereo());
+    QVERIFY(!Picture::load(dir.filePath(QStringLiteral("mono.png")), {}, OutputMode::Stereo).isStereo());
 }
 void PictureTest::readerIntegration_data()
 {
@@ -612,9 +709,9 @@ void PictureTest::pairAtEverySize()
         }
         ++(viewer ? pairs : ones);
     }
-    // the range holds both answers
-    QVERIFY(pairs > 0);
-    QVERIFY(ones > 0);
+    // by its shape a picture of 2400x1080 is a pair at every share of unrelated pixels, in a thumbnail as in a viewer
+    QCOMPARE(pairs, 21);
+    QCOMPARE(ones, 0);
 }
 static QByteArray pngChunk(const QByteArray &type, const QByteArray &data)
 {
@@ -661,14 +758,13 @@ void PictureTest::loadPairPng()
         QCOMPARE(pair.left.pixelColor(64, 40), QColor(Qt::red));
         QCOMPARE(pair.right.pixelColor(64, 40), QColor(Qt::blue));
     }
-    // The same pixels without the chunk are one picture (flat red and blue halves are not views of one scene) at 3:1; a
-    // scene of two views at that shape is a pair, and at 4:1 a panorama.
+    // The same pixels without the chunk are a pair by their shape at 3:1 (the last safety net), and at 4:1 a panorama.
     QImage wide(1600, 400, QImage::Format_RGB32);
     wide.fill(Qt::gray);
     QVERIFY(wide.save(dir.filePath(QStringLiteral("panorama.png"))));
     QVERIFY(!Picture::loadPair(dir.filePath(QStringLiteral("panorama.png")), QSize(256, 256), {}).isStereo());
-    QVERIFY(image.save(dir.filePath(QStringLiteral("flat.png"))));
-    QVERIFY(!Picture::loadPair(dir.filePath(QStringLiteral("flat.png")), QSize(256, 256), {}).isStereo());
+    QVERIFY(image.save(dir.filePath(QStringLiteral("unmarked.png"))));
+    QCOMPARE(Picture::loadPair(dir.filePath(QStringLiteral("unmarked.png")), QSize(256, 256), {}).source, Picture::Source::Shape);
     QVERIFY(::picture(QSize(900, 300), Content::Pair).save(dir.filePath(QStringLiteral("shape.png"))));
     QCOMPARE(Picture::loadPair(dir.filePath(QStringLiteral("shape.png")), QSize(256, 256), {}).source, Picture::Source::Shape);
     QVERIFY(Picture().sideBySide().isNull());

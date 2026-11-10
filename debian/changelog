@@ -1,3 +1,16 @@
+stereo-layer (1.17.3-1) unstable; urgency=medium
+
+  * An unmarked picture within the shape of a pair (2:1 to 3.6:1) is a side by side pair by its shape, and the pixels are not asked: the
+    comparison of the halves (added in 1.4.1) said "not a pair" for real pairs with little depth, such as a sunk texture, so Dolphin and
+    Gwenview left an unmarked full side by side PNG flat (ORDER 504; Daniel 2026-10-13: the shape is the last safety net). Picture::pairByContent()
+    stays for a program that wants it. A picture shown flat or as a pair by its shape says why in the log (category org.sparky.stereo.picture).
+  * WidgetLayer::shownRect() and shownChanged(), and the area's property "stereoLayerShown": where the picture's surface shows. The window's hole is
+    that rectangle, no longer the whole area, so what a viewer paints around the picture is its own opaque background (Gwenview showed what lay behind
+    its window in the strips around a picture).
+  * A test for the padding columns of sTER (PNG Extensions 1.4.0, 3.6) at 0, 1, 6 and 7 columns.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Tue, 10 Nov 2026 18:00:00 +0000
+
 stereo-layer (1.17.2-1) unstable; urgency=medium
 
   * A compositor that announces the stereo global and does not take the declaration of a picture's surface is said, never a silent flat picture

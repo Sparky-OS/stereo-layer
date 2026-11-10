@@ -4,6 +4,7 @@
 #include "picture.h"
 #include <QObject>
 #include <QPointF>
+#include <QRect>
 #include <memory>
 class QWidget;
 class QPainter;
@@ -25,6 +26,10 @@ public:
     // adapter that gives each eye a whole view of its area, clear outside its stereo pictures; off by default.
     void setKeepTransparency(bool keep);
     bool isActive() const;
+    // Where the picture shows in the area, in the area's coordinates; empty while the layer is not active. The picture's
+    // surface lies below the window and this rectangle is the window's hole: what a viewer paints in the area around it
+    // is its own and opaque, never see-through. The area carries the same rectangle as its property "stereoLayerShown".
+    QRect shownRect() const;
     // Empty, or why the compositor announces stereo and the picture is still shown flat: the declaration of its surface failed (also logged once,
     // category org.sparky.stereo.layer). The one message every player shows; a compositor with no stereo is no failure.
     QString failure() const;
@@ -33,6 +38,7 @@ public:
 Q_SIGNALS:
     void activeChanged();
     void failureChanged();
+    void shownChanged();
 
 protected:
     bool eventFilter(QObject *object, QEvent *event) override;

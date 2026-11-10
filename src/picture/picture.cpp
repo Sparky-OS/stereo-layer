@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImageReader>
+#include <QLoggingCategory>
 #include <QPainter>
 #include <QXmlStreamReader>
 #include <QtEndian>
@@ -21,6 +22,7 @@
 
 namespace Stereo
 {
+Q_LOGGING_CATEGORY(qLcPicture, "org.sparky.stereo.picture")
 namespace
 {
 bool hasJpsDescriptor(const QByteArray &data)
@@ -201,29 +203,34 @@ Decision decide(const QString &fileMetadata, const QByteArray &format, const QBy
 }
 
 // A stereo photograph is two pictures next to each other: from two squares (2:1) to two 16:9 pictures (32:9, 3.56:1),
-// with a little margin. A wider picture is a panorama, and a tall one a portrait or a phone screenshot: the shape alone
-// never says top and bottom, and never says pair at all: it only says whether the pixels are worth comparing
-// (Picture::pairByContent()).
+// with a little margin. A wider picture is a panorama, and a tall one a portrait or a phone screenshot: the shape never
+// says top and bottom. Inside that band, a picture without a mark is a side-by-side pair: the last safety net for files that
+// say nothing (Daniel, 2026-10-13), and the pixels are not asked. A pair with a shallow or no depth, a sunk texture say, has
+// halves a comparison cannot tell from two unrelated ones, and a comparison that says "not a pair" leaves a real pair flat
+// (ORDER 504). Picture::pairByContent() stays for a program that wants the comparison itself.
 bool pairByShape(const QSize &size) { return stereo_policy_picture_pair_by_shape(size.width(), size.height()) == 1; }
+
+// Why an unmarked picture is shown as a pair or flat, for whoever asks the log (QT_LOGGING_RULES="org.sparky.stereo.picture=true").
+void logShape(const QSize &size, bool pair, bool panorama)
+{
+    if (!qLcPicture().isDebugEnabled() || size.height() <= 0) {
+        return;
+    }
+    const double ratio = double(size.width()) / size.height();
+    if (panorama) {
+        qCDebug(qLcPicture).noquote() << "unmarked picture" << size << "is shown flat: its XMP says an equirectangular panorama (Photo Sphere)";
+    } else if (pair) {
+        qCDebug(qLcPicture).noquote() << "unmarked picture" << size << "is a side by side pair by its shape:" << ratio << ": 1 is between 2:1 and 3.6:1";
+    } else {
+        qCDebug(qLcPicture).noquote() << "unmarked picture" << size << "is shown flat: no mark, and its shape" << ratio << ": 1 is outside 2:1 to 3.6:1";
+    }
+}
 
 // The width at which the halves of a picture are compared (Picture::pairByContent()).
 constexpr int pairSampleWidth = 384;
 
-// A file's pixels as the comparison of its halves sees them: decoded at one size, whatever size the picture is decoded
-// at for showing, so that a thumbnail, a larger preview and a viewer give the same answer. A comparison of the picture
-// decoded at the size of each preview lies on the other side of its thresholds for some pictures at some sizes.
-QImage pairSample(const QString &path, const QSize &size)
-{
-    QImageReader reader(path);
-    if (size.isValid() && size.width() > pairSampleWidth && reader.supportsOption(QImageIOHandler::ScaledSize)) {
-        reader.setScaledSize(QSize(pairSampleWidth, qMax(1, qRound(double(size.height()) * pairSampleWidth / size.width()))));
-    }
-    return reader.read();
-}
-
 Picture fromImagesComparing(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
-    const Picture::Options &options, OutputMode output, const QImage &sample, const Picture::DepthOptions &depthOptions = {},
-    const QImage &depthPicture = {});
+    const Picture::Options &options, OutputMode output, const Picture::DepthOptions &depthOptions = {}, const QImage &depthPicture = {});
 
 // A HEIF stem group may keep a separate monoscopic primary at image zero.
 // The reader names the actual stereo view image numbers without changing that primary.
@@ -329,9 +336,7 @@ Picture Picture::load(const QString &path, const Options &fileOptions, const Dep
     if (metadata == QLatin1String("depthSeparate") && depthPicture == DepthPicture::Original && imageCount >= 3 && reader.jumpToImage(2)) {
         original = reader.read();
     }
-    const bool pixels = decide(metadata, format, header, !second.isNull(), options).pixels;
-    Picture result = fromImagesComparing(
-        image, second, metadata, format, header, options, output, pixels ? pairSample(path, image.size()) : QImage(), depthOptions, original);
+    Picture result = fromImagesComparing(image, second, metadata, format, header, options, output, depthOptions, original);
     if (indexed && options.view == View::Stereo) {
         result.original = shown;
     }
@@ -362,6 +367,9 @@ Picture Picture::loadPair(
     const QSize size = reader.size();
     const Decision decision = decide(metadata, format, header, multiView, options);
     if (decision.pixels ? decision.panorama || (size.isValid() && !pairByShape(size)) : decision.packing == Layout::None) {
+        if (decision.pixels) {
+            logShape(size, false, decision.panorama);
+        }
         return {};
     }
     // A packed picture holds two views in either direction, so each image is decoded to fit twice the bound. Interleaved,
@@ -401,8 +409,7 @@ Picture Picture::loadPair(
     if (metadata == QLatin1String("depthSeparate") && depthPicture == DepthPicture::Original && imageCount >= 3 && reader.jumpToImage(2)) {
         original = read(reader.size());
     }
-    const QImage sample = decision.pixels ? pairSample(path, size) : QImage();
-    Picture result = fromImagesComparing(image, second, metadata, format, header, options, OutputMode::Unknown, sample, depthOptions, original);
+    Picture result = fromImagesComparing(image, second, metadata, format, header, options, OutputMode::Unknown, depthOptions, original);
     if (indexed && options.view == View::Stereo) {
         result.original = shown;
     }
@@ -419,10 +426,9 @@ Picture Picture::loadPair(
 
 namespace
 {
-// fromImages(), with the halves of the picture compared on sample, the file's pixels at the size of the comparison
-// (pairSample())
+// fromImages(), with the depth options
 Picture fromImagesComparing(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
-    const Picture::Options &options, OutputMode output, const QImage &sample, const Picture::DepthOptions &depthOptions, const QImage &depthPicture)
+    const Picture::Options &options, OutputMode output, const Picture::DepthOptions &depthOptions, const QImage &depthPicture)
 {
     using Layout = Picture::Layout;
     using EyeOrder = Picture::EyeOrder;
@@ -439,9 +445,12 @@ Picture fromImagesComparing(const QImage &image, const QImage &second, const QSt
         decision.anaglyph = Picture::detectAnaglyph(image);
         if (decision.anaglyph != AnaglyphColorPair::None) {
             decision.source = Source::Detection;
-        } else if (!decision.panorama && pairByShape(image.size()) && Picture::pairByContent(sample.isNull() ? image : sample)) {
+        } else if (!decision.panorama && pairByShape(image.size())) {
             decision.packing = Layout::SideBySide;
             decision.source = Source::Shape;
+            logShape(image.size(), true, false);
+        } else {
+            logShape(image.size(), false, decision.panorama);
         }
     }
     if (decision.packing == Layout::None && decision.anaglyph == AnaglyphColorPair::None) {
@@ -528,13 +537,13 @@ Picture Picture::fromReader(QImageReader &reader, const QImage &primary, const Q
 Picture Picture::fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
     const Options &options, OutputMode output)
 {
-    return fromImagesComparing(image, second, metadata, format, header, options, output, image);
+    return fromImagesComparing(image, second, metadata, format, header, options, output);
 }
 
 Picture Picture::fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
     const Options &options, const DepthOptions &depthOptions, OutputMode output)
 {
-    return fromImagesComparing(image, second, metadata, format, header, options, output, image, depthOptions);
+    return fromImagesComparing(image, second, metadata, format, header, options, output, depthOptions);
 }
 
 namespace
