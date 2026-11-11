@@ -307,7 +307,7 @@ Picture Picture::load(const QString &path, const Options &fileOptions, const Dep
     }
     const QByteArray header = file.peek(1024 * 1024);
     const QByteArray extension = QFileInfo(path).suffix().toLatin1().toLower();
-    QImageReader reader(&file, extension == "jps" || extension == "mpo" ? extension : QByteArray());
+    QImageReader reader(&file, extension == "mpo" ? extension : hasJpsDescriptor(header) ? QByteArray("jps") : extension == "jps" ? extension : QByteArray());
     QString metadata = reader.text(QStringLiteral("Stereo3DLayout"));
     const QByteArray detectedFormat = reader.format();
     const QByteArray format = extension == "jps" || extension == "mpo" || extension == "pns" ? extension : detectedFormat;
@@ -361,7 +361,7 @@ Picture Picture::loadPair(
     }
     const QByteArray header = file.peek(1024 * 1024);
     const QByteArray extension = QFileInfo(path).suffix().toLatin1().toLower();
-    QImageReader reader(&file, extension == "jps" || extension == "mpo" ? extension : QByteArray());
+    QImageReader reader(&file, extension == "mpo" ? extension : hasJpsDescriptor(header) ? QByteArray("jps") : extension == "jps" ? extension : QByteArray());
     QString metadata = reader.text(QStringLiteral("Stereo3DLayout"));
     const QByteArray format = extension == "jps" || extension == "mpo" || extension == "pns" ? extension : reader.format();
     const int imageCount = reader.imageCount();

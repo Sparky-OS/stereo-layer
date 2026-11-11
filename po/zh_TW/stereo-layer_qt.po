@@ -158,3 +158,63 @@ msgstr "%1（%2 需要的 GPU 記憶體超過可用量）"
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (needs about %2 MB of the GPU's memory, %3 MB is free)"
 msgstr "%1（需要約 %2 MB 的 GPU 記憶體，可用 %3 MB）"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The original picture could not be read completely."
+msgstr "無法完整讀取原始圖片。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "Metadata-only save requires a regular file, not a symbolic link."
+msgstr "僅儲存中繼資料需要一般檔案，不能使用符號連結。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPEG segments or scan data are truncated or invalid."
+msgstr "JPEG 區段或掃描資料已截斷或無效。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "Lossless JPEG cannot yet be verified by the picture reader; the file was kept."
+msgstr "圖片讀取器尚無法驗證無損 JPEG；檔案已保留。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The requested layout, eye order or view is invalid."
+msgstr "所要求的配置、左右眼順序或檢視無效。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references."
+msgstr "MPO 不是具有一致基準視點參照的有效完整雙視點視差圖片對。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "JPS cannot describe the chosen packing. Choose side by side, top and bottom, rows, red/cyan or mono."
+msgstr "JPS 無法描述所選配置。請選擇左右並排、上下排列、列交錯、紅／青或單視圖。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "JPS can describe only red/cyan anaglyphs."
+msgstr "JPS 只能描述紅／青色差立體圖。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPS descriptor is invalid or ambiguous; correct its fields before saving."
+msgstr "JPS 描述元無效或不明確；請在儲存前修正其欄位。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The chosen JPS packing and separation do not fit the stored pixel dimensions."
+msgstr "所選 JPS 配置與間距不符合已儲存的像素尺寸。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPEG has unindexed trailing data; metadata-only save cannot preserve its offsets safely."
+msgstr "JPEG 尾端有未索引的資料；僅儲存中繼資料無法安全保留其偏移量。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The picture could not be decoded with the chosen layout and eyes; the original was kept."
+msgstr "無法依所選配置與左右眼順序解碼圖片；原始檔案已保留。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The temporary picture could not be written, read back or replaced; the original was kept."
+msgstr "無法寫入、重新讀取或取代暫存圖片；原始檔案已保留。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The temporary picture's ownership, permissions or attributes could not be preserved."
+msgstr "無法保留暫存圖片的擁有者、權限或屬性。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The original picture changed during the save; retry with the current file."
+msgstr "原始圖片在儲存期間變更；請使用目前檔案重試。"

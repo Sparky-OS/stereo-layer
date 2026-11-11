@@ -96,6 +96,7 @@ add_test(NAME translationtest-c
 set_tests_properties(translationtest-c PROPERTIES ENVIRONMENT "LC_ALL=C")
 
 add_executable(picturesavetest picturesavetest.cpp)
-target_link_libraries(picturesavetest PRIVATE StereoLayer Qt6::Test)
+target_link_libraries(picturesavetest PRIVATE StereoLayer StereoPolicy Qt6::Test)
+target_compile_definitions(picturesavetest PRIVATE SAVE_TRANSLATIONS_DIR="${CMAKE_BINARY_DIR}/ECMPoQm")
 add_test(NAME picturesavetest COMMAND picturesavetest)
 set_tests_properties(picturesavetest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_PLUGIN_PATH=${_picture_plugin_path}")

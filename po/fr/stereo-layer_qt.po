@@ -158,3 +158,63 @@ msgstr "%1 (%2 demande plus de mémoire du GPU qu’il n’y en a de libre)"
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (needs about %2 MB of the GPU's memory, %3 MB is free)"
 msgstr "%1 (demande environ %2 Mo de mémoire du GPU, %3 Mo sont libres)"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The original picture could not be read completely."
+msgstr "L’image originale n’a pas pu être lue entièrement."
+
+msgctxt "Stereo::PictureSave|"
+msgid "Metadata-only save requires a regular file, not a symbolic link."
+msgstr "L’enregistrement des seules métadonnées nécessite un fichier ordinaire, pas un lien symbolique."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPEG segments or scan data are truncated or invalid."
+msgstr "Les segments JPEG ou les données de balayage sont tronqués ou invalides."
+
+msgctxt "Stereo::PictureSave|"
+msgid "Lossless JPEG cannot yet be verified by the picture reader; the file was kept."
+msgstr "Le lecteur d’images ne peut pas encore vérifier le JPEG sans perte ; le fichier a été conservé."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The requested layout, eye order or view is invalid."
+msgstr "La disposition, l’ordre des yeux ou la vue demandée est invalide."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references."
+msgstr "Le MPO n’est pas une paire complète et valide de deux vues de disparité avec des références concordantes au point de vue de base."
+
+msgctxt "Stereo::PictureSave|"
+msgid "JPS cannot describe the chosen packing. Choose side by side, top and bottom, rows, red/cyan or mono."
+msgstr "JPS ne peut pas décrire la disposition choisie. Choisissez côte à côte, dessus-dessous, lignes, rouge/cyan ou mono."
+
+msgctxt "Stereo::PictureSave|"
+msgid "JPS can describe only red/cyan anaglyphs."
+msgstr "JPS ne peut décrire que les anaglyphes rouge/cyan."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPS descriptor is invalid or ambiguous; correct its fields before saving."
+msgstr "Le descripteur JPS est invalide ou ambigu ; corrigez ses champs avant d’enregistrer."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The chosen JPS packing and separation do not fit the stored pixel dimensions."
+msgstr "La disposition JPS et la séparation choisies ne correspondent pas aux dimensions des pixels stockés."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPEG has unindexed trailing data; metadata-only save cannot preserve its offsets safely."
+msgstr "Le JPEG contient des données finales non indexées ; l’enregistrement des seules métadonnées ne peut pas préserver leurs décalages en toute sécurité."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The picture could not be decoded with the chosen layout and eyes; the original was kept."
+msgstr "L’image n’a pas pu être décodée avec la disposition et les yeux choisis ; l’original a été conservé."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The temporary picture could not be written, read back or replaced; the original was kept."
+msgstr "L’image temporaire n’a pas pu être écrite, relue ou remplacée ; l’original a été conservé."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The temporary picture's ownership, permissions or attributes could not be preserved."
+msgstr "Le propriétaire, les permissions ou les attributs de l’image temporaire n’ont pas pu être préservés."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The original picture changed during the save; retry with the current file."
+msgstr "L’image originale a changé pendant l’enregistrement ; réessayez avec le fichier actuel."

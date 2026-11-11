@@ -28,7 +28,9 @@ STEREO_POLICY_EXPORT uint32_t stereo_mpf_u32(const void *, size_t, size_t offset
 STEREO_POLICY_EXPORT size_t stereo_mpf_field(const void *, size_t, uint32_t ifd, uint16_t tag, uint16_t type, uint32_t count);
 STEREO_POLICY_EXPORT uint32_t stereo_mpf_next(const void *, size_t, uint32_t ifd);
 STEREO_POLICY_EXPORT int stereo_mpf_set_u32(void *, size_t, size_t offset, uint32_t value);
-struct stereo_mpf_entry { uint32_t attributes, size, offset; };
+struct stereo_mpf_entry {
+    uint32_t attributes, size, offset;
+};
 /* Two-view writer's TIFF: entries non-null => index + attributes (viewpoint 1),
  * null => secondary attributes (viewpoint 2); B204 is viewpoint 1. */
 STEREO_POLICY_EXPORT size_t stereo_mpf_encode_pair(const struct stereo_mpf_entry *entries, void *output, size_t capacity);
