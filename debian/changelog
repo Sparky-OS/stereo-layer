@@ -1,3 +1,13 @@
+stereo-layer (1.17.5-1) unstable; urgency=medium
+
+  * Add explicit metadata-only JPS/MPO correction saves: validate JPEG and
+    MPF structure, preserve compressed bytes and verify a temporary file
+    before atomic replacement. Refuse unsupported or ambiguous inputs.
+  * Share the full JPS and MPF descriptor codec in libstereo-policy, for
+    picture saves and image-format plugins. Keep SOVERSION 1; additions only.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Wed, 11 Nov 2026 22:54:00 +0000
+
 stereo-layer (1.17.4-1) unstable; urgency=medium
 
   * Honour the chosen depth assembly options for every packed depth layout,

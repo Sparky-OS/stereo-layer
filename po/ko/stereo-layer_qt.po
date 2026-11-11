@@ -158,3 +158,67 @@ msgstr "%1 (%2은(는) 남은 GPU 메모리보다 더 많이 필요함)"
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (needs about %2 MB of the GPU's memory, %3 MB is free)"
 msgstr "%1 (GPU 메모리가 약 %2MB 필요합니다. 여유 %3MB)"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The original picture could not be read completely."
+msgstr "원본 그림을 완전히 읽을 수 없습니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "Metadata-only save requires a regular file, not a symbolic link."
+msgstr "메타데이터만 저장하려면 심볼릭 링크가 아닌 일반 파일이 필요합니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPEG segments or scan data are truncated or invalid."
+msgstr "JPEG 세그먼트 또는 스캔 데이터가 잘렸거나 올바르지 않습니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "Lossless JPEG cannot yet be verified by the picture reader; the file was kept."
+msgstr "그림 판독기가 아직 무손실 JPEG를 검증할 수 없어 파일을 유지했습니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The requested layout, eye order or view is invalid."
+msgstr "요청한 배치, 눈 순서 또는 보기가 올바르지 않습니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references."
+msgstr "MPO가 동일한 기준 시점 참조를 가진 유효하고 완전한 두 시점 시차 쌍이 아닙니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "JPS cannot describe the chosen packing. Choose side by side, top and bottom, rows, red/cyan or mono."
+msgstr "JPS는 선택한 배치를 표현할 수 없습니다. 좌우, 상하, 행 교차, 빨강/청록 또는 모노를 선택하십시오."
+
+msgctxt "Stereo::PictureSave|"
+msgid "JPS can describe only red/cyan anaglyphs."
+msgstr "JPS는 빨강/청록 애너글리프만 표현할 수 있습니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPS descriptor is invalid or ambiguous; correct its fields before saving."
+msgstr "JPS 설명자가 올바르지 않거나 모호합니다. 저장하기 전에 필드를 수정하십시오."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The chosen JPS packing and separation do not fit the stored pixel dimensions."
+msgstr "선택한 JPS 배치와 간격이 저장된 픽셀 크기에 맞지 않습니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPEG has unindexed trailing data; metadata-only save cannot preserve its offsets safely."
+msgstr "JPEG 끝에 색인되지 않은 데이터가 있어 메타데이터만 저장할 때 오프셋을 안전하게 유지할 수 없습니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The picture could not be decoded with the chosen layout and eyes; the original was kept."
+msgstr "선택한 배치와 눈 순서로 그림을 디코딩할 수 없어 원본을 유지했습니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The temporary picture could not be written, read back or replaced; the original was kept."
+msgstr "임시 그림을 쓰거나 다시 읽거나 교체할 수 없어 원본을 유지했습니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The temporary picture's ownership, permissions or attributes could not be preserved."
+msgstr "임시 그림의 소유자, 권한 또는 속성을 유지할 수 없습니다."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The original picture changed during the save; retry with the current file."
+msgstr "저장하는 동안 원본 그림이 변경되었습니다. 현재 파일로 다시 시도하십시오."
+
+msgctxt "Stereo::PictureSave|"
+msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
+msgstr "MPO는 시차가 있는 보기를 따로 저장하므로 선택한 배치나 모노 보정을 표현할 수 없습니다."

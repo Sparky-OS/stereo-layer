@@ -119,6 +119,16 @@ public:
     static bool setUserSwapEyes(const QString &path, bool swap);
     static bool canStoreUserSwapEyes(const QString &path);
 
+    struct SaveResult {
+        bool success = false;
+        QString error;
+    };
+    // Only call after the person accepts Save to file. Rewrites metadata without recompression,
+    // verifies a temporary file before atomic replacement. On success clear the caller's saved
+    // packing/eye-order/swap correction; on failure keep it and show error. View::Mono writes a mono
+    // descriptor; LeftOnly/RightOnly keep both views. The legacy swap xattr is consumed on success.
+    static SaveResult saveCorrection(const QString &path, const Options &options);
+
     bool isStereo() const;
     // Both views side by side, left first, each at its own size, marked "sideBySideLeftFirst" in the image's
     // Stereo3DLayout text; a null image when this is not a pair.

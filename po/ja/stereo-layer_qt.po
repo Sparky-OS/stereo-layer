@@ -158,3 +158,67 @@ msgstr "%1（%2 には空きより多くの GPU メモリが必要です）"
 msgctxt "Stereo::DepthControls|"
 msgid "%1 (needs about %2 MB of the GPU's memory, %3 MB is free)"
 msgstr "%1（GPU メモリを約 %2 MB 必要とします。空きは %3 MB）"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The original picture could not be read completely."
+msgstr "元の画像を完全に読み取れませんでした。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "Metadata-only save requires a regular file, not a symbolic link."
+msgstr "メタデータのみの保存には通常のファイルが必要です。シンボリックリンクは使用できません。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPEG segments or scan data are truncated or invalid."
+msgstr "JPEG セグメントまたはスキャンデータが途中で切れているか、無効です。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "Lossless JPEG cannot yet be verified by the picture reader; the file was kept."
+msgstr "画像リーダーはまだ可逆 JPEG を検証できないため、ファイルを保持しました。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The requested layout, eye order or view is invalid."
+msgstr "指定された配置、左右の順序、または表示が無効です。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references."
+msgstr "MPO が、有効な基準視点参照を共有する完全な 2 視点の視差ペアではありません。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "JPS cannot describe the chosen packing. Choose side by side, top and bottom, rows, red/cyan or mono."
+msgstr "JPS は選択した配置を表現できません。左右並列、上下、行交互、赤／シアン、またはモノを選択してください。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "JPS can describe only red/cyan anaglyphs."
+msgstr "JPS は赤／シアンのアナグリフのみを表現できます。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPS descriptor is invalid or ambiguous; correct its fields before saving."
+msgstr "JPS 記述子が無効または曖昧です。保存前にフィールドを修正してください。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The chosen JPS packing and separation do not fit the stored pixel dimensions."
+msgstr "選択した JPS の配置と間隔が、保存された画像のピクセル寸法に合いません。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPEG has unindexed trailing data; metadata-only save cannot preserve its offsets safely."
+msgstr "JPEG の末尾に索引のないデータがあります。メタデータのみの保存では位置を安全に保持できません。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The picture could not be decoded with the chosen layout and eyes; the original was kept."
+msgstr "選択した配置と左右の画像でデコードできなかったため、元のファイルを保持しました。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The temporary picture could not be written, read back or replaced; the original was kept."
+msgstr "一時画像の書き込み、再読み取り、または置換ができなかったため、元のファイルを保持しました。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The temporary picture's ownership, permissions or attributes could not be preserved."
+msgstr "一時画像の所有者、アクセス権、または属性を保持できませんでした。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The original picture changed during the save; retry with the current file."
+msgstr "保存中に元の画像が変更されました。現在のファイルで再試行してください。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
+msgstr "MPO は視差のある視点を個別に保存するため、選択した配置やモノへの補正を表現できません。"

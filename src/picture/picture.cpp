@@ -33,6 +33,10 @@ bool hasJpsDescriptor(const QByteArray &data)
     qsizetype offset = 2;
     while (offset + 4 <= data.size() && uchar(data[offset]) == 0xff) {
         const uchar marker = uchar(data[offset + 1]);
+        if (marker == 0xff) {
+            ++offset;
+            continue;
+        }
         if (marker == 0xda || marker == 0xd9) {
             break;
         }
@@ -220,9 +224,11 @@ void logShape(const QSize &size, bool pair, bool panorama)
     if (panorama) {
         qCDebug(qLcPicture).noquote() << "unmarked picture" << size << "is shown flat: its XMP says an equirectangular panorama (Photo Sphere)";
     } else if (pair) {
-        qCDebug(qLcPicture).noquote() << "unmarked picture" << size << "is a side by side pair by its shape:" << ratio << ": 1 is between 2:1 and 3.6:1";
+        qCDebug(qLcPicture).noquote() << "unmarked picture" << size << "is a side by side pair by its shape:" << ratio
+                                      << ": 1 is between 2:1 and 3.6:1";
     } else {
-        qCDebug(qLcPicture).noquote() << "unmarked picture" << size << "is shown flat: no mark, and its shape" << ratio << ": 1 is outside 2:1 to 3.6:1";
+        qCDebug(qLcPicture).noquote() << "unmarked picture" << size << "is shown flat: no mark, and its shape" << ratio
+                                      << ": 1 is outside 2:1 to 3.6:1";
     }
 }
 
@@ -307,7 +313,11 @@ Picture Picture::load(const QString &path, const Options &fileOptions, const Dep
     }
     const QByteArray header = file.peek(1024 * 1024);
     const QByteArray extension = QFileInfo(path).suffix().toLatin1().toLower();
-    QImageReader reader(&file, extension == "jps" || extension == "mpo" ? extension : QByteArray());
+    QImageReader reader(&file,
+        extension == "mpo"             ? extension
+            : hasJpsDescriptor(header) ? QByteArray("jps")
+            : extension == "jps"       ? extension
+                                       : QByteArray());
     QString metadata = reader.text(QStringLiteral("Stereo3DLayout"));
     const QByteArray detectedFormat = reader.format();
     const QByteArray format = extension == "jps" || extension == "mpo" || extension == "pns" ? extension : detectedFormat;
@@ -361,7 +371,11 @@ Picture Picture::loadPair(
     }
     const QByteArray header = file.peek(1024 * 1024);
     const QByteArray extension = QFileInfo(path).suffix().toLatin1().toLower();
-    QImageReader reader(&file, extension == "jps" || extension == "mpo" ? extension : QByteArray());
+    QImageReader reader(&file,
+        extension == "mpo"             ? extension
+            : hasJpsDescriptor(header) ? QByteArray("jps")
+            : extension == "jps"       ? extension
+                                       : QByteArray());
     QString metadata = reader.text(QStringLiteral("Stereo3DLayout"));
     const QByteArray format = extension == "jps" || extension == "mpo" || extension == "pns" ? extension : reader.format();
     const int imageCount = reader.imageCount();
@@ -508,8 +522,8 @@ Picture fromImagesComparing(const QImage &image, const QImage &second, const QSt
 }
 }
 
-Picture Picture::fromReader(QImageReader &reader, const QImage &primary, const QString &metadata, const QByteArray &format,
-    const QByteArray &header, const Options &options, OutputMode output)
+Picture Picture::fromReader(QImageReader &reader, const QImage &primary, const QString &metadata, const QByteArray &format, const QByteArray &header,
+    const Options &options, OutputMode output)
 {
     QImage first = primary;
     QImage second;
@@ -635,18 +649,20 @@ Picture unpackWithDepth(const QImage &image, Picture::Layout layout, Picture::Ey
         Picture drawn;
         if (layout == Layout::DepthSideBySide && w % 2 == 0 && w >= 2) {
             const QImage first = image.copy(0, 0, w / 2, h), second = image.copy(w / 2, 0, w / 2, h);
-            drawn = order == EyeOrder::LeftFirst ? Picture::fromDepth(first, second, depthMark, depthOptions) : Picture::fromDepth(second, first, depthMark, depthOptions);
+            drawn = order == EyeOrder::LeftFirst ? Picture::fromDepth(first, second, depthMark, depthOptions)
+                                                 : Picture::fromDepth(second, first, depthMark, depthOptions);
         } else if (layout == Layout::DepthTopAndBottom && h % 2 == 0 && h >= 2) {
             const QImage first = image.copy(0, 0, w, h / 2), second = image.copy(0, h / 2, w, h / 2);
-            drawn = order == EyeOrder::LeftFirst ? Picture::fromDepth(first, second, depthMark, depthOptions) : Picture::fromDepth(second, first, depthMark, depthOptions);
+            drawn = order == EyeOrder::LeftFirst ? Picture::fromDepth(first, second, depthMark, depthOptions)
+                                                 : Picture::fromDepth(second, first, depthMark, depthOptions);
         } else if (layout == Layout::DepthGraphics && h % 4 == 0 && h >= 4) {
             const int q = h / 4;
-            drawn = Picture::fromDepth(
-                image.copy(0, 0, w, q), image.copy(0, q, w, q), depthMark, depthOptions, image.copy(0, 2 * q, w, q), image.copy(0, 3 * q, w, q), false);
+            drawn = Picture::fromDepth(image.copy(0, 0, w, q), image.copy(0, q, w, q), depthMark, depthOptions, image.copy(0, 2 * q, w, q),
+                image.copy(0, 3 * q, w, q), false);
         } else if (layout == Layout::DepthBackground && w % 2 == 0 && h % 2 == 0 && w >= 2 && h >= 2) {
             const int hw = w / 2, hh = h / 2;
-            drawn = Picture::fromDepth(
-                image.copy(0, 0, hw, hh), image.copy(hw, 0, hw, hh), depthMark, depthOptions, image.copy(0, hh, hw, hh), image.copy(hw, hh, hw, hh), true);
+            drawn = Picture::fromDepth(image.copy(0, 0, hw, hh), image.copy(hw, 0, hw, hh), depthMark, depthOptions, image.copy(0, hh, hw, hh),
+                image.copy(hw, hh, hw, hh), true);
         }
         if (drawn.isStereo()) {
             result.left = drawn.left;
@@ -665,10 +681,7 @@ Picture unpackWithDepth(const QImage &image, Picture::Layout layout, Picture::Ey
 
 }
 
-Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder order)
-{
-    return unpackWithDepth(image, layout, order, {});
-}
+Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder order) { return unpackWithDepth(image, layout, order, {}); }
 
 namespace
 {

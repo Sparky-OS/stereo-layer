@@ -1,0 +1,72 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: stereo-layer\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Qt-Contexts: true\n"
+
+msgctxt "Stereo::PictureSave|"
+msgid "The original picture could not be read completely."
+msgstr "No se pudo leer por completo la imagen original."
+
+msgctxt "Stereo::PictureSave|"
+msgid "Metadata-only save requires a regular file, not a symbolic link."
+msgstr "Guardar solo los metadatos requiere un archivo normal, no un enlace simbólico."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPEG segments or scan data are truncated or invalid."
+msgstr "Los segmentos JPEG o los datos de barrido están truncados o no son válidos."
+
+msgctxt "Stereo::PictureSave|"
+msgid "Lossless JPEG cannot yet be verified by the picture reader; the file was kept."
+msgstr "El lector de imágenes aún no puede verificar JPEG sin pérdida; se conservó el archivo."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The requested layout, eye order or view is invalid."
+msgstr "La disposición, el orden de los ojos o la vista solicitada no es válida."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references."
+msgstr "El MPO no es un par completo y válido de dos vistas de disparidad con referencias coincidentes a la vista base."
+
+msgctxt "Stereo::PictureSave|"
+msgid "JPS cannot describe the chosen packing. Choose side by side, top and bottom, rows, red/cyan or mono."
+msgstr "JPS no puede describir la disposición elegida. Elija lado a lado, arriba y abajo, filas, rojo/cian o mono."
+
+msgctxt "Stereo::PictureSave|"
+msgid "JPS can describe only red/cyan anaglyphs."
+msgstr "JPS solo puede describir anaglifos rojo/cian."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPS descriptor is invalid or ambiguous; correct its fields before saving."
+msgstr "El descriptor JPS no es válido o es ambiguo; corrija sus campos antes de guardar."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The chosen JPS packing and separation do not fit the stored pixel dimensions."
+msgstr "La disposición JPS y la separación elegidas no encajan en las dimensiones de píxeles almacenadas."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The JPEG has unindexed trailing data; metadata-only save cannot preserve its offsets safely."
+msgstr "El JPEG tiene datos finales sin índice; guardar solo los metadatos no puede preservar sus desplazamientos de forma segura."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The picture could not be decoded with the chosen layout and eyes; the original was kept."
+msgstr "No se pudo decodificar la imagen con la disposición y los ojos elegidos; se conservó el original."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The temporary picture could not be written, read back or replaced; the original was kept."
+msgstr "No se pudo escribir, releer o sustituir la imagen temporal; se conservó el original."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The temporary picture's ownership, permissions or attributes could not be preserved."
+msgstr "No se pudo preservar el propietario, los permisos o los atributos de la imagen temporal."
+
+msgctxt "Stereo::PictureSave|"
+msgid "The original picture changed during the save; retry with the current file."
+msgstr "La imagen original cambió durante el guardado; vuelva a intentarlo con el archivo actual."
+
+msgctxt "Stereo::PictureSave|"
+msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
+msgstr "MPO almacena vistas de disparidad separadas; no puede describir la disposición elegida ni una corrección monoscópica."
