@@ -94,3 +94,8 @@ set_tests_properties(translationtest-fr PROPERTIES
 add_test(NAME translationtest-c
     COMMAND translationtest "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed." "Depth strength")
 set_tests_properties(translationtest-c PROPERTIES ENVIRONMENT "LC_ALL=C")
+
+add_executable(picturesavetest picturesavetest.cpp)
+target_link_libraries(picturesavetest PRIVATE StereoLayer Qt6::Test)
+add_test(NAME picturesavetest COMMAND picturesavetest)
+set_tests_properties(picturesavetest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_PLUGIN_PATH=${_picture_plugin_path}")

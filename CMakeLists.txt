@@ -60,14 +60,14 @@ if(STEREO_AV_ONLY)
 endif()
 
 # The policy without Qt, for any program; the Qt layer builds on it
-add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-policy-site.c src/policy/stereo-policy-display.c src/policy/stereo-policy-picture.c src/policy/stereo-policy.h)
+add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-jpeg.c src/policy/stereo-policy-site.c src/policy/stereo-policy-display.c src/policy/stereo-policy-picture.c src/policy/stereo-policy.h)
 add_library(Stereo::Policy ALIAS StereoPolicy)
 set_target_properties(StereoPolicy PROPERTIES OUTPUT_NAME stereo-policy VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Policy
     C_STANDARD 11 C_VISIBILITY_PRESET hidden)
 target_link_libraries(StereoPolicy PRIVATE m)
 target_include_directories(StereoPolicy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/policy> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-policy>)
 install(TARGETS StereoPolicy EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
-install(FILES src/policy/stereo-policy.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-policy)
+install(FILES src/policy/stereo-policy.h src/policy/stereo-jpeg.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-policy)
 configure_file(src/policy/stereo-policy.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 
@@ -90,7 +90,7 @@ install(FILES ${STEREO_DIBR_GLSL} DESTINATION ${KDE_INSTALL_DATADIR}/stereo-dibr
 configure_file(src/dibr/stereo-dibr.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 
-add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/mark.cpp src/picture/anaglyph.cpp src/picture/panorama.cpp src/picture/render.cpp
+add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/picturesave.cpp src/picture/mark.cpp src/picture/anaglyph.cpp src/picture/panorama.cpp src/picture/render.cpp
     src/video/video.cpp src/video/video.h
     src/output/screenmode.cpp src/output/screenmode.h
     src/wayland/surface.cpp src/wayland/surface_p.h
