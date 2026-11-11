@@ -91,6 +91,7 @@ private Q_SLOTS:
         QTest::newRow("mpo-jpeg-extension") << QByteArray("mpo") << QStringLiteral("jpg") << false << false;
         QTest::newRow("mpo-big-endian") << QByteArray("mpo") << QStringLiteral("mpo") << true << false;
         QTest::newRow("jps-marker-fill") << QByteArray("jps") << QStringLiteral("jps") << false << true;
+        QTest::newRow("jps-all-fields") << QByteArray("jps") << QStringLiteral("jps") << false << false;
     }
     void correct()
     {
@@ -106,9 +107,16 @@ private Q_SLOTS:
             for (int x = 32; x < 64; ++x)
                 image.setPixelColor(x, y, Qt::blue);
         image.setText(QStringLiteral("Stereo3DLayout"), QStringLiteral("sideBySideLeftFirst"));
+        const bool fullFields = QByteArray(QTest::currentDataTag()) == "jps-all-fields";
+        if (fullFields) {
+            image.setText(QStringLiteral("Stereo3DJpsHalfHeight"), QStringLiteral("1"));
+            image.setText(QStringLiteral("Stereo3DJpsHalfWidth"), QStringLiteral("1"));
+            image.setText(QStringLiteral("Stereo3DJpsSeparation"), QStringLiteral("4"));
+            image.setText(QStringLiteral("Stereo3DJpsComment"), QStringLiteral("Labelled views"));
+        }
         QImageWriter writer(path, format);
         QVERIFY2(writer.write(image), qPrintable(writer.errorString()));
-        if (bigEndian || markerFill) {
+        if (bigEndian || markerFill || fullFields) {
             QFile source(path);
             QVERIFY(source.open(QIODevice::ReadOnly));
             auto bytes = source.readAll();
@@ -116,6 +124,14 @@ private Q_SLOTS:
             QList<QPair<qsizetype, bool>> fields;
             if (bigEndian)
                 QVERIFY(mpoFields(bytes, true, fields));
+            if (fullFields) {
+                const auto id = bytes.indexOf("_JPSJPS_");
+                QVERIFY(id >= 4);
+                const auto length = qFromBigEndian<quint16>(bytes.constData() + id - 2);
+                bytes.insert(id + 14, QByteArray::fromHex("1234"));
+                qToBigEndian<quint16>(6, bytes.data() + id + 8);
+                qToBigEndian<quint16>(quint16(length + 2), bytes.data() + id - 2);
+            }
             if (markerFill) {
                 const auto id = bytes.indexOf("_JPSJPS_");
                 QVERIFY(id >= 4);
