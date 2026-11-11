@@ -7,6 +7,8 @@
 #include <QDir>
 #include <QFile>
 #include <QImageReader>
+#include <QImageWriter>
+#include <QtEndian>
 #include <QPainter>
 #include <QTemporaryDir>
 #include <QTest>
@@ -56,6 +58,8 @@ private Q_SLOTS:
     void depthLayouts();
     void packedDepthOptions_data();
     void packedDepthOptions();
+    void savedJpsDescriptor_data();
+    void savedJpsDescriptor();
     void depthSeparate();
     void depthReaders();
     void heifMonoscopicFallback();
@@ -1143,6 +1147,64 @@ void PictureTest::depthLayouts()
     }
 }
 
+
+
+void PictureTest::savedJpsDescriptor_data()
+{
+    QTest::addColumn<int>("separation");
+    QTest::newRow("adjacent") << 0;
+    QTest::newRow("gap") << 2;
+}
+
+void PictureTest::savedJpsDescriptor()
+{
+    QFETCH(int, separation);
+    QImage packed(128 + separation, 64, QImage::Format_RGB32);
+    packed.fill(Qt::black);
+    {
+        QPainter p(&packed);
+        p.fillRect(0, 0, 64, 64, Qt::red);
+        p.fillRect(64 + separation, 0, 64, 64, Qt::blue);
+    }
+    packed.setText(QStringLiteral("Stereo3DLayout"), QStringLiteral("sideBySideLeftFirst"));
+    packed.setText(QStringLiteral("Stereo3DJpsSeparation"), QString::number(separation));
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("saved.jps"));
+    QImageWriter writer(path, "jps");
+    writer.setQuality(100);
+    QVERIFY(writer.write(packed));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QByteArray data = file.readAll();
+    int descriptors = 0;
+    for (qsizetype at = 2; at + 4 <= data.size();) {
+        QCOMPARE(quint8(data[at]), quint8(255));
+        const int marker = quint8(data[at + 1]);
+        const int length = qFromBigEndian<quint16>(data.constData() + at + 2);
+        QVERIFY(length >= 2 && at + 2 + length <= data.size());
+        if (marker == 0xda)
+            break;
+        if (marker == 0xe3 && data.mid(at + 4, 8) == "_JPSJPS_") {
+            ++descriptors;
+            QCOMPARE(length, 18);
+            QCOMPARE(qFromBigEndian<quint16>(data.constData() + at + 12), quint16(4));
+            QCOMPARE(qFromBigEndian<quint32>(data.constData() + at + 14), quint32(0x40201 | separation << 24));
+            QCOMPARE(qFromBigEndian<quint16>(data.constData() + at + 18), quint16(0));
+        }
+        at += 2 + length;
+    }
+    QCOMPARE(descriptors, 1);
+    QImageReader reader(path, "jps");
+    QCOMPARE(reader.text(QStringLiteral("Stereo3DLayout")), QStringLiteral("sideBySideLeftFirst"));
+    QVERIFY(!reader.read().isNull());
+    const auto readback = Picture::load(path, {}, OutputMode::Stereo);
+    QVERIFY(readback.isStereo());
+    QCOMPARE(readback.left.size(), QSize(64, 64));
+    QCOMPARE(readback.right.size(), QSize(64, 64));
+    QVERIFY(readback.left.pixelColor(16, 16).red() > 240);
+    QVERIFY(readback.right.pixelColor(16, 16).blue() > 240);
+}
 
 void PictureTest::packedDepthOptions_data()
 {
