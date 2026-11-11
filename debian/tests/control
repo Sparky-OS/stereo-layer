@@ -1,0 +1,2 @@
+Tests: cmake-consumer
+Depends: libstereo-layer-dev, cmake, g++, make

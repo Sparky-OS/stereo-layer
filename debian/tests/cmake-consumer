@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+ulimit -c 0
+cmake -S debian/tests/consumer -B "$AUTOPKGTEST_TMP/build"
+cmake --build "$AUTOPKGTEST_TMP/build" --parallel 4
+"$AUTOPKGTEST_TMP/build/consumer"
+"$AUTOPKGTEST_TMP/build/siblings"

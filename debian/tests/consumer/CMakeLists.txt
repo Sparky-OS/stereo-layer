@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.25)
+project(StereoLayerConsumer LANGUAGES CXX)
+find_package(StereoLayer REQUIRED)
+add_executable(consumer main.cpp)
+target_link_libraries(consumer PRIVATE Stereo::Layer)
+add_executable(siblings siblings.cpp)
+target_link_libraries(siblings PRIVATE Stereo::Av Stereo::Dibr Stereo::Policy)
