@@ -25,7 +25,7 @@ Package: libstereo-layer-dev
 Section: libdevel
 Architecture: any
 Build-Profiles: <!pkg.stereo-layer.av>
-Depends: libstereo-layer1 (= ${binary:Version}), libstereo-policy-dev (= ${binary:Version}), ${misc:Depends}, qt6-base-dev, qt6-declarative-dev
+Depends: libstereo-layer1 (= ${binary:Version}), libstereo-policy-dev (= ${binary:Version}), libstereo-av-dev (= ${binary:Version}), libstereo-dibr-dev (= ${binary:Version}), ${misc:Depends}, qt6-base-dev, qt6-declarative-dev
 Description: Development files for the shared stereo picture layer
  Headers and CMake targets for stereo picture policy, Qt widget presentation
  and the org.sparky.stereo QML item.

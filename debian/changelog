@@ -1,3 +1,13 @@
+stereo-layer (1.17.3-2) unstable; urgency=medium
+
+  * Require libstereo-av-dev and libstereo-dibr-dev alongside the existing
+    policy development dependency: StereoLayer's CMake export imports all
+    four targets, so installing libstereo-layer-dev must make them usable.
+  * Test installed CMake consumers with libstereo-layer-dev as their only
+    stereo development dependency, including picture and sibling API calls.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Wed, 11 Nov 2026 19:00:00 +0000
+
 stereo-layer (1.17.3-1) unstable; urgency=medium
 
   * An unmarked picture within the shape of a pair (2:1 to 3.6:1) is a side by side pair by its shape, and the pixels are not asked: the
