@@ -4,6 +4,8 @@ stereo-layer (1.17.4-1) unstable; urgency=medium
     both declared and selected by hand, including thumbnail and image APIs.
     Keep the existing public signatures and defaults.
   * Read JPS field separation from the format reader without resizing eyes.
+    Require the stereo3d6 format plugin at build and runtime so the saved
+    descriptor and reported separation are available during partial upgrades.
   * Test packed layouts against direct depth assembly and read saved JPS
     descriptors back through the format reader and shared picture engine.
 
