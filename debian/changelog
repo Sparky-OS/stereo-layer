@@ -1,3 +1,16 @@
+stereo-layer (1.17.4-1) unstable; urgency=medium
+
+  * Honour the chosen depth assembly options for every packed depth layout,
+    both declared and selected by hand, including thumbnail and image APIs.
+    Keep the existing public signatures and defaults.
+  * Read JPS field separation from the format reader without resizing eyes.
+    Require the stereo3d6 format plugin at build and runtime so the saved
+    descriptor and reported separation are available during partial upgrades.
+  * Test packed layouts against direct depth assembly and read saved JPS
+    descriptors back through the format reader and shared picture engine.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Wed, 11 Nov 2026 21:35:00 +0000
+
 stereo-layer (1.17.3-2) unstable; urgency=medium
 
   * Require libstereo-av-dev and libstereo-dibr-dev alongside the existing

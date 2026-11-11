@@ -7,6 +7,8 @@
 #include <QDir>
 #include <QFile>
 #include <QImageReader>
+#include <QImageWriter>
+#include <QtEndian>
 #include <QPainter>
 #include <QTemporaryDir>
 #include <QTest>
@@ -54,6 +56,10 @@ private Q_SLOTS:
     void storedCorrection();
     void depthLayouts_data();
     void depthLayouts();
+    void packedDepthOptions_data();
+    void packedDepthOptions();
+    void savedJpsDescriptor_data();
+    void savedJpsDescriptor();
     void depthSeparate();
     void depthReaders();
     void heifMonoscopicFallback();
@@ -1138,6 +1144,133 @@ void PictureTest::depthLayouts()
     if (mark == QLatin1String("depthBackgroundQuarters")) {
         // the disocclusion right of the square shows the background layer (blue), not the stripes extended
         QCOMPARE(views.right.pixelColor(60, y), QColor(0, 0, 255));
+    }
+}
+
+
+
+void PictureTest::savedJpsDescriptor_data()
+{
+    QTest::addColumn<int>("separation");
+    QTest::newRow("adjacent") << 0;
+    QTest::newRow("gap") << 2;
+}
+
+void PictureTest::savedJpsDescriptor()
+{
+    QFETCH(int, separation);
+    QImage packed(128 + separation, 64, QImage::Format_RGB32);
+    packed.fill(Qt::black);
+    {
+        QPainter p(&packed);
+        p.fillRect(0, 0, 64, 64, Qt::red);
+        p.fillRect(64 + separation, 0, 64, 64, Qt::blue);
+    }
+    packed.setText(QStringLiteral("Stereo3DLayout"), QStringLiteral("sideBySideLeftFirst"));
+    packed.setText(QStringLiteral("Stereo3DJpsSeparation"), QString::number(separation));
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("saved.jps"));
+    QImageWriter writer(path, "jps");
+    writer.setQuality(100);
+    QVERIFY(writer.write(packed));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QByteArray data = file.readAll();
+    int descriptors = 0;
+    for (qsizetype at = 2; at + 4 <= data.size();) {
+        QCOMPARE(quint8(data[at]), quint8(255));
+        const int marker = quint8(data[at + 1]);
+        const int length = qFromBigEndian<quint16>(data.constData() + at + 2);
+        QVERIFY(length >= 2 && at + 2 + length <= data.size());
+        if (marker == 0xda)
+            break;
+        if (marker == 0xe3 && data.mid(at + 4, 8) == "_JPSJPS_") {
+            ++descriptors;
+            QCOMPARE(length, 18);
+            QCOMPARE(qFromBigEndian<quint16>(data.constData() + at + 12), quint16(4));
+            QCOMPARE(qFromBigEndian<quint32>(data.constData() + at + 14), quint32(0x40201 | separation << 24));
+            QCOMPARE(qFromBigEndian<quint16>(data.constData() + at + 18), quint16(0));
+        }
+        at += 2 + length;
+    }
+    QCOMPARE(descriptors, 1);
+    QImageReader reader(path, "jps");
+    QCOMPARE(reader.text(QStringLiteral("Stereo3DLayout")), QStringLiteral("sideBySideLeftFirst"));
+    QVERIFY(!reader.read().isNull());
+    const auto readback = Picture::load(path, {}, OutputMode::Stereo);
+    QVERIFY(readback.isStereo());
+    QCOMPARE(readback.left.size(), QSize(64, 64));
+    QCOMPARE(readback.right.size(), QSize(64, 64));
+    QVERIFY(readback.left.pixelColor(16, 16).red() > 240);
+    QVERIFY(readback.right.pixelColor(16, 16).blue() > 240);
+}
+
+void PictureTest::packedDepthOptions_data()
+{
+    depthLayouts_data();
+}
+
+void PictureTest::packedDepthOptions()
+{
+    QFETCH(QString, mark);
+    const int w = 128, h = 32;
+    const QImage pic = stripes(w, h), depth = depthOf(w, h, 255, 32);
+    const bool side = mark.startsWith(QLatin1String("depthSideBySide"));
+    const bool top = mark.startsWith(QLatin1String("depthTopBottom"));
+    const bool reversed = mark.endsWith(QLatin1String("DepthFirst"));
+    const bool background = mark == QLatin1String("depthBackgroundQuarters");
+    QImage layer, layerDepth;
+    if (!side && !top) {
+        layer = pic;
+        layer.fill(background ? QColor(Qt::blue) : QColor(Qt::yellow));
+        layerDepth = depthOf(w, h, background ? 1 : 255, background ? 1 : 0);
+    }
+    Picture::DepthOptions chosen;
+    chosen.range = 640;
+    chosen.view = Picture::DepthOptions::View::Center;
+    chosen.fill = Picture::DepthOptions::Fill::None;
+    const auto expected = Picture::fromDepth(pic, depth, {}, chosen, layer, layerDepth, background);
+    const auto defaults = Picture::fromDepth(pic, depth, {}, {}, layer, layerDepth, background);
+    QVERIFY(expected.isStereo());
+    QVERIFY(defaults.isStereo());
+    QVERIFY(expected.left != defaults.left || expected.right != defaults.right);
+    QImage frame(side || background ? 2 * w : w, top ? 2 * h : side ? h : background ? 2 * h : 4 * h, pic.format());
+    {
+        QPainter painter(&frame);
+        painter.drawImage(0, 0, reversed ? depth : pic);
+        painter.drawImage(side || background ? w : 0, side || background ? 0 : h, reversed ? pic : depth);
+        if (!layer.isNull()) {
+            painter.drawImage(0, background ? h : 2 * h, layer);
+            painter.drawImage(background ? w : 0, background ? h : 3 * h, layerDepth);
+        }
+    }
+    Picture::Options manual;
+    manual.inputLayout = side ? Picture::Layout::DepthSideBySide : top ? Picture::Layout::DepthTopAndBottom
+        : background ? Picture::Layout::DepthBackground : Picture::Layout::DepthGraphics;
+    manual.inputOrder = reversed ? Picture::EyeOrder::RightFirst : Picture::EyeOrder::LeftFirst;
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    for (bool declared : { false, true }) {
+        const QString path = dir.filePath(declared ? QStringLiteral("marked.png") : QStringLiteral("manual.png"));
+        frame.setText(QStringLiteral("Stereo3DLayout"), declared ? mark : QString());
+        QVERIFY(frame.save(path));
+        const Picture::Options options = declared ? Picture::Options() : manual;
+        const auto loaded = Picture::load(path, options, chosen, Picture::DepthPicture::Shown, OutputMode::Stereo);
+        QVERIFY(loaded.isStereo());
+        QCOMPARE(loaded.left, expected.left);
+        QCOMPARE(loaded.right, expected.right);
+        const auto thumb = Picture::loadPair(path, QSize(2 * w, 4 * h), options, chosen, Picture::DepthPicture::Shown);
+        QCOMPARE(thumb.left, expected.left);
+        QCOMPARE(thumb.right, expected.right);
+        const auto images = Picture::fromImages(frame, {}, declared ? mark : QString(), "png", {}, options, chosen, OutputMode::Stereo);
+        QCOMPARE(images.left, expected.left);
+        QCOMPARE(images.right, expected.right);
+        auto swappedOptions = options;
+        swappedOptions.swapEyes = true;
+        const auto swapped = Picture::load(path, swappedOptions, chosen, Picture::DepthPicture::Shown, OutputMode::Stereo);
+        QCOMPARE(swapped.left, expected.right);
+        QCOMPARE(swapped.right, expected.left);
     }
 }
 

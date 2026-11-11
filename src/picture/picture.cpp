@@ -229,6 +229,8 @@ void logShape(const QSize &size, bool pair, bool panorama)
 // The width at which the halves of a picture are compared (Picture::pairByContent()).
 constexpr int pairSampleWidth = 384;
 
+Picture unpackWithDepth(const QImage &image, Picture::Layout layout, Picture::EyeOrder order, const Picture::DepthOptions &depthOptions);
+
 Picture fromImagesComparing(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
     const Picture::Options &options, OutputMode output, const Picture::DepthOptions &depthOptions = {}, const QImage &depthPicture = {});
 
@@ -489,7 +491,7 @@ Picture fromImagesComparing(const QImage &image, const QImage &second, const QSt
     } else if (source == Source::FileMark && (format == "png" || format == "pns") && packing == Layout::SideBySide) {
         result = unpackPng(image, order);
     } else {
-        result = Picture::fromPackedImage(image, packing, order);
+        result = unpackWithDepth(image, packing, order, depthOptions);
     }
     result.original = image;
     result.source = source;
@@ -590,8 +592,12 @@ QImage upconverted(const QImage &frame, Picture::Layout layout, int phase)
 }
 }
 
-Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder order)
+namespace
 {
+Picture unpackWithDepth(const QImage &image, Picture::Layout layout, Picture::EyeOrder order, const Picture::DepthOptions &depthOptions)
+{
+    using Layout = Picture::Layout;
+    using EyeOrder = Picture::EyeOrder;
     Picture result;
     result.layout = layout;
     if (layout == Layout::SideBySideQuincunx && image.width() % 2 == 0 && image.width() >= 2) {
@@ -602,14 +608,26 @@ Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder or
         || (layout == Layout::Checkerboard && image.width() >= 2)) {
         result.left = upconverted(image, layout, 0);
         result.right = upconverted(image, layout, 1);
-    } else if (layout == Layout::SideBySide && image.width() % 2 == 0 && image.width() >= 2) {
-        const int width = image.width() / 2;
-        result.left = image.copy(0, 0, width, image.height());
-        result.right = image.copy(width, 0, width, image.height());
-    } else if (layout == Layout::TopAndBottom && image.height() % 2 == 0 && image.height() >= 2) {
-        const int height = image.height() / 2;
-        result.left = image.copy(0, 0, image.width(), height);
-        result.right = image.copy(0, height, image.width(), height);
+    } else if (layout == Layout::SideBySide || layout == Layout::TopAndBottom) {
+        const QString separationText = image.text(QStringLiteral("Stereo3DJpsSeparation"));
+        bool ok = true;
+        const int separation = separationText.isEmpty() ? 0 : separationText.toInt(&ok);
+        const bool side = layout == Layout::SideBySide;
+        const int size = (side ? image.width() : image.height()) - separation;
+        if (!ok || separation < 0 || separation > 255 || size < 2 || size % 2) {
+            result.layout = Layout::None;
+            result.original = image;
+            return result;
+        }
+        if (side) {
+            const int width = size / 2;
+            result.left = image.copy(0, 0, width, image.height());
+            result.right = image.copy(width + separation, 0, width, image.height());
+        } else {
+            const int height = size / 2;
+            result.left = image.copy(0, 0, image.width(), height);
+            result.right = image.copy(0, height + separation, image.width(), height);
+        }
     } else if (layout >= Layout::DepthSideBySide && layout <= Layout::DepthBackground) {
         // a picture and its depth in one frame: the views are drawn, so the order is where the picture is
         const QString depthMark = image.text(QStringLiteral("Stereo3DDepth"));
@@ -617,18 +635,18 @@ Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder or
         Picture drawn;
         if (layout == Layout::DepthSideBySide && w % 2 == 0 && w >= 2) {
             const QImage first = image.copy(0, 0, w / 2, h), second = image.copy(w / 2, 0, w / 2, h);
-            drawn = order == EyeOrder::LeftFirst ? fromDepth(first, second, depthMark) : fromDepth(second, first, depthMark);
+            drawn = order == EyeOrder::LeftFirst ? Picture::fromDepth(first, second, depthMark, depthOptions) : Picture::fromDepth(second, first, depthMark, depthOptions);
         } else if (layout == Layout::DepthTopAndBottom && h % 2 == 0 && h >= 2) {
             const QImage first = image.copy(0, 0, w, h / 2), second = image.copy(0, h / 2, w, h / 2);
-            drawn = order == EyeOrder::LeftFirst ? fromDepth(first, second, depthMark) : fromDepth(second, first, depthMark);
+            drawn = order == EyeOrder::LeftFirst ? Picture::fromDepth(first, second, depthMark, depthOptions) : Picture::fromDepth(second, first, depthMark, depthOptions);
         } else if (layout == Layout::DepthGraphics && h % 4 == 0 && h >= 4) {
             const int q = h / 4;
-            drawn = fromDepth(
-                image.copy(0, 0, w, q), image.copy(0, q, w, q), depthMark, {}, image.copy(0, 2 * q, w, q), image.copy(0, 3 * q, w, q), false);
+            drawn = Picture::fromDepth(
+                image.copy(0, 0, w, q), image.copy(0, q, w, q), depthMark, depthOptions, image.copy(0, 2 * q, w, q), image.copy(0, 3 * q, w, q), false);
         } else if (layout == Layout::DepthBackground && w % 2 == 0 && h % 2 == 0 && w >= 2 && h >= 2) {
             const int hw = w / 2, hh = h / 2;
-            drawn = fromDepth(
-                image.copy(0, 0, hw, hh), image.copy(hw, 0, hw, hh), depthMark, {}, image.copy(0, hh, hw, hh), image.copy(hw, hh, hw, hh), true);
+            drawn = Picture::fromDepth(
+                image.copy(0, 0, hw, hh), image.copy(hw, 0, hw, hh), depthMark, depthOptions, image.copy(0, hh, hw, hh), image.copy(hw, hh, hw, hh), true);
         }
         if (drawn.isStereo()) {
             result.left = drawn.left;
@@ -643,6 +661,13 @@ Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder or
     }
     result.original = image;
     return order == EyeOrder::RightFirst ? result.swapped() : result;
+}
+
+}
+
+Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder order)
+{
+    return unpackWithDepth(image, layout, order, {});
 }
 
 namespace
