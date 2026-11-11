@@ -218,3 +218,7 @@ msgstr "無法保留暫存圖片的擁有者、權限或屬性。"
 msgctxt "Stereo::PictureSave|"
 msgid "The original picture changed during the save; retry with the current file."
 msgstr "原始圖片在儲存期間變更；請使用目前檔案重試。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
+msgstr "MPO 儲存獨立的視差檢視，無法描述所選配置或單視圖修正。"

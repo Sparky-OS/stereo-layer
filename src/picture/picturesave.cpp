@@ -21,7 +21,7 @@ using Layout = Picture::Layout;
 using Order = Picture::EyeOrder;
 QString message(const char *text) { return QCoreApplication::translate("Stereo::PictureSave", text); }
 struct Segment {
-    qsizetype begin, payload, end;
+    qsizetype begin, payload, end, prefix;
     unsigned marker;
 };
 struct Jpeg {
@@ -62,6 +62,7 @@ bool scan(const QByteArray &data, qsizetype begin, Jpeg &jpeg)
             ++pos;
         if (pos == data.size())
             return false;
+        const qsizetype markerBegin = pos - 1;
         unsigned marker = uchar(data[pos++]);
         if (marker == 0xd9) {
             jpeg.end = pos;
@@ -96,7 +97,7 @@ bool scan(const QByteArray &data, qsizetype begin, Jpeg &jpeg)
             entropy = true;
             scans = true;
         }
-        jpeg.segments.append({ start, payload, end, marker });
+        jpeg.segments.append({ markerBegin, payload, end, start, marker });
         pos = end;
     }
     return false;
@@ -278,7 +279,7 @@ QString rewriteJps(const QByteArray &original, const Jpeg &jpeg, const Picture &
     if (blocks.isEmpty()) {
         qsizetype insertion = 2;
         for (auto s : jpeg.segments) {
-            if (s.begin == insertion && (s.marker == 0xe0 || s.marker == 0xe1))
+            if (s.prefix == insertion && (s.marker == 0xe0 || s.marker == 0xe1))
                 insertion = s.end;
             else
                 break;
@@ -337,10 +338,11 @@ Picture::SaveResult Picture::saveCorrection(const QString &path, const Options &
     if (requested.view != View::Stereo && requested.view != View::LeftOnly && requested.view != View::RightOnly && requested.view != View::Mono)
         return { false, message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "The requested layout, eye order or view is invalid.")) };
     if (multi
-        && (requested.anaglyph != AnaglyphColorPair::None || (requested.inputLayout != Layout::None && requested.inputLayout != Layout::MultiView)))
+        && (requested.view == View::Mono || requested.anaglyph != AnaglyphColorPair::None
+            || (requested.inputLayout != Layout::None && requested.inputLayout != Layout::MultiView)))
         return { false,
             message(QT_TRANSLATE_NOOP(
-                "Stereo::PictureSave", "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references.")) };
+                "Stereo::PictureSave", "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction.")) };
     if (!multi && requested.view != View::Mono && requested.inputLayout != Layout::None && requested.inputLayout != Layout::SideBySide
         && requested.inputLayout != Layout::TopAndBottom && requested.inputLayout != Layout::Rows)
         return { false,
@@ -369,8 +371,8 @@ Picture::SaveResult Picture::saveCorrection(const QString &path, const Options &
     if (multi) {
         if (chosen.layout != Layout::MultiView || chosen.anaglyph != AnaglyphColorPair::None)
             return { false,
-                message(QT_TRANSLATE_NOOP(
-                    "Stereo::PictureSave", "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references.")) };
+                message(QT_TRANSLATE_NOOP("Stereo::PictureSave",
+                    "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction.")) };
         error = rewriteMpo(bytes, jpeg, chosen.eyeOrder, candidate);
     } else
         error = rewriteJps(bytes, jpeg, chosen, candidate);
@@ -400,7 +402,8 @@ Picture::SaveResult Picture::saveCorrection(const QString &path, const Options &
                 QT_TRANSLATE_NOOP("Stereo::PictureSave", "The temporary picture's ownership, permissions or attributes could not be preserved.")) };
     struct stat current {};
     if (lstat(QFile::encodeName(path).constData(), &current) || current.st_dev != source.st_dev || current.st_ino != source.st_ino
-        || current.st_mtim.tv_sec != source.st_mtim.tv_sec || current.st_mtim.tv_nsec != source.st_mtim.tv_nsec || !original.seek(0)
+        || current.st_mtim.tv_sec != source.st_mtim.tv_sec || current.st_mtim.tv_nsec != source.st_mtim.tv_nsec
+        || current.st_ctim.tv_sec != source.st_ctim.tv_sec || current.st_ctim.tv_nsec != source.st_ctim.tv_nsec || !original.seek(0)
         || original.readAll() != bytes)
         return { false,
             message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "The original picture changed during the save; retry with the current file.")) };

@@ -218,3 +218,7 @@ msgstr "一時画像の所有者、アクセス権、または属性を保持で
 msgctxt "Stereo::PictureSave|"
 msgid "The original picture changed during the save; retry with the current file."
 msgstr "保存中に元の画像が変更されました。現在のファイルで再試行してください。"
+
+msgctxt "Stereo::PictureSave|"
+msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
+msgstr "MPO は視差のある視点を個別に保存するため、選択した配置やモノへの補正を表現できません。"

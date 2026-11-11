@@ -218,3 +218,7 @@ msgstr "임시 그림의 소유자, 권한 또는 속성을 유지할 수 없습
 msgctxt "Stereo::PictureSave|"
 msgid "The original picture changed during the save; retry with the current file."
 msgstr "저장하는 동안 원본 그림이 변경되었습니다. 현재 파일로 다시 시도하십시오."
+
+msgctxt "Stereo::PictureSave|"
+msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
+msgstr "MPO는 시차가 있는 보기를 따로 저장하므로 선택한 배치나 모노 보정을 표현할 수 없습니다."

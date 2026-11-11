@@ -218,3 +218,7 @@ msgstr "Le propriétaire, les permissions ou les attributs de l’image temporai
 msgctxt "Stereo::PictureSave|"
 msgid "The original picture changed during the save; retry with the current file."
 msgstr "L’image originale a changé pendant l’enregistrement ; réessayez avec le fichier actuel."
+
+msgctxt "Stereo::PictureSave|"
+msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
+msgstr "MPO stocke des vues de disparité séparées ; il ne peut pas décrire la disposition choisie ni une correction monoscopique."

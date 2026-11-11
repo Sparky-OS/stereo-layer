@@ -66,3 +66,7 @@ msgstr "No se pudo preservar el propietario, los permisos o los atributos de la 
 msgctxt "Stereo::PictureSave|"
 msgid "The original picture changed during the save; retry with the current file."
 msgstr "La imagen original cambió durante el guardado; vuelva a intentarlo con el archivo actual."
+
+msgctxt "Stereo::PictureSave|"
+msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
+msgstr "MPO almacena vistas de disparidad separadas; no puede describir la disposición elegida ni una corrección monoscópica."

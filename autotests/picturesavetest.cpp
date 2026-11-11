@@ -3,6 +3,7 @@
 #include "picture.h"
 #include "stereo-jpeg.h"
 #include <QBuffer>
+#include <QDataStream>
 #include <QDir>
 #include <QFile>
 #include <QImageReader>
@@ -83,17 +84,20 @@ private Q_SLOTS:
         QTest::addColumn<QByteArray>("format");
         QTest::addColumn<QString>("suffix");
         QTest::addColumn<bool>("bigEndian");
-        QTest::newRow("jps") << QByteArray("jps") << QStringLiteral("jps") << false;
-        QTest::newRow("jpeg-extension") << QByteArray("jps") << QStringLiteral("jpg") << false;
-        QTest::newRow("mpo") << QByteArray("mpo") << QStringLiteral("mpo") << false;
-        QTest::newRow("mpo-jpeg-extension") << QByteArray("mpo") << QStringLiteral("jpg") << false;
-        QTest::newRow("mpo-big-endian") << QByteArray("mpo") << QStringLiteral("mpo") << true;
+        QTest::addColumn<bool>("markerFill");
+        QTest::newRow("jps") << QByteArray("jps") << QStringLiteral("jps") << false << false;
+        QTest::newRow("jpeg-extension") << QByteArray("jps") << QStringLiteral("jpg") << false << false;
+        QTest::newRow("mpo") << QByteArray("mpo") << QStringLiteral("mpo") << false << false;
+        QTest::newRow("mpo-jpeg-extension") << QByteArray("mpo") << QStringLiteral("jpg") << false << false;
+        QTest::newRow("mpo-big-endian") << QByteArray("mpo") << QStringLiteral("mpo") << true << false;
+        QTest::newRow("jps-marker-fill") << QByteArray("jps") << QStringLiteral("jps") << false << true;
     }
     void correct()
     {
         QFETCH(QByteArray, format);
         QFETCH(QString, suffix);
         QFETCH(bool, bigEndian);
+        QFETCH(bool, markerFill);
         QTemporaryDir dir;
         QString path = dir.filePath(QStringLiteral("picture.") + suffix);
         QImage image(64, 24, QImage::Format_RGB888);
@@ -104,13 +108,19 @@ private Q_SLOTS:
         image.setText(QStringLiteral("Stereo3DLayout"), QStringLiteral("sideBySideLeftFirst"));
         QImageWriter writer(path, format);
         QVERIFY2(writer.write(image), qPrintable(writer.errorString()));
-        if (bigEndian) {
+        if (bigEndian || markerFill) {
             QFile source(path);
             QVERIFY(source.open(QIODevice::ReadOnly));
             auto bytes = source.readAll();
             source.close();
             QList<QPair<qsizetype, bool>> fields;
-            QVERIFY(mpoFields(bytes, true, fields));
+            if (bigEndian)
+                QVERIFY(mpoFields(bytes, true, fields));
+            if (markerFill) {
+                const auto id = bytes.indexOf("_JPSJPS_");
+                QVERIFY(id >= 4);
+                bytes.insert(id - 4, QByteArray::fromHex("ffff"));
+            }
             QVERIFY(source.open(QIODevice::WriteOnly | QIODevice::Truncate));
             QCOMPARE(source.write(bytes), bytes.size());
             source.close();
@@ -169,6 +179,12 @@ private Q_SLOTS:
         QVERIFY(Picture::saveCorrection(path, options).success);
         QVERIFY(original.open(QIODevice::ReadOnly));
         QCOMPARE(original.readAll(), changed);
+        original.close();
+        options = {};
+        options.swapEyes = true;
+        QVERIFY(Picture::saveCorrection(path, options).success);
+        QVERIFY(original.open(QIODevice::ReadOnly));
+        QCOMPARE(original.readAll(), bytes); // Relative swap is an involution, including B204 references.
     }
     void layouts_data()
     {
@@ -340,13 +356,21 @@ private Q_SLOTS:
             const auto base = bytes.indexOf(QByteArray("MPF\0", 4)) + 4;
             QVERIFY(base > 4);
             // The fixture's little-endian TIFF offsets are independently specified by its index directory.
-            const auto ifd = qFromLittleEndian<quint32>(bytes.constData() + base + 4);
+            QDataStream fields(bytes);
+            fields.setByteOrder(QDataStream::LittleEndian);
+            QCOMPARE(fields.skipRawData(base + 4), base + 4);
+            quint32 ifd = 0;
+            fields >> ifd;
+            QCOMPARE(fields.status(), QDataStream::Ok);
             auto put = [&](qsizetype offset, quint32 value) { qToLittleEndian<quint32>(value, bytes.data() + base + offset); };
             if (damage == 2)
                 put(ifd + 2 + 12 * 3, ifd); // cyclic next-IFD
             if (damage == 3)
                 put(ifd + 2 + 24 + 8, 0xfffffff0); // MPEntry array outside APP2
-            const auto entry = qFromLittleEndian<quint32>(bytes.constData() + base + ifd + 2 + 24 + 8);
+            QVERIFY(fields.device()->seek(base + ifd + 2 + 24 + 8));
+            quint32 entry = 0;
+            fields >> entry;
+            QCOMPARE(fields.status(), QDataStream::Ok);
             if (damage == 4)
                 put(entry + 24, 1); // overlap / wrong second SOI
             if (damage == 5)
