@@ -128,99 +128,37 @@ bool equalPixels(const QImage &a, const QImage &b)
 {
     return !a.isNull() && !b.isNull() && a.convertToFormat(QImage::Format_RGBA8888) == b.convertToFormat(QImage::Format_RGBA8888);
 }
-struct Mpf {
-    QByteArray tiff;
-    qsizetype base = 0;
-    size_t ordinal = 0;
-};
-bool mpf(const QByteArray &data, const Jpeg &jpeg, Mpf &out)
+QString rewrite(const QByteArray &original, int layout, Order order, QByteArray &candidate)
 {
-    const auto blocks = segments(data, jpeg, 0xe2, QByteArray("MPF\0", 4));
-    if (blocks.size() != 1)
-        return false;
-    out.base = blocks[0].payload + 4;
-    out.tiff = data.mid(out.base, blocks[0].end - out.base);
-    return stereo_mpf_valid(out.tiff.constData(), size_t(out.tiff.size()));
-}
-uint32_t value(const Mpf &m, size_t offset) { return stereo_mpf_u32(m.tiff.constData(), size_t(m.tiff.size()), offset); }
-size_t field(const Mpf &m, uint32_t ifd, uint16_t tag, uint16_t type, uint32_t count)
-{
-    return stereo_mpf_field(m.tiff.constData(), size_t(m.tiff.size()), ifd, tag, type, count);
-}
-size_t attribute(const Mpf &m, uint16_t tag)
-{
-    uint32_t ifd = value(m, 4);
-    size_t found = 0;
-    while (ifd) {
-        const size_t pos = field(m, ifd, tag, 4, 1);
-        if (pos) {
-            if (found)
-                return 0;
-            found = pos;
-        }
-        ifd = stereo_mpf_next(m.tiff.constData(), size_t(m.tiff.size()), ifd);
+    candidate.resize(original.size() + 65537);
+    size_t size = 0;
+    const int result = stereo_jpeg_correct(
+        original.constData(), size_t(original.size()), layout, order == Order::RightFirst, candidate.data(), size_t(candidate.size()), &size);
+    if (result == STEREO_JPEG_OK) {
+        candidate.resize(qsizetype(size));
+        return {};
     }
-    return found;
-}
-QString rewriteMpo(const QByteArray &original, const Jpeg &first, Order order, QByteArray &candidate)
-{
-    Mpf a, b;
-    if (!mpf(original, first, a))
-        return message(QT_TRANSLATE_NOOP(
-            "Stereo::PictureSave", "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references."));
-    const uint32_t ifd = value(a, 4);
-    const auto number = field(a, ifd, 0xb001, 4, 1), table = field(a, ifd, 0xb002, 7, 32);
-    const auto version = field(a, ifd, 0xb000, 7, 4);
-    if (!version || a.tiff.mid(qsizetype(version), 4) != "0100" || !number || value(a, number) != 2 || !table)
-        return message(QT_TRANSLATE_NOOP(
-            "Stereo::PictureSave", "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references."));
-    const uint32_t entries = value(a, table);
-    if (entries > uint32_t(a.tiff.size()) || uint32_t(a.tiff.size()) - entries < 32)
-        return message(QT_TRANSLATE_NOOP(
-            "Stereo::PictureSave", "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references."));
-    const uint32_t firstSize = value(a, entries + 4), secondSize = value(a, entries + 20), secondOffset = value(a, entries + 24);
-    const qint64 secondStart = qint64(a.base) + secondOffset;
-    if ((value(a, entries) & 0x07ffffff) != 0x020002 || (value(a, entries + 16) & 0x07ffffff) != 0x020002 || value(a, entries + 8) != 0
-        || firstSize != first.end || secondStart < first.end || secondStart > original.size() || secondSize > original.size() - secondStart)
-        return message(QT_TRANSLATE_NOOP(
-            "Stereo::PictureSave", "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references."));
-    Jpeg second;
-    if (!scan(original, qsizetype(secondStart), second) || second.end != secondStart + secondSize || second.end != original.size()
-        || !mpf(original, second, b) || field(b, value(b, 4), 0xb001, 4, 1))
-        return message(QT_TRANSLATE_NOOP(
-            "Stereo::PictureSave", "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references."));
-    if (second.lossless)
+    candidate.clear();
+    switch (result) {
+    case STEREO_JPEG_LOSSLESS:
         return message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "Lossless JPEG cannot yet be verified by the picture reader; the file was kept."));
-    a.ordinal = attribute(a, 0xb101);
-    b.ordinal = attribute(b, 0xb101);
-    const uint32_t av = value(a, a.ordinal), bv = value(b, b.ordinal);
-    const auto abase = attribute(a, 0xb204), bbase = attribute(b, 0xb204);
-    if (!a.ordinal || !b.ordinal || !abase || !bbase || value(a, abase) != value(b, bbase) || (value(a, abase) != 1 && value(a, abase) != 2)
-        || !((av == 1 && bv == 2) || (av == 2 && bv == 1)))
+    case STEREO_JPEG_MPO:
         return message(QT_TRANSLATE_NOOP(
             "Stereo::PictureSave", "The MPO is not a valid complete two-view disparity pair with matching base-viewpoint references."));
-    // CIPA 5.2.4.5: B204 refers to a viewpoint number. Renumber its reference
-    // with B101, retaining the same physical base camera and all calibration data.
-    const uint32_t wanted = order == Order::LeftFirst ? 1 : 2;
-    if (av != wanted) {
-        stereo_mpf_set_u32(a.tiff.data(), size_t(a.tiff.size()), abase, 3 - value(a, abase));
-        stereo_mpf_set_u32(b.tiff.data(), size_t(b.tiff.size()), bbase, 3 - value(b, bbase));
-    }
-    stereo_mpf_set_u32(a.tiff.data(), size_t(a.tiff.size()), a.ordinal, wanted);
-    stereo_mpf_set_u32(b.tiff.data(), size_t(b.tiff.size()), b.ordinal, 3 - wanted);
-    candidate = original;
-    candidate.replace(a.base + qsizetype(a.ordinal), 4, a.tiff.mid(qsizetype(a.ordinal), 4));
-    candidate.replace(b.base + qsizetype(b.ordinal), 4, b.tiff.mid(qsizetype(b.ordinal), 4));
-    candidate.replace(a.base + qsizetype(abase), 4, a.tiff.mid(qsizetype(abase), 4));
-    candidate.replace(b.base + qsizetype(bbase), 4, b.tiff.mid(qsizetype(bbase), 4));
-    return {};
-}
-QString rewriteJps(const QByteArray &original, const Jpeg &jpeg, const Picture &chosen, QByteArray &candidate)
-{
-    if (jpeg.end != original.size())
+    case STEREO_JPEG_DESCRIPTOR:
+        return message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "The JPS descriptor is invalid or ambiguous; correct its fields before saving."));
+    case STEREO_JPEG_GEOMETRY:
+        return message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "The chosen JPS packing and separation do not fit the stored pixel dimensions."));
+    case STEREO_JPEG_TRAILING:
         return message(
             QT_TRANSLATE_NOOP("Stereo::PictureSave", "The JPEG has unindexed trailing data; metadata-only save cannot preserve its offsets safely."));
-    unsigned layout = 0;
+    default:
+        return message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "The JPEG segments or scan data are truncated or invalid."));
+    }
+}
+QString rewriteJps(const QByteArray &original, const Picture &chosen, QByteArray &candidate)
+{
+    int layout = 0;
     switch (chosen.layout) {
     case Layout::None:
         break;
@@ -242,52 +180,7 @@ QString rewriteJps(const QByteArray &original, const Jpeg &jpeg, const Picture &
             return message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "JPS can describe only red/cyan anaglyphs."));
         layout = 4;
     }
-    const auto blocks = segments(original, jpeg, 0xe3, QByteArray("_JPSJPS_", 8));
-    if (blocks.size() > 1)
-        return message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "The JPS descriptor is invalid or ambiguous; correct its fields before saving."));
-    stereo_jps_descriptor descriptor {};
-    QByteArray old;
-    if (!blocks.isEmpty()) {
-        const auto segment = blocks[0];
-        old = original.mid(segment.payload, segment.end - segment.payload);
-        if (!stereo_jps_decode(old.constData(), size_t(old.size()), &descriptor))
-            return message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "The JPS descriptor is invalid or ambiguous; correct its fields before saving."));
-    }
-    const uint32_t half = descriptor.value & 0x30000u;
-    const uint32_t separation = (layout == 2 || layout == 3) ? descriptor.value & 0xff000000u : 0;
-    const uint32_t display = !layout && !(descriptor.value & 255u) ? descriptor.value & 0xff00u : 0;
-    descriptor.value = half | separation | display | (layout ? 1u | (layout << 8) | (chosen.eyeOrder == Order::LeftFirst ? 0x40000u : 0) : 0);
-    unsigned gap = descriptor.value >> 24;
-    if ((layout == 2 && (jpeg.width - int(gap) < 2 || (jpeg.width - int(gap)) % 2))
-        || (layout == 3 && (jpeg.height - int(gap) < 2 || (jpeg.height - int(gap)) % 2)) || (layout == 1 && jpeg.height % 2))
-        return message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "The chosen JPS packing and separation do not fit the stored pixel dimensions."));
-    QByteArray payload(65533, Qt::Uninitialized);
-    const size_t length = stereo_jps_encode(&descriptor, payload.data(), size_t(payload.size()));
-    if (!length)
-        return message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "The JPS descriptor is invalid or ambiguous; correct its fields before saving."));
-    payload.resize(qsizetype(length));
-    // Keep a legacy descriptor byte-for-byte when the chosen fields already match (including its trailing NUL).
-    stereo_jps_descriptor previous {};
-    if (!old.isEmpty() && stereo_jps_decode(old.constData(), size_t(old.size()), &previous) && previous.value == descriptor.value) {
-        candidate = original;
-        return {};
-    }
-    QByteArray segment = QByteArray::fromHex("ffe30000");
-    qToBigEndian<quint16>(quint16(payload.size() + 2), segment.data() + 2);
-    segment += payload;
-    candidate = original;
-    if (blocks.isEmpty()) {
-        qsizetype insertion = 2;
-        for (auto s : jpeg.segments) {
-            if (s.prefix == insertion && (s.marker == 0xe0 || s.marker == 0xe1))
-                insertion = s.end;
-            else
-                break;
-        }
-        candidate.insert(insertion, segment);
-    } else
-        candidate.replace(blocks[0].begin, blocks[0].end - blocks[0].begin, segment);
-    return {};
+    return rewrite(original, layout, chosen.eyeOrder, candidate);
 }
 // Preserve filesystem metadata, including ACLs; the legacy swap xattr is consumed by this save.
 // Failure to preserve an attribute aborts before replacement rather than discarding it.
@@ -373,9 +266,9 @@ Picture::SaveResult Picture::saveCorrection(const QString &path, const Options &
             return { false,
                 message(QT_TRANSLATE_NOOP("Stereo::PictureSave",
                     "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction.")) };
-        error = rewriteMpo(bytes, jpeg, chosen.eyeOrder, candidate);
+        error = rewrite(bytes, 5, chosen.eyeOrder, candidate);
     } else
-        error = rewriteJps(bytes, jpeg, chosen, candidate);
+        error = rewriteJps(bytes, chosen, candidate);
     if (!error.isEmpty())
         return { false, error };
     Jpeg verified;

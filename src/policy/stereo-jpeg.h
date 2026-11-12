@@ -34,6 +34,32 @@ struct stereo_mpf_entry {
 /* Two-view writer's TIFF: entries non-null => index + attributes (viewpoint 1),
  * null => secondary attributes (viewpoint 2); B204 is viewpoint 1. */
 STEREO_POLICY_EXPORT size_t stereo_mpf_encode_pair(const struct stereo_mpf_entry *entries, void *output, size_t capacity);
+/* Existing-file metadata correction, without Qt or an image encoder.
+ * Layout: -1 unmarked (inspect only), 0 mono, 1 rows, 2 side by side,
+ * 3 top/bottom, 4 red/cyan, 5 indexed disparity MPO. right_first is 0 or 1.
+ * JPEG scan bytes, marker fill and unrelated metadata are preserved.
+ * Buffers must not overlap. On refusal output is untouched.
+ * Capacity size + 65537 suffices; output_size is written only on success.
+ * The caller must verify decoded eyes and perform a temporary-file transaction. */
+enum stereo_jpeg_result {
+    STEREO_JPEG_OK = 0,
+    STEREO_JPEG_INVALID = 1,
+    STEREO_JPEG_LOSSLESS = 2,
+    STEREO_JPEG_DESCRIPTOR = 3,
+    STEREO_JPEG_GEOMETRY = 4,
+    STEREO_JPEG_MPO = 5,
+    STEREO_JPEG_TRAILING = 6,
+    STEREO_JPEG_CAPACITY = 7,
+    STEREO_JPEG_LAYOUT = 8
+};
+struct stereo_jpeg_info {
+    unsigned width, height;
+    int layout, right_first, lossless;
+    uint32_t descriptor;
+    size_t image_count, image_offset[2], image_size[2];
+};
+STEREO_POLICY_EXPORT int stereo_jpeg_inspect(const void *, size_t, struct stereo_jpeg_info *);
+STEREO_POLICY_EXPORT int stereo_jpeg_correct(const void *, size_t, int layout, int right_first, void *output, size_t capacity, size_t *output_size);
 #ifdef __cplusplus
 }
 #endif
