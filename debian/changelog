@@ -1,3 +1,15 @@
+stereo-layer (1.17.6-1) unstable; urgency=medium
+
+  * Expose Qt-free existing-file JPEG/JPS/MPO inspection and correction
+    in libstereo-policy, and use it from the Qt picture save as well.
+    Preserve marker fill, descriptor fields and both MPO viewpoint and
+    base-viewpoint numbers. Keep opaque JPEG trailers and legacy padding
+    without changing any unrelated bytes; refuse unindexed extra images.
+  * Add complete-byte independent correction fixtures and C API tests.
+    Keep both SONAMEs and all existing exports; additions only.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 12 Nov 2026 00:38:18 +0000
+
 stereo-layer (1.17.5-1) unstable; urgency=medium
 
   * Add explicit metadata-only JPS/MPO correction saves: validate JPEG and

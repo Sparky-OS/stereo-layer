@@ -96,6 +96,10 @@ add_test(NAME translationtest-c
 set_tests_properties(translationtest-c PROPERTIES ENVIRONMENT "LC_ALL=C")
 
 add_executable(picturesavetest picturesavetest.cpp)
+add_executable(jpegcorrecttest jpegcorrecttest.c)
+target_link_libraries(jpegcorrecttest PRIVATE StereoPolicy)
+target_compile_definitions(jpegcorrecttest PRIVATE CORRECTION_DATA="${CMAKE_CURRENT_SOURCE_DIR}/corrections")
+add_test(NAME jpegcorrecttest COMMAND jpegcorrecttest)
 target_link_libraries(picturesavetest PRIVATE StereoLayer StereoPolicy Qt6::Test)
 target_compile_definitions(picturesavetest PRIVATE SAVE_TRANSLATIONS_DIR="${CMAKE_BINARY_DIR}/ECMPoQm")
 add_test(NAME picturesavetest COMMAND picturesavetest)

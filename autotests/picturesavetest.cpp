@@ -358,7 +358,7 @@ private Q_SLOTS:
             if (damage == 5)
                 bytes[id + 11] = char(0x84); // reserved flag
             if (damage == 6)
-                bytes.append("unindexed auxiliary");
+                bytes.append(bytes); // An additional JPEG needs an MPF index, not an opaque trailer.
             if (damage == 7)
                 options.inputLayout = Picture::Layout::Columns;
             if (damage == 8)
