@@ -5,8 +5,13 @@
  * correction, full or half views and the shape rules, checked against what RFC 9559, Table D-8 and the edition say
  * (H.264 V15, 08/2024 numbers that table D-8; V16, 06/2026 D-9). */
 
+#define _DEFAULT_SOURCE
+#define _POSIX_C_SOURCE 200809L
 #include "stereo-policy.h"
 
+#include <unistd.h>
+#include <sys/stat.h>
+#include <errno.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -356,6 +361,91 @@ static void fileCorrection(void)
 }
 
 
+/* The per-file choice lives in the programs' state, never in the file: kept, read back as by another process, replaced,
+ * forgotten; the file's bytes, attributes and times are as they were; a store that cannot be written says so. */
+static void fileChoiceStore(void)
+{
+    char state[] = "policytest-state-XXXXXX";
+    char absolute[4096], entry[4096], other[4096], cwd[2048];
+    const char *path = "policytest-choice.tmp";
+    struct stat before, after;
+    struct stereo_policy_file_choice choice = { 0, 0, 0, 0, 0 }, read;
+    CHECK(mkdtemp(state) != NULL);
+    CHECK(getcwd(cwd, sizeof(cwd)) != NULL);
+    snprintf(absolute, sizeof(absolute), "%s/%s", cwd, state);
+    setenv("XDG_STATE_HOME", absolute, 1);
+    FILE *file = fopen(path, "w");
+    CHECK(file != NULL);
+    if (!file)
+        return;
+    fputs("a wide screenshot", file);
+    fclose(file);
+    CHECK(stat(path, &before) == 0);
+    CHECK(stereo_policy_file_choice(path, &read) == 0);
+    CHECK(read.layout == 0 && read.view == 0 && read.swap_eyes == 0);
+    /* Not 3D */
+    choice.view = STEREO_POLICY_VIEW_MONO;
+    CHECK(stereo_policy_set_file_choice(path, &choice) == 0);
+    CHECK(stereo_policy_file_choice(path, &read) == 1);
+    CHECK(read.view == STEREO_POLICY_VIEW_MONO && read.layout == STEREO_POLICY_LAYOUT_NONE && read.swap_eyes == 0);
+    /* the same file by another spelling of its path is the same entry */
+    snprintf(other, sizeof(other), "%s/./%s", cwd, path);
+    CHECK(stereo_policy_file_choice(other, &read) == 1 && read.view == STEREO_POLICY_VIEW_MONO);
+    /* the entry is under the state folder, and another file has none */
+    CHECK(stereo_policy_file_choice_entry(path, entry, sizeof(entry)) == 0);
+    CHECK(strncmp(entry, absolute, strlen(absolute)) == 0);
+    CHECK(access(entry, R_OK) == 0);
+    CHECK(stereo_policy_file_choice("policytest-other.tmp", &read) == 0);
+    /* every field, replaced as a whole */
+    choice.view = STEREO_POLICY_VIEW_STEREO;
+    choice.layout = STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM;
+    choice.order = STEREO_POLICY_RIGHT_FIRST;
+    choice.swap_eyes = 1;
+    CHECK(stereo_policy_set_file_choice(path, &choice) == 0);
+    CHECK(stereo_policy_file_choice(path, &read) == 1);
+    CHECK(read.layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM && read.order == STEREO_POLICY_RIGHT_FIRST && read.view == 0 && read.swap_eyes == 1
+        && read.anaglyph == 0);
+    for (int layout = STEREO_POLICY_LAYOUT_SIDE_BY_SIDE; layout <= STEREO_POLICY_LAYOUT_DEPTH_SEPARATE; ++layout) {
+        choice.layout = layout;
+        CHECK(stereo_policy_set_file_choice(path, &choice) == 0);
+        CHECK(stereo_policy_file_choice(path, &read) == 1 && read.layout == layout);
+    }
+    choice.layout = 0;
+    choice.swap_eyes = 0;
+    choice.anaglyph = STEREO_POLICY_ANAGLYPH_AMBER_BLUE;
+    CHECK(stereo_policy_set_file_choice(path, &choice) == 0);
+    CHECK(stereo_policy_file_choice(path, &read) == 1 && read.anaglyph == STEREO_POLICY_ANAGLYPH_AMBER_BLUE);
+    /* a value outside the lists is refused and the entry stays */
+    choice.layout = 99;
+    errno = 0;
+    CHECK(stereo_policy_set_file_choice(path, &choice) == -1 && errno == EINVAL);
+    CHECK(stereo_policy_file_choice(path, &read) == 1 && read.anaglyph == STEREO_POLICY_ANAGLYPH_AMBER_BLUE);
+    /* the file itself was never touched: size, times (the change time moves with any attribute) and attributes */
+    CHECK(stat(path, &after) == 0);
+    CHECK(before.st_size == after.st_size && before.st_mtim.tv_sec == after.st_mtim.tv_sec && before.st_mtim.tv_nsec == after.st_mtim.tv_nsec
+        && before.st_ctim.tv_sec == after.st_ctim.tv_sec && before.st_ctim.tv_nsec == after.st_ctim.tv_nsec);
+    CHECK(stereo_policy_file_swap_eyes(path) <= 0);
+    /* the default choice forgets the file, twice without an error */
+    CHECK(stereo_policy_set_file_choice(path, NULL) == 0);
+    CHECK(stereo_policy_file_choice(path, &read) == 0);
+    CHECK(access(entry, F_OK) != 0);
+    CHECK(stereo_policy_set_file_choice(path, NULL) == 0);
+    /* a store that cannot be written: the state folder is a file */
+    snprintf(other, sizeof(other), "%s/%s", cwd, path);
+    setenv("XDG_STATE_HOME", other, 1);
+    choice.layout = STEREO_POLICY_LAYOUT_SIDE_BY_SIDE;
+    choice.anaglyph = 0;
+    errno = 0;
+    CHECK(stereo_policy_set_file_choice(path, &choice) == -1 && errno == ENOTDIR);
+    CHECK(stereo_policy_file_choice(path, &read) == 0);
+    CHECK(stereo_policy_file_choice(NULL, &read) == -1);
+    CHECK(stereo_policy_file_choice("line\nbreak", &read) == -1);
+    unsetenv("XDG_STATE_HOME");
+    remove(path);
+    snprintf(other, sizeof(other), "rm -rf '%s'", absolute);
+    CHECK(strstr(absolute, "policytest-state-") != NULL && system(other) == 0);
+}
+
 /* A scene of smooth texture: sums of waves, one set per seed, no two seeds alike. */
 static double scene(double x, double y, int seed)
 {
@@ -660,6 +750,7 @@ int main(void)
     marks();
     depthLayouts();
     fileCorrection();
+    fileChoiceStore();
     videoLayout();
     fullViews();
     videoViewsTable();

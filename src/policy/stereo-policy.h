@@ -12,6 +12,8 @@
 #ifndef STEREO_POLICY_H
 #define STEREO_POLICY_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -317,6 +319,44 @@ STEREO_POLICY_EXPORT int stereo_policy_file_swap_eyes(const char *path);
 
 /* Stores the correction with the file (swap 1) or removes it (swap 0). Returns 0, or -1 with errno set. */
 STEREO_POLICY_EXPORT int stereo_policy_set_file_swap_eyes(const char *path, int swap);
+
+/*
+ * The person's per-file viewing choice: the input packing chosen by hand for a file (with its order, or the colours of
+ * an anaglyph), the view (both views, one of them, or one flat picture, "Not 3D") and the swap of the eyes. It is kept
+ * in the programs' own state, one small entry per file, and never in the file: $XDG_STATE_HOME/stereo-policy/files
+ * ($HOME/.local/state when unset; XDG Base Directory Specification: "state data that should persist between
+ * (application) restarts", "current state of the application that can be reused on a restart"), the entry named from
+ * the file's real path, as a player names a resume position. One store for every program built on the policy, so a
+ * file manager, its thumbnailer and a viewer show a file alike. A file that is moved or renamed loses its entry, as it
+ * loses a resume position. The swap is over whatever decided the layout, the file's own mark included; a packing chosen
+ * here is the person's correction of that file and comes before its mark (a declaration can be wrong), where a
+ * caller's general choice comes after it. Nothing here reads or writes the file, its attributes or its times.
+ */
+enum stereo_policy_view {
+    STEREO_POLICY_VIEW_STEREO = 0,
+    STEREO_POLICY_VIEW_LEFT_ONLY = 1,
+    STEREO_POLICY_VIEW_RIGHT_ONLY = 2,
+    STEREO_POLICY_VIEW_MONO = 3,
+};
+
+struct stereo_policy_file_choice {
+    int layout; /* enum stereo_policy_layout; NONE leaves the packing to the file's mark and the shape */
+    int order; /* STEREO_POLICY_LEFT_FIRST or RIGHT_FIRST of that packing */
+    int anaglyph; /* enum stereo_policy_anaglyph */
+    int view; /* enum stereo_policy_view */
+    int swap_eyes; /* 1 swaps the eyes of the file as stored */
+};
+
+/* Reads the entry of path into choice (zeroed when there is none). Returns 1 when the file has an entry, 0 when it has
+ * none, -1 with errno set when the store cannot be read or the argument is bad. */
+STEREO_POLICY_EXPORT int stereo_policy_file_choice(const char *path, struct stereo_policy_file_choice *choice);
+
+/* Keeps choice for path, replacing its entry as a whole; a choice of all zeros, or null, removes the entry. Returns 0,
+ * or -1 with errno set (the store cannot be written: say so to the person, the choice is not kept). */
+STEREO_POLICY_EXPORT int stereo_policy_set_file_choice(const char *path, const struct stereo_policy_file_choice *choice);
+
+/* Where the entry of path is, or would be, for a message or a test. Returns 0, or -1 with errno set. */
+STEREO_POLICY_EXPORT int stereo_policy_file_choice_entry(const char *path, char *entry, size_t size);
 
 #ifdef __cplusplus
 }

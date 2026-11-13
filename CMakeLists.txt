@@ -60,7 +60,7 @@ if(STEREO_AV_ONLY)
 endif()
 
 # The policy without Qt, for any program; the Qt layer builds on it
-add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-jpeg.c src/policy/stereo-jpeg-correct.c src/policy/stereo-policy-site.c src/policy/stereo-policy-display.c src/policy/stereo-policy-picture.c src/policy/stereo-policy.h)
+add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-jpeg.c src/policy/stereo-jpeg-correct.c src/policy/stereo-policy-site.c src/policy/stereo-policy-display.c src/policy/stereo-policy-picture.c src/policy/stereo-policy-file.c src/policy/stereo-policy.h)
 add_library(Stereo::Policy ALIAS StereoPolicy)
 set_target_properties(StereoPolicy PROPERTIES OUTPUT_NAME stereo-policy VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Policy
     C_STANDARD 11 C_VISIBILITY_PRESET hidden)
