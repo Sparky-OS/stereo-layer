@@ -222,3 +222,143 @@ msgstr "저장하는 동안 원본 그림이 변경되었습니다. 현재 파�
 msgctxt "Stereo::PictureSave|"
 msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
 msgstr "MPO는 시차가 있는 보기를 따로 저장하므로 선택한 배치나 모노 보정을 표현할 수 없습니다."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "3D Input Format"
+msgstr "3D 입력 형식"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Automatic"
+msgstr "자동"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Not 3D"
+msgstr "3D 아님"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, left eye first"
+msgstr "좌우 나란히, 왼쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, right eye first"
+msgstr "좌우 나란히, 오른쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, left eye first"
+msgstr "상하, 왼쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, right eye first"
+msgstr "상하, 오른쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Interleaved"
+msgstr "인터리브"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Rows, left eye first"
+msgstr "행, 왼쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Rows, right eye first"
+msgstr "행, 오른쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Columns, left eye first"
+msgstr "열, 왼쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Columns, right eye first"
+msgstr "열, 오른쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Checkerboard, left eye first"
+msgstr "체커보드, 왼쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Checkerboard, right eye first"
+msgstr "체커보드, 오른쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side quincunx, left eye first"
+msgstr "좌우 나란히 퀸컹스, 왼쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side quincunx, right eye first"
+msgstr "좌우 나란히 퀸컹스, 오른쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Anaglyph"
+msgstr "애너글리프"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Red/cyan"
+msgstr "빨강/청록"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Green/magenta"
+msgstr "초록/자홍"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Amber/blue"
+msgstr "호박색/파랑"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Picture and depth"
+msgstr "영상과 깊이"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, picture first"
+msgstr "좌우 나란히, 영상 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, depth first"
+msgstr "좌우 나란히, 깊이 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, picture first"
+msgstr "상하, 영상 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, depth first"
+msgstr "상하, 깊이 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Four rows: picture, depth, graphics, graphics depth"
+msgstr "네 줄: 영상, 깊이, 그래픽, 그래픽 깊이"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Four quarters: picture, depth, background, background depth"
+msgstr "네 구역: 영상, 깊이, 배경, 배경 깊이"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Swap left and right eyes"
+msgstr "왼쪽과 오른쪽 눈 바꾸기"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Show each eye the other view of this file"
+msgstr "이 파일의 다른 쪽 뷰를 각 눈에 표시합니다"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "A stereo picture holds a view for each eye. When a file has them the wrong way round, this swaps them for this file. The choice is kept with the program's own state: the file is not changed."
+msgstr "스테레오 사진에는 각 눈을 위한 뷰가 들어 있습니다. 파일에 좌우가 반대로 들어 있으면 이 파일에 대해 바꿉니다. 선택은 프로그램 자체의 상태에 보관되며 파일은 변경되지 않습니다."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Save the correction into the file"
+msgstr "보정을 파일에 저장"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Write this correction into the file itself, so every program and device reads it"
+msgstr "모든 프로그램과 기기가 읽을 수 있도록 이 보정을 파일 자체에 기록합니다"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "%1 was not changed and its correction is kept: %2"
+msgstr "%1 파일은 변경되지 않았고 보정은 유지됩니다: %2"
+
+msgctxt "Stereo::Picture|"
+msgid "The choice for this file cannot be kept in %1: %2."
+msgstr "이 파일의 선택을 %1에 보관할 수 없습니다: %2."
+
+msgctxt "Stereo::Picture|"
+msgid "This file has no 3D correction to save."
+msgstr "이 파일에는 저장할 3D 보정이 없습니다."

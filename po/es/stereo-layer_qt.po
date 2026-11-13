@@ -70,3 +70,143 @@ msgstr "La imagen original cambió durante el guardado; vuelva a intentarlo con 
 msgctxt "Stereo::PictureSave|"
 msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
 msgstr "MPO almacena vistas de disparidad separadas; no puede describir la disposición elegida ni una corrección monoscópica."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "3D Input Format"
+msgstr "Formato de entrada 3D"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Automatic"
+msgstr "Automático"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Not 3D"
+msgstr "No es 3D"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, left eye first"
+msgstr "Lado a lado, ojo izquierdo primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, right eye first"
+msgstr "Lado a lado, ojo derecho primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, left eye first"
+msgstr "Arriba y abajo, ojo izquierdo primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, right eye first"
+msgstr "Arriba y abajo, ojo derecho primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Interleaved"
+msgstr "Entrelazado"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Rows, left eye first"
+msgstr "Filas, ojo izquierdo primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Rows, right eye first"
+msgstr "Filas, ojo derecho primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Columns, left eye first"
+msgstr "Columnas, ojo izquierdo primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Columns, right eye first"
+msgstr "Columnas, ojo derecho primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Checkerboard, left eye first"
+msgstr "Tablero de ajedrez, ojo izquierdo primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Checkerboard, right eye first"
+msgstr "Tablero de ajedrez, ojo derecho primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side quincunx, left eye first"
+msgstr "Lado a lado en quincunce, ojo izquierdo primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side quincunx, right eye first"
+msgstr "Lado a lado en quincunce, ojo derecho primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Anaglyph"
+msgstr "Anaglifo"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Red/cyan"
+msgstr "Rojo/cian"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Green/magenta"
+msgstr "Verde/magenta"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Amber/blue"
+msgstr "Ámbar/azul"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Picture and depth"
+msgstr "Imagen y profundidad"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, picture first"
+msgstr "Lado a lado, imagen primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, depth first"
+msgstr "Lado a lado, profundidad primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, picture first"
+msgstr "Arriba y abajo, imagen primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, depth first"
+msgstr "Arriba y abajo, profundidad primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Four rows: picture, depth, graphics, graphics depth"
+msgstr "Cuatro filas: imagen, profundidad, gráficos, profundidad de los gráficos"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Four quarters: picture, depth, background, background depth"
+msgstr "Cuatro cuartos: imagen, profundidad, fondo, profundidad del fondo"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Swap left and right eyes"
+msgstr "Intercambiar los ojos izquierdo y derecho"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Show each eye the other view of this file"
+msgstr "Mostrar a cada ojo la otra vista de este archivo"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "A stereo picture holds a view for each eye. When a file has them the wrong way round, this swaps them for this file. The choice is kept with the program's own state: the file is not changed."
+msgstr "Una imagen estéreo contiene una vista para cada ojo. Cuando un archivo las tiene al revés, esto las intercambia para este archivo. La elección se guarda en el estado propio del programa: el archivo no se modifica."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Save the correction into the file"
+msgstr "Guardar la corrección en el archivo"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Write this correction into the file itself, so every program and device reads it"
+msgstr "Escribir esta corrección en el propio archivo, para que la lea cualquier programa o dispositivo"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "%1 was not changed and its correction is kept: %2"
+msgstr "%1 no se ha modificado y su corrección se conserva: %2"
+
+msgctxt "Stereo::Picture|"
+msgid "The choice for this file cannot be kept in %1: %2."
+msgstr "La elección para este archivo no se puede guardar en %1: %2."
+
+msgctxt "Stereo::Picture|"
+msgid "This file has no 3D correction to save."
+msgstr "Este archivo no tiene ninguna corrección 3D que guardar."

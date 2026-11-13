@@ -222,3 +222,143 @@ msgstr "原始图片在保存期间发生了变化；请使用当前文件重试
 msgctxt "Stereo::PictureSave|"
 msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
 msgstr "MPO 存储独立的视差视图，无法描述所选布局或单视图修正。"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "3D Input Format"
+msgstr "3D 输入格式"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Automatic"
+msgstr "自动"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Not 3D"
+msgstr "非 3D"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, left eye first"
+msgstr "左右并排,左眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, right eye first"
+msgstr "左右并排,右眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, left eye first"
+msgstr "上下排列,左眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, right eye first"
+msgstr "上下排列,右眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Interleaved"
+msgstr "交错"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Rows, left eye first"
+msgstr "行交错,左眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Rows, right eye first"
+msgstr "行交错,右眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Columns, left eye first"
+msgstr "列交错,左眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Columns, right eye first"
+msgstr "列交错,右眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Checkerboard, left eye first"
+msgstr "棋盘格,左眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Checkerboard, right eye first"
+msgstr "棋盘格,右眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side quincunx, left eye first"
+msgstr "左右并排梅花采样,左眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side quincunx, right eye first"
+msgstr "左右并排梅花采样,右眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Anaglyph"
+msgstr "红蓝立体"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Red/cyan"
+msgstr "红/青"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Green/magenta"
+msgstr "绿/品红"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Amber/blue"
+msgstr "琥珀/蓝"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Picture and depth"
+msgstr "图像和深度"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, picture first"
+msgstr "左右并排,图像在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, depth first"
+msgstr "左右并排,深度在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, picture first"
+msgstr "上下排列,图像在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, depth first"
+msgstr "上下排列,深度在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Four rows: picture, depth, graphics, graphics depth"
+msgstr "四行:图像、深度、图形、图形深度"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Four quarters: picture, depth, background, background depth"
+msgstr "四等分:图像、深度、背景、背景深度"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Swap left and right eyes"
+msgstr "交换左右眼"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Show each eye the other view of this file"
+msgstr "让每只眼睛看到此文件的另一个视图"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "A stereo picture holds a view for each eye. When a file has them the wrong way round, this swaps them for this file. The choice is kept with the program's own state: the file is not changed."
+msgstr "立体图片为每只眼睛保存一个视图。当文件中的左右颠倒时,此选项会为该文件交换它们。此选择保存在程序自身的状态中:文件不会被更改。"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Save the correction into the file"
+msgstr "将校正保存到文件"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Write this correction into the file itself, so every program and device reads it"
+msgstr "将此校正写入文件本身,使每个程序和设备都能读取"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "%1 was not changed and its correction is kept: %2"
+msgstr "%1 未被更改,其校正仍然保留:%2"
+
+msgctxt "Stereo::Picture|"
+msgid "The choice for this file cannot be kept in %1: %2."
+msgstr "无法将此文件的选择保存到 %1:%2。"
+
+msgctxt "Stereo::Picture|"
+msgid "This file has no 3D correction to save."
+msgstr "此文件没有可保存的 3D 校正。"

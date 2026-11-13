@@ -222,3 +222,143 @@ msgstr "保存中に元の画像が変更されました。現在のファイル
 msgctxt "Stereo::PictureSave|"
 msgid "MPO stores separate disparity views; it cannot describe the chosen packing or a monoscopic correction."
 msgstr "MPO は視差のある視点を個別に保存するため、選択した配置やモノへの補正を表現できません。"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "3D Input Format"
+msgstr "3D 入力形式"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Automatic"
+msgstr "自動"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Not 3D"
+msgstr "3D ではない"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, left eye first"
+msgstr "サイドバイサイド、左目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, right eye first"
+msgstr "サイドバイサイド、右目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, left eye first"
+msgstr "トップアンドボトム、左目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, right eye first"
+msgstr "トップアンドボトム、右目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Interleaved"
+msgstr "インターリーブ"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Rows, left eye first"
+msgstr "行、左目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Rows, right eye first"
+msgstr "行、右目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Columns, left eye first"
+msgstr "列、左目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Columns, right eye first"
+msgstr "列、右目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Checkerboard, left eye first"
+msgstr "チェッカーボード、左目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Checkerboard, right eye first"
+msgstr "チェッカーボード、右目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side quincunx, left eye first"
+msgstr "サイドバイサイド(五の目)、左目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side quincunx, right eye first"
+msgstr "サイドバイサイド(五の目)、右目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Anaglyph"
+msgstr "アナグリフ"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Red/cyan"
+msgstr "赤/シアン"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Green/magenta"
+msgstr "緑/マゼンタ"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Amber/blue"
+msgstr "アンバー/青"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Picture and depth"
+msgstr "画像と深度"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, picture first"
+msgstr "サイドバイサイド、画像が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Side by side, depth first"
+msgstr "サイドバイサイド、深度が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, picture first"
+msgstr "トップアンドボトム、画像が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Top and bottom, depth first"
+msgstr "トップアンドボトム、深度が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Four rows: picture, depth, graphics, graphics depth"
+msgstr "4 段: 画像、深度、グラフィックス、グラフィックスの深度"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Four quarters: picture, depth, background, background depth"
+msgstr "4 分割: 画像、深度、背景、背景の深度"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Swap left and right eyes"
+msgstr "左右の目を入れ替える"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Show each eye the other view of this file"
+msgstr "このファイルのもう一方のビューをそれぞれの目に表示します"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "A stereo picture holds a view for each eye. When a file has them the wrong way round, this swaps them for this file. The choice is kept with the program's own state: the file is not changed."
+msgstr "ステレオ画像には、それぞれの目のためのビューが入っています。ファイルの左右が逆になっている場合、このファイルについて入れ替えます。選択はプログラム自身の状態に保存され、ファイルは変更されません。"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Save the correction into the file"
+msgstr "補正をファイルに保存する"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Write this correction into the file itself, so every program and device reads it"
+msgstr "どのプログラムや機器でも読めるように、この補正をファイル自体に書き込みます"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "%1 was not changed and its correction is kept: %2"
+msgstr "%1 は変更されず、補正は保持されています: %2"
+
+msgctxt "Stereo::Picture|"
+msgid "The choice for this file cannot be kept in %1: %2."
+msgstr "このファイルの選択を %1 に保存できません: %2。"
+
+msgctxt "Stereo::Picture|"
+msgid "This file has no 3D correction to save."
+msgstr "このファイルには保存する 3D 補正がありません。"

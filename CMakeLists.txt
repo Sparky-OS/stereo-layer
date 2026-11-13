@@ -95,7 +95,8 @@ add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/picturesave.c
     src/output/screenmode.cpp src/output/screenmode.h
     src/wayland/surface.cpp src/wayland/surface_p.h
     src/widgets/widgetlayer.cpp src/widgets/widgetlayer.h
-    src/widgets/depthcontrols.cpp src/widgets/depthcontrols.h)
+    src/widgets/depthcontrols.cpp src/widgets/depthcontrols.h
+    src/widgets/filechoicemenu.cpp src/widgets/filechoicemenu.h)
 add_library(Stereo::Layer ALIAS StereoLayer)
 ecm_create_qm_loader(StereoLayer stereo-layer_qt)
 ecm_generate_export_header(StereoLayer BASE_NAME STEREO_LAYER VERSION ${PROJECT_VERSION} EXPORT_FILE_NAME stereo_layer_export.h)
@@ -112,7 +113,7 @@ set_target_properties(StereoLayerplugin PROPERTIES PREFIX "${CMAKE_SHARED_LIBRAR
 install(TARGETS StereoLayerplugin DESTINATION ${KDE_INSTALL_QMLDIR}/org/sparky/stereo)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/qml/org/sparky/stereo/qmldir ${CMAKE_CURRENT_BINARY_DIR}/qml/org/sparky/stereo/StereoLayer.qmltypes DESTINATION ${KDE_INSTALL_QMLDIR}/org/sparky/stereo)
 install(TARGETS StereoLayer EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
-install(FILES src/picture/picture.h src/picture/render.h src/video/video.h src/widgets/widgetlayer.h src/widgets/depthcontrols.h src/output/screenmode.h src/quick/pictureitem.h src/quick/depthsettings.h ${CMAKE_CURRENT_BINARY_DIR}/stereo_layer_export.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-layer)
+install(FILES src/picture/picture.h src/picture/render.h src/video/video.h src/widgets/widgetlayer.h src/widgets/depthcontrols.h src/widgets/filechoicemenu.h src/output/screenmode.h src/quick/pictureitem.h src/quick/depthsettings.h ${CMAKE_CURRENT_BINARY_DIR}/stereo_layer_export.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-layer)
 install(EXPORT StereoLayerTargets NAMESPACE Stereo:: DESTINATION ${KDE_INSTALL_CMAKEPACKAGEDIR}/StereoLayer)
 configure_package_config_file(cmake/StereoLayerConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/StereoLayerConfig.cmake INSTALL_DESTINATION ${KDE_INSTALL_CMAKEPACKAGEDIR}/StereoLayer)
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/StereoLayerConfigVersion.cmake VERSION ${PROJECT_VERSION} COMPATIBILITY SameMajorVersion)
