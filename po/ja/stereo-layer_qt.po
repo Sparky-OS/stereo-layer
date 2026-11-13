@@ -362,3 +362,7 @@ msgstr "このファイルの選択を %1 に保存できません: %2。"
 msgctxt "Stereo::Picture|"
 msgid "This file has no 3D correction to save."
 msgstr "このファイルには保存する 3D 補正がありません。"
+
+msgctxt "Stereo::Picture|"
+msgid "A correction can be saved into JPEG, JPS and MPO pictures only; this file has another format."
+msgstr "補正を保存できるのは JPEG、JPS、MPO の画像だけです。このファイルは別の形式です。"

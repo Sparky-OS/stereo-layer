@@ -1595,10 +1595,36 @@ void PictureTest::fileChoice()
     QVERIFY(Picture::setFileChoice(wide, flat));
     const Picture::SaveResult saved = Picture::saveFileChoice(wide);
     QVERIFY(!saved.success);
-    QVERIFY(!saved.error.isEmpty());
+    QVERIFY2(saved.error.contains(QLatin1String("JPEG, JPS and MPO")), qPrintable(saved.error));
     QCOMPARE(Picture::fileChoice(wide).view, Picture::View::Mono);
     QCOMPARE(fileState(wide), untouched);
     QVERIFY(!Picture::saveFileChoice(marked).success);
+
+    // the person chose "save into the file" for a JPEG pair with a swap: the file then carries the correction, the entry
+    // is cleared, and the picture shows as it did with the entry
+    const QString jpeg = dir.filePath(QStringLiteral("pair.jpg"));
+    QVERIFY(picture(QSize(384, 108), Content::Pair).save(jpeg, "jpeg", 95));
+    Picture::Options swapped;
+    swapped.inputLayout = Picture::Layout::SideBySide;
+    swapped.swapEyes = true;
+    QVERIFY(Picture::setFileChoice(jpeg, swapped));
+    const Picture corrected = Picture::loadPair(jpeg, QSize(512, 512), {});
+    QVERIFY(corrected.isStereo());
+    const QByteArray jpegBefore = fileState(jpeg);
+    const Picture::SaveResult written = Picture::saveFileChoice(jpeg);
+    if (written.success) {
+        QVERIFY(!Picture::hasFileChoice(jpeg));
+        QVERIFY(fileState(jpeg) != jpegBefore);
+        const Picture reread = Picture::loadPair(jpeg, QSize(512, 512), {});
+        QCOMPARE(reread.source, Picture::Source::FileMark);
+        QCOMPARE(reread.left, corrected.left);
+        QCOMPARE(reread.right, corrected.right);
+    } else {
+        // a JPS reader older than the shared save's descriptor refuses its own read-back: nothing was written
+        qWarning("saveFileChoice() refused the JPEG here: %s", qPrintable(written.error));
+        QVERIFY(Picture::hasFileChoice(jpeg));
+        QCOMPARE(fileState(jpeg), jpegBefore);
+    }
 
     // a store that cannot be written is said, with where and why, and nothing is kept
     QVERIFY(Picture::setFileChoice(wide, {}));

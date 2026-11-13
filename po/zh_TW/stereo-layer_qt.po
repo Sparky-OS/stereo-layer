@@ -362,3 +362,7 @@ msgstr "無法將此檔案的選擇保存到 %1:%2。"
 msgctxt "Stereo::Picture|"
 msgid "This file has no 3D correction to save."
 msgstr "此檔案沒有可儲存的 3D 校正。"
+
+msgctxt "Stereo::Picture|"
+msgid "A correction can be saved into JPEG, JPS and MPO pictures only; this file has another format."
+msgstr "校正只能儲存到 JPEG、JPS 和 MPO 圖片中;此檔案是其他格式。"

@@ -362,3 +362,7 @@ msgstr "이 파일의 선택을 %1에 보관할 수 없습니다: %2."
 msgctxt "Stereo::Picture|"
 msgid "This file has no 3D correction to save."
 msgstr "이 파일에는 저장할 3D 보정이 없습니다."
+
+msgctxt "Stereo::Picture|"
+msgid "A correction can be saved into JPEG, JPS and MPO pictures only; this file has another format."
+msgstr "보정은 JPEG, JPS, MPO 사진에만 저장할 수 있습니다. 이 파일은 다른 형식입니다."

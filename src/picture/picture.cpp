@@ -405,6 +405,14 @@ Picture::SaveResult Picture::saveFileChoice(const QString &path)
     if (!found && !userSwapEyes(path)) {
         return {false, QCoreApplication::translate("Stereo::Picture", "This file has no 3D correction to save.")};
     }
+    // The shared save rewrites the descriptor of a JPEG, JPS or MPO file; say so plainly for any other format instead of
+    // a JPEG parser's message.
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly) || file.read(2) != QByteArray("\xff\xd8", 2)) {
+        return {false,
+            QCoreApplication::translate("Stereo::Picture", "A correction can be saved into JPEG, JPS and MPO pictures only; this file has another format.")};
+    }
+    file.close();
     const SaveResult result = saveCorrection(path, stored);
     if (result.success) {
         // the file carries the correction now: the per-file choice is unmarked again
