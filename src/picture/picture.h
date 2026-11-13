@@ -123,7 +123,8 @@ public:
     // (stereo-policy.h, stereo_policy_file_choice()): the input packing chosen by hand with its order or its colours,
     // the view (View::Mono is "Not 3D") and the swap of the eyes. load() and loadPair() apply it to every caller, so a
     // file manager, its thumbnailer and a viewer show a file alike: a field the caller sets itself wins over the
-    // stored one, the swaps add up (two swaps are none), and a stored packing is the person's correction of that
+    // stored one (a caller's own packing also over a stored Not 3D), the swaps add up (two swaps are none), and a
+    // stored packing is the person's correction of that
     // file, so it comes before the file's mark; with no entry the mark decides, then the shape. fileChoice() gives
     // the choice in effect, a swap kept in the file's legacy attribute by an earlier version included (it is read,
     // never written). setFileChoice() keeps choice as the whole choice of that file (a default Options forgets the

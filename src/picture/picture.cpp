@@ -348,7 +348,8 @@ Picture::Options withFileChoice(const QString &path, const Picture::Options &cal
         options.anaglyph = stored.anaglyph;
         *overMark = true;
     }
-    if (caller.view == Picture::View::Stereo) {
+    // a packing the caller chose itself (a viewer's menu, for this session) is shown: a stored "Not 3D" does not veto it
+    if (caller.view == Picture::View::Stereo && caller.inputLayout == Picture::Layout::None && caller.anaglyph == Picture::AnaglyphColorPair::None) {
         options.view = stored.view;
     }
     return options;

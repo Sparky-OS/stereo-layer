@@ -1500,6 +1500,8 @@ void PictureTest::fileChoice()
     QCOMPARE(shown.original.size(), QSize(384, 108));
     QVERIFY(!QFile::exists(thumbnail));
     QVERIFY(QFile::exists(bystander));
+    // a viewer's own packing for the session still shows it as that pair
+    QVERIFY(Picture::load(wide, Picture::Options{Picture::Layout::SideBySide}, OutputMode::Stereo).isStereo());
     QCOMPARE(fileState(wide), untouched);
     // another file of the same shape beside it keeps its own answer
     const QString real = dir.filePath(QStringLiteral("pair.png"));
