@@ -1,3 +1,32 @@
+stereo-layer (1.18.0-1) unstable; urgency=medium
+
+  * The person's per-file viewing choice has one store for every program on
+    the layer, in the programs' state and never in the file (ORDER 512;
+    Daniel, 2026-10-23: "never touch the user file"): libstereo-policy keeps
+    the input packing chosen by hand, Not 3D and the eye swap of a file under
+    $XDG_STATE_HOME/stereo-policy/files, one entry per file named from its
+    real path (stereo_policy_file_choice(), stereo_policy_set_file_choice()).
+  * Stereo::Picture::load() and loadPair() apply it for every caller, so a
+    file manager, its thumbnailer and a viewer show a file alike: a wide
+    screenshot that the shape rule takes for a pair is set to Not 3D once and
+    is flat everywhere. A packing kept for a file corrects it even when the
+    file declares another; with no entry the mark decides, then the shape.
+    fileChoice(), hasFileChoice(), setFileChoice() (it drops the file's cached
+    thumbnails), saveFileChoice() (the shared save into the file, only on the
+    person's choice; the entry is cleared on success, the reason is given on
+    failure) and dropThumbnails().
+  * A swap an earlier version kept in the file attribute
+    user.stereo-policy.swap-eyes is still read. It moves into the store when
+    the person next changes that file's choice, and the attribute is then
+    removed; where the file cannot be changed it stays and is counted.
+    setUserSwapEyes() stays in the library for existing programs.
+  * Stereo::FileChoiceMenu: the per-file input corrections as one menu
+    (Automatic, Not 3D, every still packing in either order, anaglyph pairs,
+    picture and depth, Swap left and right eyes, Save the correction into the
+    file), in the ten languages.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Fri, 13 Nov 2026 19:26:26 +0000
+
 stereo-layer (1.17.6-1) unstable; urgency=medium
 
   * Expose Qt-free existing-file JPEG/JPS/MPO inspection and correction
