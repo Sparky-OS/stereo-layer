@@ -8,14 +8,22 @@
 #include "stereo-policy.h"
 
 #include <QByteArrayView>
+#include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QImageReader>
 #include <QLoggingCategory>
 #include <QPainter>
+#include <QSet>
+#include <QStandardPaths>
+#include <QUrl>
 #include <QXmlStreamReader>
 #include <QtEndian>
 #include <algorithm>
+#include <cerrno>
+#include <cstring>
 #include <optional>
 #include <vector>
 #include <zlib.h>
@@ -155,9 +163,18 @@ struct Decision {
 };
 
 // What the file's marks, its format and the user's choice say, before any pixel is read.
-Decision decide(const QString &fileMetadata, const QByteArray &format, const QByteArray &header, bool second, const Picture::Options &options)
+Decision decide(const QString &fileMetadata, const QByteArray &format, const QByteArray &header, bool second, const Picture::Options &options,
+    bool overMark = false)
 {
     Decision result;
+    // The person's packing for this one file (Picture::setFileChoice()) corrects it, whatever the file declares.
+    if (overMark && (options.inputLayout != Picture::Layout::None || options.anaglyph != Picture::AnaglyphColorPair::None)) {
+        result.packing = options.inputLayout;
+        result.order = options.inputOrder;
+        result.anaglyph = options.anaglyph;
+        result.source = Picture::Source::User;
+        return result;
+    }
     const bool drawing = format == "svg" || format == "svgz";
     QString metadata = fileMetadata;
     if (metadata.isEmpty() && format == "svg")
@@ -238,7 +255,8 @@ constexpr int pairSampleWidth = 384;
 Picture unpackWithDepth(const QImage &image, Picture::Layout layout, Picture::EyeOrder order, const Picture::DepthOptions &depthOptions);
 
 Picture fromImagesComparing(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
-    const Picture::Options &options, OutputMode output, const Picture::DepthOptions &depthOptions = {}, const QImage &depthPicture = {});
+    const Picture::Options &options, OutputMode output, const Picture::DepthOptions &depthOptions = {}, const QImage &depthPicture = {},
+    bool overMark = false);
 
 // A HEIF stem group may keep a separate monoscopic primary at image zero.
 // The reader names the actual stereo view image numbers without changing that primary.
@@ -297,6 +315,126 @@ bool Picture::setUserSwapEyes(const QString &path, bool swap)
 
 bool Picture::canStoreUserSwapEyes(const QString &path) { return stereo_policy_file_swap_eyes(QFile::encodeName(path).constData()) >= 0; }
 
+namespace
+{
+Picture::Options storedChoice(const QString &path, bool *found = nullptr)
+{
+    struct stereo_policy_file_choice stored;
+    const bool has = stereo_policy_file_choice(QFile::encodeName(path).constData(), &stored) == 1;
+    if (found) {
+        *found = has;
+    }
+    Picture::Options choice;
+    if (has) {
+        choice.inputLayout = Picture::Layout(stored.layout);
+        choice.inputOrder = stored.order == STEREO_POLICY_RIGHT_FIRST ? Picture::EyeOrder::RightFirst : Picture::EyeOrder::LeftFirst;
+        choice.anaglyph = Picture::AnaglyphColorPair(stored.anaglyph);
+        choice.view = Picture::View(stored.view);
+        choice.swapEyes = stored.swap_eyes == 1;
+    }
+    return choice;
+}
+
+// The caller's options with the file's stored choice: the caller's own fields win, the swaps add up.
+Picture::Options withFileChoice(const QString &path, const Picture::Options &caller, bool *overMark)
+{
+    Picture::Options options = caller;
+    const Picture::Options stored = storedChoice(path);
+    options.swapEyes = (caller.swapEyes != stored.swapEyes) != Picture::userSwapEyes(path);
+    if (caller.inputLayout == Picture::Layout::None && caller.anaglyph == Picture::AnaglyphColorPair::None
+        && (stored.inputLayout != Picture::Layout::None || stored.anaglyph != Picture::AnaglyphColorPair::None)) {
+        options.inputLayout = stored.inputLayout;
+        options.inputOrder = stored.inputOrder;
+        options.anaglyph = stored.anaglyph;
+        *overMark = true;
+    }
+    if (caller.view == Picture::View::Stereo) {
+        options.view = stored.view;
+    }
+    return options;
+}
+}
+
+Picture::Options Picture::fileChoice(const QString &path)
+{
+    Options choice = storedChoice(path);
+    choice.swapEyes = choice.swapEyes != userSwapEyes(path);
+    return choice;
+}
+
+bool Picture::hasFileChoice(const QString &path)
+{
+    const Options choice = fileChoice(path);
+    return choice.inputLayout != Layout::None || choice.anaglyph != AnaglyphColorPair::None || choice.view != View::Stereo || choice.swapEyes;
+}
+
+bool Picture::setFileChoice(const QString &path, const Options &choice, QString *error)
+{
+    const QByteArray name = QFile::encodeName(path);
+    // A swap an earlier version kept in the file's attribute user.stereo-policy.swap-eyes moves into the store with
+    // this choice. Only stereo_policy_set_file_swap_eyes() ever wrote that name, at a person's Swap Eyes, so it is
+    // taken out of the file; where the file cannot be changed it stays and the stored swap is kept against it.
+    bool legacy = userSwapEyes(path);
+    if (legacy && stereo_policy_set_file_swap_eyes(name.constData(), 0) == 0) {
+        legacy = false;
+    }
+    struct stereo_policy_file_choice stored;
+    stored.layout = int(choice.inputLayout);
+    stored.order = choice.inputOrder == EyeOrder::RightFirst ? STEREO_POLICY_RIGHT_FIRST : STEREO_POLICY_LEFT_FIRST;
+    stored.anaglyph = int(choice.anaglyph);
+    stored.view = int(choice.view);
+    stored.swap_eyes = choice.swapEyes != legacy;
+    if (stereo_policy_set_file_choice(name.constData(), &stored) != 0) {
+        const int code = errno;
+        if (error) {
+            char entry[4096] = "";
+            stereo_policy_file_choice_entry(name.constData(), entry, sizeof(entry));
+            *error = QCoreApplication::translate("Stereo::Picture", "The choice for this file cannot be kept in %1: %2.")
+                         .arg(QFile::decodeName(entry), QString::fromLocal8Bit(strerror(code)));
+        }
+        return false;
+    }
+    dropThumbnails(path);
+    return true;
+}
+
+Picture::SaveResult Picture::saveFileChoice(const QString &path)
+{
+    bool found = false;
+    const Options stored = storedChoice(path, &found);
+    if (!found && !userSwapEyes(path)) {
+        return {false, QCoreApplication::translate("Stereo::Picture", "This file has no 3D correction to save.")};
+    }
+    const SaveResult result = saveCorrection(path, stored);
+    if (result.success) {
+        // the file carries the correction now: the per-file choice is unmarked again
+        stereo_policy_set_file_choice(QFile::encodeName(path).constData(), nullptr);
+        dropThumbnails(path);
+    }
+    return result;
+}
+
+void Picture::dropThumbnails(const QString &path)
+{
+    const QString canonical = QFileInfo(path).canonicalFilePath();
+    const QString cache = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + QLatin1String("/thumbnails/");
+    QSet<QString> names;
+    for (const QString &file : {path, canonical}) {
+        if (file.isEmpty()) {
+            continue;
+        }
+        // the URI as the desktop's thumbnailers write it (KIO::PreviewJob: the file's URL, QUrl::toEncoded(QUrl::RemovePassword | QUrl::FullyEncoded))
+        const QUrl url = QUrl::fromLocalFile(QDir::cleanPath(QFileInfo(file).absoluteFilePath()));
+        names.insert(QString::fromLatin1(QCryptographicHash::hash(url.toEncoded(QUrl::RemovePassword | QUrl::FullyEncoded), QCryptographicHash::Md5).toHex()) + QLatin1String(".png"));
+    }
+    const QStringList sizes = QDir(cache).entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &size : sizes) {
+        for (const QString &name : std::as_const(names)) {
+            QFile::remove(cache + size + QLatin1Char('/') + name);
+        }
+    }
+}
+
 Picture Picture::load(const QString &path, const Options &fileOptions, OutputMode output)
 {
     return load(path, fileOptions, DepthOptions(), DepthPicture::Shown, output);
@@ -304,9 +442,9 @@ Picture Picture::load(const QString &path, const Options &fileOptions, OutputMod
 
 Picture Picture::load(const QString &path, const Options &fileOptions, const DepthOptions &depthOptions, DepthPicture depthPicture, OutputMode output)
 {
-    // the user's correction stored with the file, over its mark
-    Options options = fileOptions;
-    options.swapEyes = options.swapEyes != userSwapEyes(path);
+    // the person's choice for this file, from the per-file store, with the caller's own
+    bool overMark = false;
+    const Options options = withFileChoice(path, fileOptions, &overMark);
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
         return {};
@@ -348,7 +486,7 @@ Picture Picture::load(const QString &path, const Options &fileOptions, const Dep
     if (metadata == QLatin1String("depthSeparate") && depthPicture == DepthPicture::Original && imageCount >= 3 && reader.jumpToImage(2)) {
         original = reader.read();
     }
-    Picture result = fromImagesComparing(image, second, metadata, format, header, options, output, depthOptions, original);
+    Picture result = fromImagesComparing(image, second, metadata, format, header, options, output, depthOptions, original, overMark);
     if (indexed && options.view == View::Stereo) {
         result.original = shown;
     }
@@ -363,8 +501,8 @@ Picture Picture::loadPair(const QString &path, const QSize &bound, const Options
 Picture Picture::loadPair(
     const QString &path, const QSize &bound, const Options &fileOptions, const DepthOptions &depthOptions, DepthPicture depthPicture)
 {
-    Options options = fileOptions;
-    options.swapEyes = options.swapEyes != userSwapEyes(path);
+    bool overMark = false;
+    const Options options = withFileChoice(path, fileOptions, &overMark);
     QFile file(path);
     if (bound.isEmpty() || options.view == View::Mono || !file.open(QIODevice::ReadOnly)) {
         return {};
@@ -381,7 +519,7 @@ Picture Picture::loadPair(
     const int imageCount = reader.imageCount();
     const bool multiView = hasSecondImage(imageCount, format, metadata);
     const QSize size = reader.size();
-    const Decision decision = decide(metadata, format, header, multiView, options);
+    const Decision decision = decide(metadata, format, header, multiView, options, overMark);
     if (decision.pixels ? decision.panorama || (size.isValid() && !pairByShape(size)) : decision.packing == Layout::None) {
         if (decision.pixels) {
             logShape(size, false, decision.panorama);
@@ -425,7 +563,7 @@ Picture Picture::loadPair(
     if (metadata == QLatin1String("depthSeparate") && depthPicture == DepthPicture::Original && imageCount >= 3 && reader.jumpToImage(2)) {
         original = read(reader.size());
     }
-    Picture result = fromImagesComparing(image, second, metadata, format, header, options, OutputMode::Unknown, depthOptions, original);
+    Picture result = fromImagesComparing(image, second, metadata, format, header, options, OutputMode::Unknown, depthOptions, original, overMark);
     if (indexed && options.view == View::Stereo) {
         result.original = shown;
     }
@@ -444,7 +582,7 @@ namespace
 {
 // fromImages(), with the depth options
 Picture fromImagesComparing(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
-    const Picture::Options &options, OutputMode output, const Picture::DepthOptions &depthOptions, const QImage &depthPicture)
+    const Picture::Options &options, OutputMode output, const Picture::DepthOptions &depthOptions, const QImage &depthPicture, bool overMark)
 {
     using Layout = Picture::Layout;
     using EyeOrder = Picture::EyeOrder;
@@ -456,7 +594,7 @@ Picture fromImagesComparing(const QImage &image, const QImage &second, const QSt
     if (image.isNull() || options.view == View::Mono) {
         return result;
     }
-    Decision decision = decide(metadata, format, header, !second.isNull(), options);
+    Decision decision = decide(metadata, format, header, !second.isNull(), options, overMark);
     if (decision.pixels) {
         decision.anaglyph = Picture::detectAnaglyph(image);
         if (decision.anaglyph != AnaglyphColorPair::None) {

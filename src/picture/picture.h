@@ -119,15 +119,37 @@ public:
     static bool setUserSwapEyes(const QString &path, bool swap);
     static bool canStoreUserSwapEyes(const QString &path);
 
+    // The person's per-file choice, kept in the programs' own per-file store and never in the file
+    // (stereo-policy.h, stereo_policy_file_choice()): the input packing chosen by hand with its order or its colours,
+    // the view (View::Mono is "Not 3D") and the swap of the eyes. load() and loadPair() apply it to every caller, so a
+    // file manager, its thumbnailer and a viewer show a file alike: a field the caller sets itself wins over the
+    // stored one, the swaps add up (two swaps are none), and a stored packing is the person's correction of that
+    // file, so it comes before the file's mark; with no entry the mark decides, then the shape. fileChoice() gives
+    // the choice in effect, a swap kept in the file's legacy attribute by an earlier version included (it is read,
+    // never written). setFileChoice() keeps choice as the whole choice of that file (a default Options forgets the
+    // file) and drops its cached thumbnails so they are made again; when the file carries the legacy attribute it is
+    // taken into the store and removed from the file, or, where the file cannot be changed, left and counted. It
+    // returns false with the reason in error when the store cannot be written: the choice is then not kept.
+    static Options fileChoice(const QString &path);
+    static bool hasFileChoice(const QString &path);
+    static bool setFileChoice(const QString &path, const Options &choice, QString *error = nullptr);
+    // Removes the thumbnails the desktop's cache keeps of path (Thumbnail Managing Standard, "Thumbnail Directory":
+    // $XDG_CACHE_HOME/thumbnails/<size>/<MD5 of the URI>.png), so the next request makes them again.
+    static void dropThumbnails(const QString &path);
+
     struct SaveResult {
         bool success = false;
         QString error;
     };
     // Only call after the person accepts Save to file. Rewrites metadata without recompression,
     // verifies a temporary file before atomic replacement. On success clear the caller's saved
-    // packing/eye-order/swap correction; on failure keep it and show error. View::Mono writes a mono
+    // packing/eye-order/swap correction (setFileChoice(path, {})); on failure keep it and show error. View::Mono writes a mono
     // descriptor; LeftOnly/RightOnly keep both views. The legacy swap xattr is consumed on success.
     static SaveResult saveCorrection(const QString &path, const Options &options);
+    // saveCorrection() of the file's stored choice (setFileChoice()), for a program's "save the correction into the
+    // file" action, called only after the person chose it: on success the file carries the correction, its entry in
+    // the store is cleared and its thumbnails are made again; on failure the file and the entry stay and error says why.
+    static SaveResult saveFileChoice(const QString &path);
 
     bool isStereo() const;
     // Both views side by side, left first, each at its own size, marked "sideBySideLeftFirst" in the image's

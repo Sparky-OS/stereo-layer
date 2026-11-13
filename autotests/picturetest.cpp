@@ -2,6 +2,11 @@
 // SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
 #include "picture.h"
 #include "render.h"
+#include <QCryptographicHash>
+#include <QScopeGuard>
+#include <QUrl>
+#include <sys/stat.h>
+#include <sys/xattr.h>
 #include <QBuffer>
 #include <QDataStream>
 #include <QDir>
@@ -54,6 +59,7 @@ private Q_SLOTS:
     void upconversion();
     void swapOverMark();
     void storedCorrection();
+    void fileChoice();
     void depthLayouts_data();
     void depthLayouts();
     void packedDepthOptions_data();
@@ -1430,6 +1436,178 @@ void PictureTest::heifMonoscopicFallback()
     const auto thumb = Picture::loadPair(path, QSize(2000, 1000), {});
     QCOMPARE(thumb.left, left);
     QCOMPARE(thumb.right, right);
+}
+
+static QByteArray fileState(const QString &path)
+{
+    // the file as the person has it: its bytes, its times and every extended attribute
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    QByteArray state = QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha256).toHex();
+    struct stat status;
+    if (stat(QFile::encodeName(path).constData(), &status) != 0) {
+        return {};
+    }
+    state += ' ' + QByteArray::number(qlonglong(status.st_mtim.tv_sec)) + '.' + QByteArray::number(qlonglong(status.st_mtim.tv_nsec));
+    state += ' ' + QByteArray::number(qlonglong(status.st_ctim.tv_sec)) + '.' + QByteArray::number(qlonglong(status.st_ctim.tv_nsec));
+    char names[4096];
+    const ssize_t length = listxattr(QFile::encodeName(path).constData(), names, sizeof(names));
+    state += ' ' + QByteArray(names, length > 0 ? length : 0).toHex();
+    return state;
+}
+
+void PictureTest::fileChoice()
+{
+    // The person's per-file choice is kept in the programs' state and applied by load() and loadPair() for every caller;
+    // the file is never touched.
+    QTemporaryDir dir(QDir::currentPath() + QStringLiteral("/choice-XXXXXX"));
+    QVERIFY(dir.isValid());
+    qputenv("XDG_STATE_HOME", QFile::encodeName(dir.filePath(QStringLiteral("state"))));
+    qputenv("XDG_CACHE_HOME", QFile::encodeName(dir.filePath(QStringLiteral("cache"))));
+    const auto restore = qScopeGuard([] {
+        qunsetenv("XDG_STATE_HOME");
+        qunsetenv("XDG_CACHE_HOME");
+    });
+    // an unmarked picture in the shape of a pair (a wide screenshot): a pair by its shape, the last safety net
+    const QString wide = dir.filePath(QStringLiteral("screenshot.png"));
+    QVERIFY(picture(QSize(384, 108), Content::Unrelated).save(wide));
+    const QByteArray untouched = fileState(wide);
+    QVERIFY(!untouched.isEmpty());
+    QVERIFY(!Picture::hasFileChoice(wide));
+    QCOMPARE(Picture::loadPair(wide, QSize(256, 256), {}).source, Picture::Source::Shape);
+    QVERIFY(Picture::load(wide, {}, OutputMode::Stereo).isStereo());
+    // a thumbnail of it in the desktop's cache, as KIO names it
+    const QString thumbnails = dir.filePath(QStringLiteral("cache/thumbnails/large/"));
+    QVERIFY(QDir().mkpath(thumbnails));
+    const QString thumbnail =
+        thumbnails + QString::fromLatin1(QCryptographicHash::hash(QUrl::fromLocalFile(wide).toEncoded(QUrl::RemovePassword | QUrl::FullyEncoded), QCryptographicHash::Md5).toHex()) + QStringLiteral(".png");
+    QVERIFY(QImage(8, 8, QImage::Format_RGB32).save(thumbnail));
+    const QString bystander = thumbnails + QStringLiteral("0123456789abcdef0123456789abcdef.png");
+    QVERIFY(QImage(8, 8, QImage::Format_RGB32).save(bystander));
+
+    // Not 3D: one flat picture everywhere, and its thumbnails are made again
+    Picture::Options flat;
+    flat.view = Picture::View::Mono;
+    QString error;
+    QVERIFY2(Picture::setFileChoice(wide, flat, &error), qPrintable(error));
+    QVERIFY(Picture::hasFileChoice(wide));
+    QCOMPARE(Picture::fileChoice(wide).view, Picture::View::Mono);
+    QVERIFY(!Picture::loadPair(wide, QSize(256, 256), {}).isStereo());
+    const Picture shown = Picture::load(wide, {}, OutputMode::Stereo);
+    QVERIFY(!shown.isStereo());
+    QCOMPARE(shown.original.size(), QSize(384, 108));
+    QVERIFY(!QFile::exists(thumbnail));
+    QVERIFY(QFile::exists(bystander));
+    QCOMPARE(fileState(wide), untouched);
+    // another file of the same shape beside it keeps its own answer
+    const QString real = dir.filePath(QStringLiteral("pair.png"));
+    QVERIFY(picture(QSize(384, 108), Content::Pair).save(real));
+    QVERIFY(Picture::loadPair(real, QSize(256, 256), {}).isStereo());
+
+    // a packing chosen by hand, right eye first, with the swap over it
+    Picture::Options choice;
+    choice.inputLayout = Picture::Layout::TopAndBottom;
+    choice.inputOrder = Picture::EyeOrder::RightFirst;
+    QVERIFY(Picture::setFileChoice(wide, choice));
+    Picture pair = Picture::loadPair(wide, QSize(512, 512), {});
+    QCOMPARE(pair.source, Picture::Source::User);
+    QCOMPARE(pair.layout, Picture::Layout::TopAndBottom);
+    QCOMPARE(pair.eyeOrder, Picture::EyeOrder::RightFirst);
+    QCOMPARE(pair.left.size(), QSize(256, 36));
+    const QImage leftBefore = pair.left;
+    choice.swapEyes = true;
+    QVERIFY(Picture::setFileChoice(wide, choice));
+    pair = Picture::loadPair(wide, QSize(512, 512), {});
+    QCOMPARE(pair.right, leftBefore);
+    // a caller's own choice for the session wins over the stored packing, and its swap adds to the stored one
+    Picture::Options session;
+    session.inputLayout = Picture::Layout::SideBySide;
+    session.swapEyes = true;
+    pair = Picture::load(wide, session, OutputMode::Stereo);
+    QCOMPARE(pair.layout, Picture::Layout::SideBySide);
+    QCOMPARE(pair.left.size(), QSize(192, 108));
+    QCOMPARE(pair.left, Picture::load(wide, Picture::Options{Picture::Layout::SideBySide}, OutputMode::Stereo).right);
+    // every packing a still can hold is kept and read back
+    for (const auto layout : {Picture::Layout::SideBySide, Picture::Layout::TopAndBottom, Picture::Layout::Rows, Picture::Layout::Columns,
+             Picture::Layout::Checkerboard, Picture::Layout::SideBySideQuincunx, Picture::Layout::DepthSideBySide, Picture::Layout::DepthTopAndBottom,
+             Picture::Layout::DepthGraphics, Picture::Layout::DepthBackground}) {
+        Picture::Options each;
+        each.inputLayout = layout;
+        QVERIFY(Picture::setFileChoice(wide, each));
+        QCOMPARE(Picture::fileChoice(wide).inputLayout, layout);
+        QVERIFY2(Picture::load(wide, {}, OutputMode::Stereo).isStereo(), qPrintable(QString::number(int(layout))));
+    }
+    // the default choice forgets the file: the shape decides again
+    QVERIFY(Picture::setFileChoice(wide, {}));
+    QVERIFY(!Picture::hasFileChoice(wide));
+    QCOMPARE(Picture::loadPair(wide, QSize(256, 256), {}).source, Picture::Source::Shape);
+    QCOMPARE(fileState(wide), untouched);
+
+    // a file that declares itself: the mark decides, the shape is never asked, and only the person's choice for this
+    // file corrects it (a declaration can be wrong)
+    const QString marked = dir.filePath(QStringLiteral("marked.png"));
+    {
+        QImage image = picture(QSize(384, 108), Content::Pair);
+        image.setText(QStringLiteral("Stereo3DLayout"), QStringLiteral("sideBySideRightFirst"));
+        QVERIFY(image.save(marked));
+    }
+    Picture declared = Picture::loadPair(marked, QSize(512, 512), {});
+    if (declared.source == Picture::Source::FileMark) {
+        QCOMPARE(declared.eyeOrder, Picture::EyeOrder::RightFirst);
+        Picture::Options general;
+        general.inputLayout = Picture::Layout::TopAndBottom;
+        QCOMPARE(Picture::loadPair(marked, QSize(512, 512), general).source, Picture::Source::FileMark);
+        Picture::Options correction;
+        correction.inputLayout = Picture::Layout::SideBySide;
+        QVERIFY(Picture::setFileChoice(marked, correction));
+        declared = Picture::loadPair(marked, QSize(512, 512), {});
+        QCOMPARE(declared.source, Picture::Source::User);
+        QCOMPARE(declared.eyeOrder, Picture::EyeOrder::LeftFirst);
+        QVERIFY(Picture::setFileChoice(marked, flat));
+        QVERIFY(!Picture::loadPair(marked, QSize(512, 512), {}).isStereo());
+        QVERIFY(Picture::setFileChoice(marked, {}));
+        QCOMPARE(Picture::loadPair(marked, QSize(512, 512), {}).source, Picture::Source::FileMark);
+    } else {
+        qWarning("Qt's PNG writer keeps no Stereo3DLayout text here: the marked case is not checked");
+    }
+
+    // a swap an earlier version kept in the file's attribute is read, and moves into the store at the next choice
+    if (Picture::canStoreUserSwapEyes(real) && Picture::setUserSwapEyes(real, true)) {
+        const Picture before = Picture::loadPair(real, QSize(256, 256), {});
+        QVERIFY(Picture::fileChoice(real).swapEyes);
+        QVERIFY(Picture::hasFileChoice(real));
+        Picture::Options kept = Picture::fileChoice(real);
+        QVERIFY(Picture::setFileChoice(real, kept));
+        QVERIFY(!Picture::userSwapEyes(real));
+        QVERIFY(Picture::fileChoice(real).swapEyes);
+        QCOMPARE(Picture::loadPair(real, QSize(256, 256), {}).left, before.left);
+        kept.swapEyes = false;
+        QVERIFY(Picture::setFileChoice(real, kept));
+        QVERIFY(!Picture::hasFileChoice(real));
+        QCOMPARE(Picture::loadPair(real, QSize(256, 256), {}).left, before.right);
+    } else {
+        qWarning("This file system keeps no extended attributes: the legacy swap is not checked");
+    }
+
+    // a format the shared save cannot write says why, and the choice stays
+    QVERIFY(Picture::setFileChoice(wide, flat));
+    const Picture::SaveResult saved = Picture::saveFileChoice(wide);
+    QVERIFY(!saved.success);
+    QVERIFY(!saved.error.isEmpty());
+    QCOMPARE(Picture::fileChoice(wide).view, Picture::View::Mono);
+    QCOMPARE(fileState(wide), untouched);
+    QVERIFY(!Picture::saveFileChoice(marked).success);
+
+    // a store that cannot be written is said, with where and why, and nothing is kept
+    QVERIFY(Picture::setFileChoice(wide, {}));
+    qputenv("XDG_STATE_HOME", QFile::encodeName(wide));
+    error.clear();
+    QVERIFY(!Picture::setFileChoice(wide, flat, &error));
+    QVERIFY2(error.contains(wide), qPrintable(error));
+    QVERIFY(!Picture::hasFileChoice(wide));
+    QCOMPARE(fileState(wide), untouched);
 }
 
 QTEST_MAIN(PictureTest)
