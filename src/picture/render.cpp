@@ -154,10 +154,16 @@ EyeCrop cropEyes(const Picture &picture, const QSize &eyePixels, qreal zoom, con
     }
     const bool alpha = left.hasAlphaChannel() || right.hasAlphaChannel();
     result.packed = QImage(source.width() * 2, source.height(), alpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32);
+    // nothing of the memory the buffer was made in is ever handed over
+    result.packed.fill(alpha ? Qt::transparent : Qt::black);
     QPainter painter(&result.packed);
     painter.setCompositionMode(QPainter::CompositionMode_Source);
-    painter.drawImage(QPoint(0, 0), left, source);
-    painter.drawImage(QPoint(source.width(), 0), right, source);
+    // Each sample to its own place, whatever device pixel ratio the caller's images carry: drawn at a point, Qt draws an
+    // image at its size divided by its ratio (QPainter, "Drawing High Resolution Versions of Pixmaps and Images"), and a
+    // view rendered for a window at 125 % came out at four fifths of its size in a corner of the buffer.
+    const QRect target(0, 0, source.width(), source.height());
+    painter.drawImage(target, left, source);
+    painter.drawImage(target.translated(source.width(), 0), right, source);
     painter.end();
     result.shown = QRectF(dest.left() + x0 / sx, dest.top() + y0 / sy, source.width() / sx, source.height() / sy);
     return result;

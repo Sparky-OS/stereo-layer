@@ -46,6 +46,8 @@ private Q_SLOTS:
     void geometry();
     void cropEyesCopies_data();
     void cropEyesCopies();
+    void cropEyesCopiesWhateverTheRatio_data();
+    void cropEyesCopiesWhateverTheRatio();
     void cropEyesZoomed();
     void panorama();
     void shape_data();
@@ -481,6 +483,28 @@ void PictureTest::cropEyesCopies()
         QVERIFY(qAbs(crop.shown.center().x() - area.width() / 2.0) < 1e-6);
         QVERIFY(qAbs(crop.shown.center().y() - area.height() / 2.0) < 1e-6);
     }
+}
+void PictureTest::cropEyesCopiesWhateverTheRatio_data()
+{
+    QTest::addColumn<qreal>("ratio");
+    // the scales a desktop offers: an image drawn for a window carries the window's device pixel ratio
+    for (const qreal ratio : { 1.0, 1.25, 1.5, 1.75, 2.0, 1.1 })
+        QTest::newRow(qPrintable(QString::number(ratio))) << ratio;
+}
+void PictureTest::cropEyesCopiesWhateverTheRatio()
+{
+    QFETCH(qreal, ratio);
+    QSize view;
+    const QImage frame = addressedFrame(Picture::Layout::SideBySide, 400, 90, &view);
+    Picture picture = Picture::fromPackedImage(frame, Picture::Layout::SideBySide, Picture::EyeOrder::LeftFirst);
+    // a view drawn for a window at this scale: the same samples, marked with the window's ratio
+    picture.left.setDevicePixelRatio(ratio);
+    picture.right.setDevicePixelRatio(ratio);
+    const EyeCrop crop = cropEyes(picture, view);
+    QCOMPARE(crop.packed.size(), QSize(2 * view.width(), view.height()));
+    // every sample its own, in its own place: nothing drawn smaller, nothing left as the buffer's memory had it
+    QCOMPARE(wrongSamples(crop.packed, view), 0);
+    QCOMPARE(crop.shown, QRectF(QPointF(), QSizeF(view)));
 }
 void PictureTest::cropEyesZoomed()
 {

@@ -64,6 +64,13 @@ struct WidgetLayer::Private {
     QRect announced; // shown while the layer is active, what shownRect() says and the area's property holds
     QSize pixels;
     bool dirty = true;
+    // eyes drawn by the adapter on the window's own pixels (setEyes()), and what they were drawn for
+    bool eyes = false;
+    QRect eyePixels;
+    QRect eyeRect; // where their surface lies in the window, on whole device pixels
+    qreal eyeRatio = 0;
+    bool eyesAsked = false;
+    QPointer<QWidget> watched; // the area's window, whose paint and geometry the layer follows too
 };
 WidgetLayer::WidgetLayer(QWidget *area, QObject *parent)
     : QObject(parent ? parent : area)
@@ -116,6 +123,7 @@ bool WidgetLayer::isSupported() { return Surface::isSupported(); }
 void WidgetLayer::setPicture(const Picture &picture)
 {
     d->source.clear();
+    d->eyes = false;
     d->picture = picture;
     d->dirty = true;
     update();
@@ -125,6 +133,7 @@ void WidgetLayer::setPicture(const Picture &picture)
 void WidgetLayer::setSource(const QString &path, const Picture::Options &options)
 {
     d->source = path;
+    d->eyes = false;
     d->options = options;
     d->picture = Picture::load(path, options, d->output.mode());
     d->dirty = true;
@@ -140,6 +149,96 @@ void WidgetLayer::setTransform(qreal zoom, const QPointF &pan)
     update();
     if (d->area)
         d->area->update();
+}
+QPoint WidgetLayer::eyeOffset() const { return d->area ? d->area->mapTo(d->area->window(), QPoint()) : QPoint(); }
+QImage WidgetLayer::eyeCanvas() const
+{
+    QWindow *window = d->area ? d->area->window()->windowHandle() : nullptr;
+    if (!window || d->area->size().isEmpty())
+        return {};
+    QRect pixels;
+    Surface::onWholePixels(window, QRect(eyeOffset(), d->area->size()), &pixels);
+    QImage canvas(pixels.right() + 1, pixels.bottom() + 1, QImage::Format_ARGB32_Premultiplied);
+    if (canvas.isNull())
+        return {};
+    canvas.setDevicePixelRatio(d->area->devicePixelRatioF());
+    canvas.fill(Qt::transparent);
+    return canvas;
+}
+void WidgetLayer::setEyes(const QImage &left, const QImage &right)
+{
+    d->source.clear();
+    d->picture = Picture();
+    d->packed = QImage();
+    d->eyes = true;
+    d->eyesAsked = false;
+    d->eyePixels = QRect();
+    QWindow *window = d->area ? d->area->window()->windowHandle() : nullptr;
+    QRect pixels;
+    if (window && !left.isNull() && left.size() == right.size()) {
+        d->eyeRect = Surface::onWholePixels(window, QRect(eyeOffset(), d->area->size()), &pixels);
+        // canvases of eyeCanvas(), drawn for the area as it is now
+        if (left.size() == QSize(pixels.right() + 1, pixels.bottom() + 1) && !pixels.isEmpty()) {
+            // the surface's own pixels, from whole pixel to whole pixel around the area; clear where the area is not, and where it is kept clear
+            d->packed = QImage(2 * pixels.width(), pixels.height(), QImage::Format_ARGB32_Premultiplied);
+            d->packed.fill(Qt::transparent);
+            QPainter painter(&d->packed);
+            const QRect target(QPoint(), pixels.size());
+            if (!d->keepTransparency) {
+                // the clear parts of the area black, as around a picture
+                QRect areaPixels;
+                const qreal ratio = d->area->devicePixelRatioF();
+                const QRect area(eyeOffset(), d->area->size());
+                areaPixels = QRect(QPoint(qRound(area.x() * ratio), qRound(area.y() * ratio)),
+                    QPoint(qRound((area.x() + area.width()) * ratio) - 1, qRound((area.y() + area.height()) * ratio) - 1)).translated(-pixels.topLeft());
+                painter.fillRect(areaPixels, Qt::black);
+                painter.fillRect(areaPixels.translated(pixels.width(), 0), Qt::black);
+            } else {
+                painter.setCompositionMode(QPainter::CompositionMode_Source);
+            }
+            painter.drawImage(target, left, pixels);
+            painter.drawImage(target.translated(pixels.width(), 0), right, pixels);
+            painter.end();
+            d->eyePixels = pixels;
+            d->eyeRatio = d->area->devicePixelRatioF();
+            d->picture.layout = Picture::Layout::SideBySide;
+            // the picture only says that there are two eyes; what is shown is the packed pixels
+            d->picture.left = d->packed.copy(0, 0, 1, 1);
+            d->picture.right = d->picture.left;
+        }
+    }
+    d->dirty = true;
+    update();
+    if (d->area)
+        d->area->update();
+}
+bool WidgetLayer::eyesFit() const
+{
+    QWindow *window = d->area ? d->area->window()->windowHandle() : nullptr;
+    if (!window || d->packed.isNull())
+        return false;
+    QRect pixels;
+    const QRect rect = Surface::onWholePixels(window, QRect(eyeOffset(), d->area->size()), &pixels);
+    return pixels == d->eyePixels && rect == d->eyeRect && d->area->devicePixelRatioF() == d->eyeRatio;
+}
+void WidgetLayer::dropStaleEyes()
+{
+    // drawn for another place, size or scale: no hole is painted over them, the adapter draws flat until its new eyes come
+    d->surface.hide();
+    if (d->active) {
+        d->active = false;
+        d->announced = QRect();
+        if (d->area) {
+            d->area->setProperty("stereoLayerActive", false);
+            d->area->setProperty("stereoLayerShown", QRect());
+        }
+        Q_EMIT activeChanged();
+        Q_EMIT shownChanged();
+    }
+    if (!d->eyesAsked) {
+        d->eyesAsked = true;
+        QMetaObject::invokeMethod(this, &WidgetLayer::eyesWanted, Qt::QueuedConnection);
+    }
 }
 void WidgetLayer::setPaintArea(bool enabled) { d->paintArea = enabled; }
 void WidgetLayer::setKeepTransparency(bool keep)
@@ -161,7 +260,7 @@ void WidgetLayer::paint(QPainter *painter)
         painter->setCompositionMode(QPainter::CompositionMode_Source);
         painter->fillRect(d->area->rect(), d->keepTransparency ? Qt::transparent : Qt::black);
         painter->fillRect(d->shown, Qt::transparent);
-    } else {
+    } else if (!d->eyes) {
         const QSize pixels = d->area->size();
         // drawn flat (the surface is not shown: a screen with one eye, or a declaration the compositor did not take), a pair shows its left view, as the
         // file's flat picture; never both views side by side
@@ -171,6 +270,10 @@ void WidgetLayer::paint(QPainter *painter)
 }
 bool WidgetLayer::eventFilter(QObject *object, QEvent *event)
 {
+    // Before the window or the area paints: eyes drawn for another place are let go first, so that no frame is painted with
+    // holes over them
+    if (event->type() == QEvent::Paint && d->eyes && d->active && !eyesFit())
+        dropStaleEyes();
     if (object == d->area && event->type() == QEvent::Paint && d->paintArea) {
         QPainter painter(d->area);
         paint(&painter);
@@ -193,9 +296,29 @@ void WidgetLayer::update()
             connect(window, &QWindow::screenChanged, &d->output, &ScreenMode::setScreen);
         d->output.setScreen(window ? window->screen() : nullptr);
     }
+    QWidget *top = d->area ? d->area->window() : nullptr;
+    if (top != d->watched) {
+        if (d->watched && d->watched != d->area)
+            d->watched->removeEventFilter(this);
+        d->watched = top;
+        if (top && top != d->area)
+            top->installEventFilter(this);
+    }
     const bool visible = d->area && d->area->isVisible() && !d->area->size().isEmpty();
     bool active = false;
-    if (visible && d->picture.isStereo() && d->area->window()->testAttribute(Qt::WA_TranslucentBackground)) {
+    if (visible && d->eyes && d->picture.isStereo() && d->area->window()->testAttribute(Qt::WA_TranslucentBackground)) {
+        if (!eyesFit()) {
+            dropStaleEyes();
+        } else {
+            const QRect whole(QPoint(), d->area->size());
+            if (whole != d->shown) {
+                d->shown = whole;
+                d->area->update();
+            }
+            d->dirty = false;
+            active = d->surface.show(d->area->window()->windowHandle(), d->eyeRect, d->packed, true);
+        }
+    } else if (visible && d->picture.isStereo() && d->area->window()->testAttribute(Qt::WA_TranslucentBackground)) {
         const qreal ratio = d->area->devicePixelRatioF();
         const QSize pixels(qRound(d->area->width() * ratio), qRound(d->area->height() * ratio));
         if (d->dirty || pixels != d->pixels) {
