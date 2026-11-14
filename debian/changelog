@@ -19,6 +19,9 @@ stereo-layer (1.19.0-1) unstable; urgency=medium
     shortcut; chosen names the file's entry; refresh() reads the store again.
   * StereoPicture.refresh() decodes the source again, for a program to call
     on FileChoice's changed().
+  * A program with a FileChoice keeps a file's choice with the file when the
+    desktop's file jobs rename or move it (one Stereo::FileChoiceMoves for
+    the program), and changed() says so for a file the FileChoice names.
   * libstereo-layer1 depends on qml6-module-qtquick-controls and
     qml6-module-qtqml-models, which the QML menu imports.
 
