@@ -246,3 +246,151 @@ msgstr "La elección 3D de este archivo no pudo seguirlo a %1: %2."
 msgctxt "Stereo::FileChoiceMoves|"
 msgid "The 3D choice of a file cannot follow the file when it is renamed or moved: the session bus cannot be reached (%1)."
 msgstr "La elección 3D de un archivo no puede seguirlo cuando se renombra o se mueve: no se puede acceder al bus de sesión (%1)."
+
+msgctxt "QObject|"
+msgid "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed."
+msgstr "El color se reconstruye y es aproximado: un anaglifo conserva solo una parte del color de cada ojo. El archivo original nunca se modifica."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Picture and depth"
+msgstr "Imagen y profundidad"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Depth strength"
+msgstr "Intensidad de la profundidad"
+
+msgctxt "Stereo::DepthControls|"
+msgid "How deep the picture looks: the largest parallax in front of and behind the screen, in pixels of a picture 1920 wide. 58 is about one degree of visual angle."
+msgstr "La profundidad aparente de la imagen: la mayor paralaje por delante y por detrás de la pantalla, en píxeles de una imagen de 1920 de ancho. 58 equivale aproximadamente a un grado de ángulo visual."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Screen plane"
+msgstr "Plano de la pantalla"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Where the screen is in the depth of the picture, from 0 (the farthest) to 1 (the nearest). What is nearer comes out of the screen, what is farther stays behind it."
+msgstr "Dónde está la pantalla en la profundidad de la imagen, de 0 (lo más lejano) a 1 (lo más cercano). Lo que está más cerca sale de la pantalla; lo que está más lejos queda detrás de ella."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Shift"
+msgstr "Desplazamiento"
+
+msgctxt "Stereo::DepthControls|"
+msgid "The picture is"
+msgstr "La imagen es"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Which view the picture is. As the left eye it stays exactly as it is in that eye and the right eye is drawn; as the middle, both views are drawn."
+msgstr "Qué vista es la imagen. Como ojo izquierdo, queda exactamente como está en ese ojo y se dibuja el ojo derecho; como vista central, se dibujan las dos vistas."
+
+msgctxt "Stereo::DepthControls|"
+msgid "the left eye"
+msgstr "el ojo izquierdo"
+
+msgctxt "Stereo::DepthControls|"
+msgid "the middle"
+msgstr "la vista central"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Gap filling"
+msgstr "Relleno de huecos"
+
+msgctxt "Stereo::DepthControls|"
+msgid "How the places that the picture does not show, behind the objects in front, are filled."
+msgstr "Cómo se rellenan los lugares que la imagen no muestra, detrás de los objetos que están delante."
+
+msgctxt "Stereo::DepthControls|"
+msgid "Background"
+msgstr "Fondo"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Depth-aided"
+msgstr "Guiado por la profundidad"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Inpainting"
+msgstr "Reconstrucción (inpainting)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "None"
+msgstr "Ninguno"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Warping"
+msgstr "Deformación"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Forward"
+msgstr "Hacia delante"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Backward"
+msgstr "Hacia atrás"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Layered"
+msgstr "Por capas"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Smooth the depth"
+msgstr "Suavizar la profundidad"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Filling reach"
+msgstr "Alcance del relleno"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Nearest distance"
+msgstr "Distancia más cercana"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Farthest distance"
+msgstr "Distancia más lejana"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Back to the default"
+msgstr "Volver al valor predeterminado"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Pyramid"
+msgstr "Pirámide"
+
+msgctxt "Stereo::DepthControls|"
+msgid "Automatic"
+msgstr "Automático"
+
+msgctxt "Stereo::DepthControls|"
+msgid "A still picture and a picture saved into a file are drawn the best way there is. A video is drawn the best way that keeps its frame rate on this machine, timed once for each GPU and picture size. Choosing a warping or a gap filling yourself turns this off: your choice then holds for everything, the slowest way included."
+msgstr "Una imagen fija y una imagen guardada en un archivo se dibujan de la mejor manera que existe. Un vídeo se dibuja de la mejor manera que mantiene su velocidad de fotogramas en este equipo, medida una vez para cada GPU y cada tamaño de imagen. Elegir usted mismo una deformación o un relleno de huecos lo desactiva: su elección vale entonces para todo, incluida la manera más lenta."
+
+msgctxt "Stereo::DepthControls|"
+msgid "on this GPU"
+msgstr "en esta GPU"
+
+msgctxt "Stereo::DepthControls|"
+msgid "on this processor"
+msgstr "en este procesador"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (keeps %2 frames a second %3)"
+msgstr "%1 (mantiene %2 fotogramas por segundo %3)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (%2 does not keep %3 frames a second %4)"
+msgstr "%1 (%2 no mantiene %3 fotogramas por segundo %4)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (the quickest: no way keeps %2 frames a second %3)"
+msgstr "%1 (la más rápida: ninguna manera mantiene %2 fotogramas por segundo %3)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (the GPU was reset while drawing: the processor draws now)"
+msgstr "%1 (la GPU se reinició mientras dibujaba: ahora dibuja el procesador)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (%2 needs more of the GPU's memory than is free)"
+msgstr "%1 (%2 necesita más memoria de la GPU de la que hay libre)"
+
+msgctxt "Stereo::DepthControls|"
+msgid "%1 (needs about %2 MB of the GPU's memory, %3 MB is free)"
+msgstr "%1 (necesita unos %2 MB de la memoria de la GPU; hay %3 MB libres)"

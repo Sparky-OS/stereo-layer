@@ -48,6 +48,8 @@ stereo-layer (1.18.0-1) unstable; urgency=medium
     where the menu is (a thumbnail is one frame) stays in the list and
     says so (setShownAsOneView()). setShownAsPair() tells the menu of a
     viewer that a picture is shown flat: no swap is offered on it.
+  * The Spanish catalogue gains the 37 strings of the depth controls it
+    lacked: every sentence of the layer is in the nine catalogues now.
   * fromReader() and fromImages() with a path apply the stored choice for a
     viewer that decodes the file itself, and adoptSwapEyes() takes a
     program's own per-file swap into the store once, without touching the
