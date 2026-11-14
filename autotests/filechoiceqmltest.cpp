@@ -5,6 +5,8 @@
 #include "picture.h"
 #include <QAbstractItemModel>
 #include <QAction>
+#include <QDBusConnection>
+#include <QDBusMessage>
 #include <QDir>
 #include <QFile>
 #include <QQmlComponent>
@@ -309,6 +311,43 @@ private Q_SLOTS:
         QCOMPARE(rows.toString().split(QLatin1Char('|')), video);
         QVERIFY(call("marked", QStringLiteral("frames-left")));
         QVERIFY(root->property("failures").toList().isEmpty());
+    }
+
+    void theChoiceFollowsARenamedFile()
+    {
+        // A program with a FileChoice keeps a file's choice with it when the desktop's file jobs rename it, and
+        // changed() says so for the file it names, whichever comes first: the new source or the carry.
+        QDBusConnection bus = QDBusConnection::sessionBus();
+        if (!bus.isConnected()) {
+            QSKIP("no session bus in this run: the follower is tested where the suite has one (dbus-run-session)");
+        }
+        const QString from = m_dir.filePath(QStringLiteral("before.png"));
+        const QString to = m_dir.filePath(QStringLiteral("after.png"));
+        QVERIFY(QFile::copy(m_picture, from));
+        FileChoice choice;
+        choice.setSources({QUrl::fromLocalFile(from)});
+        QVERIFY(choice.choose(QStringLiteral("not-3d")));
+        QSignalSpy changed(&choice, &FileChoice::changed);
+        QSignalSpy refused(&choice, &FileChoice::failed);
+        QVERIFY(QFile::rename(from, to));
+        // the program's own model names the new file first, as a folder view does
+        choice.setSources({QUrl::fromLocalFile(to)});
+        QCOMPARE(choice.chosen(), QStringLiteral("automatic"));
+        QDBusMessage message = QDBusMessage::createSignal(QStringLiteral("/"), QStringLiteral("org.kde.KDirNotify"), QStringLiteral("FileMoved"));
+        message << QUrl::fromLocalFile(from).toString() << QUrl::fromLocalFile(to).toString();
+        QVERIFY(bus.send(message));
+        QVERIFY(changed.wait(5000));
+        QCOMPARE(changed.at(0).at(0).toStringList(), QStringList{to});
+        QCOMPARE(choice.chosen(), QStringLiteral("not-3d"));
+        QVERIFY(!Picture::hasFileChoice(from));
+        QVERIFY(refused.isEmpty());
+        // a copy carries nothing: no announcement of a move, and the copy has no choice
+        const QString copy = m_dir.filePath(QStringLiteral("copy.png"));
+        QVERIFY(QFile::copy(to, copy));
+        choice.setSources({QUrl::fromLocalFile(copy)});
+        QCOMPARE(choice.chosen(), QStringLiteral("automatic"));
+        QVERIFY(!Picture::hasFileChoice(copy));
+        QCOMPARE(Picture::fileChoice(to).view, Picture::View::Mono);
     }
 
     void thePictureShowsTheChoice()

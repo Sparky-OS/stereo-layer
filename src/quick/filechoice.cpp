@@ -2,10 +2,28 @@
 // SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
 #include "filechoice.h"
 #include "filechoicelist_p.h"
+#include "filechoicemoves.h"
+
+#include <QCoreApplication>
+#include <QFileInfo>
 
 using namespace Stereo;
 
 using Group = FileChoiceList::Group;
+
+namespace
+{
+// One follower of renamed and moved files for all the FileChoice objects of a program: it carries the choices in the
+// store whether or not one of them names the file, as the widgets' programs do with a FileChoiceMoves of their own.
+FileChoiceMoves *sharedMoves()
+{
+    static FileChoiceMoves *moves = nullptr;
+    if (!moves && QCoreApplication::instance()) {
+        moves = new FileChoiceMoves(QCoreApplication::instance());
+    }
+    return moves;
+}
+}
 
 FileChoiceEntries::FileChoiceEntries(FileChoiceList *list, int group, QObject *parent)
     : QAbstractListModel(parent)
@@ -96,6 +114,24 @@ FileChoice::FileChoice(QObject *parent)
     });
     connect(d->list, &FileChoiceList::changed, this, &FileChoice::changed);
     connect(d->list, &FileChoiceList::failed, this, &FileChoice::failed);
+    if (FileChoiceMoves *moves = sharedMoves()) {
+        // a choice arrived with a file this object names (it was renamed or moved to that path): show it again
+        connect(moves, &FileChoiceMoves::carried, this, [this](const QStringList &paths) {
+            // the follower names files by their real paths
+            QStringList mine;
+            const QStringList files = d->list->files();
+            for (const QString &file : files) {
+                if (paths.contains(file) || paths.contains(QFileInfo(file).canonicalFilePath())) {
+                    mine.append(file);
+                }
+            }
+            if (!mine.isEmpty()) {
+                d->list->refresh();
+                Q_EMIT changed(mine);
+            }
+        });
+        connect(moves, &FileChoiceMoves::failed, this, &FileChoice::failed);
+    }
 }
 
 FileChoice::~FileChoice() = default;

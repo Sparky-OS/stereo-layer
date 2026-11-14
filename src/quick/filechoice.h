@@ -57,7 +57,9 @@ private:
 // with FileChoiceMenu { choice: ... } or builds its own from the groups; on changed() it shows the files again
 // (StereoPicture.refresh()), and it says failed() where it shows its errors. The choice is kept in the programs' state
 // and never in the file; save() writes the file only because the person chose it. A source that is not a local file has
-// no place in the store: available is then false and nothing is offered.
+// no place in the store: available is then false and nothing is offered. A program with a FileChoice also keeps every
+// file's choice with it when the desktop's file jobs rename or move it (Stereo::FileChoiceMoves, one for the program),
+// and changed() says so for a file this object names.
 class STEREO_LAYER_EXPORT FileChoice : public QObject
 {
     Q_OBJECT
