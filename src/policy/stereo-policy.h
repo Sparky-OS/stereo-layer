@@ -327,11 +327,28 @@ STEREO_POLICY_EXPORT int stereo_policy_set_file_swap_eyes(const char *path, int 
  * ($HOME/.local/state when unset; XDG Base Directory Specification: "state data that should persist between
  * (application) restarts", "current state of the application that can be reused on a restart"), the entry named from
  * the file's real path, as a player names a resume position. One store for every program built on the policy, so a
- * file manager, its thumbnailer and a viewer show a file alike. A file that is moved or renamed loses its entry, as it
- * loses a resume position. The swap is over whatever decided the layout, the file's own mark included; a packing chosen
- * here is the person's correction of that file and comes before its mark (a declaration can be wrong), where a
- * caller's general choice comes after it. Nothing here reads or writes the file, its attributes or its times.
+ * file manager, its thumbnailer and a viewer show a file alike. The swap is over whatever decided the layout, the
+ * file's own mark included; a packing chosen here is the person's correction of that file and comes before its mark (a
+ * declaration can be wrong), where a caller's general choice comes after it. Nothing here reads or writes the file, its
+ * attributes or its times.
+ *
+ * The entry follows the file where a program tells the store that it renamed or moved it
+ * (stereo_policy_move_file_choice()); a file renamed or moved behind the store's back loses its entry, as it loses a
+ * resume position, and a copy has none. An entry file is named from a hash of the path and holds every path of that
+ * hash, so two paths with one hash keep a record each. One writer changes the store at a time (a lock file in the
+ * store's folder); readers take no lock, since an entry file is replaced whole by a rename. Each record also keeps the
+ * device and inode the file had when it was written, which is what tells a file that is gone from a drive that is not
+ * connected, and a file that took another one's place from the file a choice was made for.
+ *
+ * The store tidies itself where it is written: each write that keeps a choice, and each move, also looks at up to
+ * STEREO_POLICY_FILE_PRUNE_STEP entry files, going round the store from where the last one stopped, and drops the
+ * records of files that are gone. That is bounded by the step and by the store's own folder: it looks only at paths the
+ * store holds and never reads a folder of the person's. A file counts as gone when nothing is at its path and the
+ * nearest folder that still exists is on the device the file was on (a drive that is not connected, or a share that is
+ * not mounted, shows another device there, and its files keep their choice).
  */
+#define STEREO_POLICY_FILE_PRUNE_STEP 32
+
 enum stereo_policy_view {
     STEREO_POLICY_VIEW_STEREO = 0,
     STEREO_POLICY_VIEW_LEFT_ONLY = 1,
@@ -357,6 +374,17 @@ STEREO_POLICY_EXPORT int stereo_policy_set_file_choice(const char *path, const s
 
 /* Where the entry of path is, or would be, for a message or a test. Returns 0, or -1 with errno set. */
 STEREO_POLICY_EXPORT int stereo_policy_file_choice_entry(const char *path, char *entry, size_t size);
+
+/* Carries the choice of a file that a program renamed or moved from the path from to the path to; when to is a folder,
+ * the choice of every file that was below from. Call it after the move, when to exists. A file still at from was
+ * copied, not moved, and nothing is done. With no choice to carry, a choice kept at to for a file this one replaced is
+ * dropped. Calling it twice for one move, from two programs that saw it, changes nothing the second time. Returns the
+ * number of choices carried (0 when there was none), or -1 with errno set: the choices then stay where they were. */
+STEREO_POLICY_EXPORT int stereo_policy_move_file_choice(const char *from, const char *to);
+
+/* Looks at up to limit entry files, as a write does with STEREO_POLICY_FILE_PRUNE_STEP, and drops the records of
+ * files that are gone. Returns the number dropped, or -1 with errno set. */
+STEREO_POLICY_EXPORT int stereo_policy_prune_file_choices(int limit);
 
 #ifdef __cplusplus
 }

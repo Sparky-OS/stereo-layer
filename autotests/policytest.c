@@ -446,6 +446,169 @@ static void fileChoiceStore(void)
     CHECK(strstr(absolute, "policytest-state-") != NULL && system(other) == 0);
 }
 
+static void writeFile(const char *path)
+{
+    FILE *file = fopen(path, "w");
+    if (file) {
+        fputs("a picture", file);
+        fclose(file);
+    }
+}
+
+/* The choice follows a file the program renamed or moved, and a folder's files follow the folder (ORDER 551). */
+static void fileChoiceMove(void)
+{
+    char work[] = "policytest-move-XXXXXX", cwd[2048], state[4096], a[4096], b[4096], c[4096], command[8300];
+    struct stereo_policy_file_choice choice = { 0, 0, 0, STEREO_POLICY_VIEW_MONO, 0 }, read;
+    CHECK(mkdtemp(work) != NULL && getcwd(cwd, sizeof(cwd)) != NULL);
+    snprintf(state, sizeof(state), "%s/%s/state", cwd, work);
+    setenv("XDG_STATE_HOME", state, 1);
+    snprintf(a, sizeof(a), "%s/%s/a.png", cwd, work);
+    snprintf(b, sizeof(b), "%s/%s/b.png", cwd, work);
+    snprintf(c, sizeof(c), "%s/%s/c.png", cwd, work);
+    writeFile(a);
+    CHECK(stereo_policy_set_file_choice(a, &choice) == 0);
+    /* a copy: the file is still at its old path, nothing moves */
+    writeFile(b);
+    CHECK(stereo_policy_move_file_choice(a, b) == 0);
+    CHECK(stereo_policy_file_choice(a, &read) == 1 && stereo_policy_file_choice(b, &read) == 0);
+    remove(b);
+    /* a rename */
+    CHECK(rename(a, b) == 0);
+    CHECK(stereo_policy_file_choice(b, &read) == 0);
+    CHECK(stereo_policy_move_file_choice(a, b) == 1);
+    CHECK(stereo_policy_file_choice(b, &read) == 1 && read.view == STEREO_POLICY_VIEW_MONO);
+    CHECK(stereo_policy_file_choice(a, &read) == 0);
+    /* a second program that saw the same rename changes nothing */
+    CHECK(stereo_policy_move_file_choice(a, b) == 0);
+    CHECK(stereo_policy_file_choice(b, &read) == 1 && read.view == STEREO_POLICY_VIEW_MONO);
+    /* a file with no choice moved over one that has one: that choice was for the file it replaced */
+    writeFile(c);
+    CHECK(rename(c, b) == 0);
+    CHECK(stereo_policy_move_file_choice(c, b) == 0);
+    CHECK(stereo_policy_file_choice(b, &read) == 0);
+    /* a file with a choice moved over one with another choice: the moved file's choice is the one kept */
+    writeFile(a);
+    choice.view = 0;
+    choice.swap_eyes = 1;
+    CHECK(stereo_policy_set_file_choice(a, &choice) == 0);
+    choice.swap_eyes = 0;
+    choice.layout = STEREO_POLICY_LAYOUT_ROWS;
+    CHECK(stereo_policy_set_file_choice(b, &choice) == 0);
+    CHECK(rename(a, b) == 0);
+    CHECK(stereo_policy_move_file_choice(a, b) == 1);
+    CHECK(stereo_policy_file_choice(b, &read) == 1 && read.swap_eyes == 1 && read.layout == 0);
+    /* into another folder, and then the folder itself is renamed: the files below it keep their choices */
+    snprintf(a, sizeof(a), "%s/%s/album", cwd, work);
+    snprintf(c, sizeof(c), "%s/%s/album/deep", cwd, work);
+    CHECK(mkdir(a, 0700) == 0 && mkdir(c, 0700) == 0);
+    snprintf(c, sizeof(c), "%s/%s/album/deep/b.png", cwd, work);
+    CHECK(rename(b, c) == 0);
+    CHECK(stereo_policy_move_file_choice(b, c) == 1);
+    CHECK(stereo_policy_file_choice(c, &read) == 1 && read.swap_eyes == 1);
+    snprintf(b, sizeof(b), "%s/%s/album/top.png", cwd, work);
+    writeFile(b);
+    choice.layout = STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM;
+    CHECK(stereo_policy_set_file_choice(b, &choice) == 0);
+    snprintf(b, sizeof(b), "%s/%s/albums", cwd, work);
+    CHECK(rename(a, b) == 0);
+    CHECK(stereo_policy_move_file_choice(a, b) == 2);
+    snprintf(c, sizeof(c), "%s/%s/albums/deep/b.png", cwd, work);
+    CHECK(stereo_policy_file_choice(c, &read) == 1 && read.swap_eyes == 1);
+    snprintf(c, sizeof(c), "%s/%s/albums/top.png", cwd, work);
+    CHECK(stereo_policy_file_choice(c, &read) == 1 && read.layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM);
+    snprintf(c, sizeof(c), "%s/%s/album/top.png", cwd, work);
+    CHECK(stereo_policy_file_choice(c, &read) == 0);
+    /* a folder whose name only starts like the moved one is another folder */
+    CHECK(stereo_policy_move_file_choice(a, b) == 0);
+    /* bad arguments, and a target that is not there */
+    errno = 0;
+    CHECK(stereo_policy_move_file_choice(NULL, b) == -1 && errno == EINVAL);
+    snprintf(c, sizeof(c), "%s/%s/nowhere.png", cwd, work);
+    CHECK(stereo_policy_move_file_choice(a, c) == -1);
+    unsetenv("XDG_STATE_HOME");
+    snprintf(command, sizeof(command), "rm -rf '%s/%s'", cwd, work);
+    CHECK(strstr(work, "policytest-move-") != NULL && system(command) == 0);
+}
+
+/* The store drops the choices of files that are gone, a bounded step at each write (ORDER 551). */
+static void fileChoicePrune(void)
+{
+    char work[] = "policytest-prune-XXXXXX", cwd[2048], state[4096], path[4096], kept[4096], command[8300];
+    struct stereo_policy_file_choice choice = { 0, 0, 0, STEREO_POLICY_VIEW_MONO, 0 }, read;
+    const int files = STEREO_POLICY_FILE_PRUNE_STEP * 2 + 8;
+    CHECK(mkdtemp(work) != NULL && getcwd(cwd, sizeof(cwd)) != NULL);
+    snprintf(state, sizeof(state), "%s/%s/state", cwd, work);
+    setenv("XDG_STATE_HOME", state, 1);
+    for (int i = 0; i < files; ++i) {
+        snprintf(path, sizeof(path), "%s/%s/%d.png", cwd, work, i);
+        writeFile(path);
+        CHECK(stereo_policy_set_file_choice(path, &choice) == 0);
+    }
+    /* nothing is gone: a whole round drops nothing */
+    CHECK(stereo_policy_prune_file_choices(files) == 0);
+    /* every second file is deleted; its choice stays readable by path until the store is written or pruned */
+    for (int i = 0; i < files; i += 2) {
+        snprintf(path, sizeof(path), "%s/%s/%d.png", cwd, work, i);
+        CHECK(remove(path) == 0);
+    }
+    snprintf(path, sizeof(path), "%s/%s/0.png", cwd, work);
+    CHECK(stereo_policy_file_choice(path, &read) == 1);
+    /* one write looks at one step of the store, not at all of it */
+    snprintf(kept, sizeof(kept), "%s/%s/1.png", cwd, work);
+    choice.swap_eyes = 1;
+    CHECK(stereo_policy_set_file_choice(kept, &choice) == 0);
+    int left = 0;
+    for (int i = 0; i < files; i += 2) {
+        snprintf(path, sizeof(path), "%s/%s/%d.png", cwd, work, i);
+        left += stereo_policy_file_choice(path, &read) == 1;
+    }
+    CHECK(left > 0 && left < files / 2);
+    CHECK(left >= files / 2 - STEREO_POLICY_FILE_PRUNE_STEP);
+    /* and going round, the next writes reach the rest */
+    for (int round = 0; round < 3; ++round)
+        CHECK(stereo_policy_set_file_choice(kept, &choice) == 0);
+    left = 0;
+    for (int i = 0; i < files; ++i) {
+        snprintf(path, sizeof(path), "%s/%s/%d.png", cwd, work, i);
+        const int has = stereo_policy_file_choice(path, &read) == 1;
+        CHECK(has == (i % 2 == 1));
+        left += has;
+    }
+    CHECK(left == files / 2);
+    /* a file whose folder went with it is gone too */
+    snprintf(path, sizeof(path), "%s/%s/folder", cwd, work);
+    CHECK(mkdir(path, 0700) == 0);
+    snprintf(path, sizeof(path), "%s/%s/folder/in.png", cwd, work);
+    writeFile(path);
+    CHECK(stereo_policy_set_file_choice(path, &choice) == 0);
+    CHECK(remove(path) == 0);
+    snprintf(command, sizeof(command), "%s/%s/folder", cwd, work);
+    CHECK(rmdir(command) == 0);
+    CHECK(stereo_policy_prune_file_choices(files + 8) == 1);
+    CHECK(stereo_policy_file_choice(path, &read) == 0);
+    /* a file on a drive that is not connected keeps its choice: its record names another device than the folder that
+     * is left. The record is written here as the store writes it, with a device no folder of this test is on. */
+    snprintf(path, sizeof(path), "%s/%s/drive", cwd, work);
+    CHECK(mkdir(path, 0700) == 0);
+    snprintf(path, sizeof(path), "%s/%s/drive/film.mkv", cwd, work);
+    writeFile(path);
+    CHECK(stereo_policy_set_file_choice(path, &choice) == 0);
+    CHECK(stereo_policy_file_choice_entry(path, kept, sizeof(kept)) == 0);
+    FILE *entry = fopen(kept, "w");
+    CHECK(entry != NULL);
+    if (entry) {
+        fprintf(entry, "stereo-policy-file-choice 1\npath=%s\nlayout=0\norder=0\nanaglyph=0\nview=3\nswap-eyes=0\ndevice=18446744073709551000\ninode=7\n", path);
+        fclose(entry);
+    }
+    CHECK(remove(path) == 0);
+    CHECK(stereo_policy_prune_file_choices(files + 8) == 0);
+    CHECK(stereo_policy_file_choice(path, &read) == 1 && read.view == STEREO_POLICY_VIEW_MONO);
+    unsetenv("XDG_STATE_HOME");
+    snprintf(command, sizeof(command), "rm -rf '%s/%s'", cwd, work);
+    CHECK(strstr(work, "policytest-prune-") != NULL && system(command) == 0);
+}
+
 /* A scene of smooth texture: sums of waves, one set per seed, no two seeds alike. */
 static double scene(double x, double y, int seed)
 {
@@ -751,6 +914,8 @@ int main(void)
     depthLayouts();
     fileCorrection();
     fileChoiceStore();
+    fileChoiceMove();
+    fileChoicePrune();
     videoLayout();
     fullViews();
     videoViewsTable();
