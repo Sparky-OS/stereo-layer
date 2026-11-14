@@ -46,8 +46,14 @@ target_link_libraries(picturetest PRIVATE StereoLayer Qt6::Test Qt6::Widgets Qt6
 target_include_directories(picturetest PRIVATE ${CMAKE_SOURCE_DIR}/src/widgets)
 add_dependencies(picturetest depthtestreader)
 # a session bus of the test's own: the follower of renamed and moved files hears the desktop's file jobs there
-find_program(DBUS_RUN_SESSION dbus-run-session REQUIRED)
-add_test(NAME picturetest COMMAND ${DBUS_RUN_SESSION} -- $<TARGET_FILE:picturetest>)
+find_program(DBUS_RUN_SESSION dbus-run-session)
+if(DBUS_RUN_SESSION)
+    add_test(NAME picturetest COMMAND ${DBUS_RUN_SESSION} -- $<TARGET_FILE:picturetest>)
+else()
+    # a build that runs no tests (the nocheck profile leaves dbus-daemon out) still configures them
+    message(WARNING "dbus-run-session was not found (package dbus-daemon): picturetest will skip the follower of renamed and moved files unless a session bus is running")
+    add_test(NAME picturetest COMMAND picturetest)
+endif()
 cmake_path(CONVERT "$ENV{QT_PLUGIN_PATH}" TO_CMAKE_PATH_LIST _picture_plugins)
 list(PREPEND _picture_plugins "${CMAKE_CURRENT_BINARY_DIR}/plugins")
 cmake_path(CONVERT "${_picture_plugins}" TO_NATIVE_PATH_LIST _picture_plugin_path)
