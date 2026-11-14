@@ -42,54 +42,54 @@ FileChoiceList::FileChoiceList(QObject *parent)
         m_entries.append({QString::fromLatin1(id), text, group, layout, order, anaglyph, view, videoOnly});
     };
     add("automatic", QCoreApplication::translate("Stereo::FileChoiceMenu", "Automatic"), Group::Top);
-    add("not-3d", QCoreApplication::translate("Stereo::FileChoiceMenu", "Not 3D"), Group::Top, Layout::None, Order::LeftFirst, Anaglyph::None, View::Mono);
-    add("side-by-side-left", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side, left eye first"), Group::Whole, Layout::SideBySide,
+    add("mono", QCoreApplication::translate("Stereo::FileChoiceMenu", "Not 3D"), Group::Top, Layout::None, Order::LeftFirst, Anaglyph::None, View::Mono);
+    add("sideBySideLeftFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side, left eye first"), Group::Whole, Layout::SideBySide,
         Order::LeftFirst);
-    add("side-by-side-right", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side, right eye first"), Group::Whole, Layout::SideBySide,
+    add("sideBySideRightFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side, right eye first"), Group::Whole, Layout::SideBySide,
         Order::RightFirst);
-    add("top-and-bottom-left", QCoreApplication::translate("Stereo::FileChoiceMenu", "Top and bottom, left eye first"), Group::Whole, Layout::TopAndBottom,
+    add("topBottomLeftFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Top and bottom, left eye first"), Group::Whole, Layout::TopAndBottom,
         Order::LeftFirst);
-    add("top-and-bottom-right", QCoreApplication::translate("Stereo::FileChoiceMenu", "Top and bottom, right eye first"), Group::Whole,
+    add("topBottomRightFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Top and bottom, right eye first"), Group::Whole,
         Layout::TopAndBottom, Order::RightFirst);
-    add("rows-left", QCoreApplication::translate("Stereo::FileChoiceMenu", "Rows, left eye first"), Group::Interleaved, Layout::Rows, Order::LeftFirst);
-    add("rows-right", QCoreApplication::translate("Stereo::FileChoiceMenu", "Rows, right eye first"), Group::Interleaved, Layout::Rows, Order::RightFirst);
-    add("columns-left", QCoreApplication::translate("Stereo::FileChoiceMenu", "Columns, left eye first"), Group::Interleaved, Layout::Columns,
+    add("rowInterleavedLeftFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Rows, left eye first"), Group::Interleaved, Layout::Rows, Order::LeftFirst);
+    add("rowInterleavedRightFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Rows, right eye first"), Group::Interleaved, Layout::Rows, Order::RightFirst);
+    add("columnInterleavedLeftFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Columns, left eye first"), Group::Interleaved, Layout::Columns,
         Order::LeftFirst);
-    add("columns-right", QCoreApplication::translate("Stereo::FileChoiceMenu", "Columns, right eye first"), Group::Interleaved, Layout::Columns,
+    add("columnInterleavedRightFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Columns, right eye first"), Group::Interleaved, Layout::Columns,
         Order::RightFirst);
-    add("checkerboard-left", QCoreApplication::translate("Stereo::FileChoiceMenu", "Checkerboard, left eye first"), Group::Interleaved,
+    add("checkerboardLeftFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Checkerboard, left eye first"), Group::Interleaved,
         Layout::Checkerboard, Order::LeftFirst);
-    add("checkerboard-right", QCoreApplication::translate("Stereo::FileChoiceMenu", "Checkerboard, right eye first"), Group::Interleaved,
+    add("checkerboardRightFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Checkerboard, right eye first"), Group::Interleaved,
         Layout::Checkerboard, Order::RightFirst);
-    add("quincunx-left", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side quincunx, left eye first"), Group::Interleaved,
+    add("sideBySideQuincunxLeftFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side quincunx, left eye first"), Group::Interleaved,
         Layout::SideBySideQuincunx, Order::LeftFirst);
-    add("quincunx-right", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side quincunx, right eye first"), Group::Interleaved,
+    add("sideBySideQuincunxRightFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side quincunx, right eye first"), Group::Interleaved,
         Layout::SideBySideQuincunx, Order::RightFirst);
-    add("frames-left", QCoreApplication::translate("Stereo::FileChoiceMenu", "Frames in turn, left eye first"), Group::Sequence, Layout::FrameSequential,
+    add("frameSequentialLeftFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Frames in turn, left eye first"), Group::Sequence, Layout::FrameSequential,
         Order::LeftFirst, Anaglyph::None, View::Stereo, true);
-    add("frames-right", QCoreApplication::translate("Stereo::FileChoiceMenu", "Frames in turn, right eye first"), Group::Sequence, Layout::FrameSequential,
+    add("frameSequentialRightFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Frames in turn, right eye first"), Group::Sequence, Layout::FrameSequential,
         Order::RightFirst, Anaglyph::None, View::Stereo, true);
-    add("block-left", QCoreApplication::translate("Stereo::FileChoiceMenu", "Both views in one block, left eye first"), Group::Sequence, Layout::BlockLaced,
+    add("blockLacedLeftFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Both views in one block, left eye first"), Group::Sequence, Layout::BlockLaced,
         Order::LeftFirst, Anaglyph::None, View::Stereo, true);
-    add("block-right", QCoreApplication::translate("Stereo::FileChoiceMenu", "Both views in one block, right eye first"), Group::Sequence,
+    add("blockLacedRightFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Both views in one block, right eye first"), Group::Sequence,
         Layout::BlockLaced, Order::RightFirst, Anaglyph::None, View::Stereo, true);
-    add("anaglyph-red-cyan", QCoreApplication::translate("Stereo::FileChoiceMenu", "Red/cyan"), Group::Anaglyph, Layout::None, Order::LeftFirst,
+    add("anaglyphCyanRed", QCoreApplication::translate("Stereo::FileChoiceMenu", "Red/cyan"), Group::Anaglyph, Layout::None, Order::LeftFirst,
         Anaglyph::RedCyan);
-    add("anaglyph-green-magenta", QCoreApplication::translate("Stereo::FileChoiceMenu", "Green/magenta"), Group::Anaglyph, Layout::None, Order::LeftFirst,
+    add("anaglyphGreenMagenta", QCoreApplication::translate("Stereo::FileChoiceMenu", "Green/magenta"), Group::Anaglyph, Layout::None, Order::LeftFirst,
         Anaglyph::GreenMagenta);
-    add("anaglyph-amber-blue", QCoreApplication::translate("Stereo::FileChoiceMenu", "Amber/blue"), Group::Anaglyph, Layout::None, Order::LeftFirst,
+    add("anaglyphAmberBlue", QCoreApplication::translate("Stereo::FileChoiceMenu", "Amber/blue"), Group::Anaglyph, Layout::None, Order::LeftFirst,
         Anaglyph::AmberBlue);
-    add("depth-side-by-side-picture", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side, picture first"), Group::Depth,
+    add("depthSideBySidePictureFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side, picture first"), Group::Depth,
         Layout::DepthSideBySide, Order::LeftFirst);
-    add("depth-side-by-side-depth", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side, depth first"), Group::Depth,
+    add("depthSideBySideDepthFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Side by side, depth first"), Group::Depth,
         Layout::DepthSideBySide, Order::RightFirst);
-    add("depth-top-and-bottom-picture", QCoreApplication::translate("Stereo::FileChoiceMenu", "Top and bottom, picture first"), Group::Depth,
+    add("depthTopBottomPictureFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Top and bottom, picture first"), Group::Depth,
         Layout::DepthTopAndBottom, Order::LeftFirst);
-    add("depth-top-and-bottom-depth", QCoreApplication::translate("Stereo::FileChoiceMenu", "Top and bottom, depth first"), Group::Depth,
+    add("depthTopBottomDepthFirst", QCoreApplication::translate("Stereo::FileChoiceMenu", "Top and bottom, depth first"), Group::Depth,
         Layout::DepthTopAndBottom, Order::RightFirst);
-    add("depth-graphics", QCoreApplication::translate("Stereo::FileChoiceMenu", "Four rows: picture, depth, graphics, graphics depth"), Group::Depth,
+    add("depthGraphicsTopBottom", QCoreApplication::translate("Stereo::FileChoiceMenu", "Four rows: picture, depth, graphics, graphics depth"), Group::Depth,
         Layout::DepthGraphics, Order::LeftFirst);
-    add("depth-background", QCoreApplication::translate("Stereo::FileChoiceMenu", "Four quarters: picture, depth, background, background depth"),
+    add("depthBackgroundQuarters", QCoreApplication::translate("Stereo::FileChoiceMenu", "Four quarters: picture, depth, background, background depth"),
         Group::Depth, Layout::DepthBackground, Order::LeftFirst);
     refresh();
 }

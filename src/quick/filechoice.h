@@ -17,7 +17,7 @@ class FileChoiceList;
 
 // One group of the per-file choice list as a model a QML menu shows: the entries at the top, the packings one picture
 // holds whole, or one of the sub-menus. Roles: label (the entry's words), chosen (it is the file's choice), offered (it
-// is shown for this kind of file) and entryId (its name whatever the language).
+// is shown for this kind of file) and entryId (its name whatever the language: the Stereo3DLayout word).
 class STEREO_LAYER_EXPORT FileChoiceEntries : public QAbstractListModel
 {
     Q_OBJECT
@@ -74,7 +74,8 @@ class STEREO_LAYER_EXPORT FileChoice : public QObject
     Q_PROPERTY(QList<int> shownAsOneView READ shownAsOneView WRITE setShownAsOneView NOTIFY shownAsOneViewChanged)
     Q_PROPERTY(QString title READ title CONSTANT)
     Q_PROPERTY(bool available READ available NOTIFY stateChanged)
-    // The name of the entry that is the first file's choice ("automatic", "not-3d", "side-by-side-right" ...)
+    // The name of the entry that is the first file's choice: its Stereo3DLayout word, as a file's mark has it
+    // ("sideBySideRightFirst", "topBottomLeftFirst", "anaglyphCyanRed", "mono" for Not 3D), or "automatic" for none
     Q_PROPERTY(QString chosen READ chosen NOTIFY stateChanged)
     Q_PROPERTY(Stereo::FileChoiceEntries *top READ top CONSTANT)
     Q_PROPERTY(Stereo::FileChoiceEntries *whole READ whole CONSTANT)
@@ -123,7 +124,8 @@ public:
     QString saveText() const;
     QString saveToolTip() const;
 
-    // For a program's shortcut: chooses the entry of that name for every file; false when there is no such entry
+    // For a program's shortcut: chooses the entry of that name (as chosen gives it) for every file; false when there
+    // is no such entry
     Q_INVOKABLE bool choose(const QString &entryId);
     // Only after the person chose it: writes the correction into the files (the shared save) and unmarks the choice
     Q_INVOKABLE void save();

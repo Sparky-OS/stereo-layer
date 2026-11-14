@@ -76,7 +76,7 @@ set_tests_properties(qmlimporttest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offsc
 
 # The QML face of the per-file choice: the same list as the widgets' menu, the same writes to the store
 add_executable(filechoiceqmltest filechoiceqmltest.cpp)
-target_link_libraries(filechoiceqmltest PRIVATE StereoLayer Qt6::Quick Qt6::Qml Qt6::Widgets Qt6::DBus Qt6::Test)
+target_link_libraries(filechoiceqmltest PRIVATE StereoLayer StereoPolicy Qt6::Quick Qt6::Qml Qt6::Widgets Qt6::DBus Qt6::Test)
 target_include_directories(filechoiceqmltest PRIVATE ${CMAKE_SOURCE_DIR}/src/quick ${CMAKE_SOURCE_DIR}/src/widgets)
 add_dependencies(filechoiceqmltest StereoLayerplugin)
 # a session bus of the test's own, as for picturetest: the QML type follows renamed and moved files there

@@ -15,8 +15,10 @@ stereo-layer (1.19.0-1) unstable; urgency=medium
     packing the widgets' menu offers, in the same words of the same
     catalogues, and no sentence is new. The widgets' menu behaves as before.
   * FileChoice.choose(name) chooses an entry by a name that does not change
-    with the language ("not-3d", "side-by-side-right"), for a program's
-    shortcut; chosen names the file's entry; refresh() reads the store again.
+    with the language, for a program's shortcut: the Stereo3DLayout word a
+    file's mark uses for the same thing ("sideBySideRightFirst", "mono" for
+    Not 3D), so the idea keeps one name; chosen names the file's entry;
+    refresh() reads the store again.
   * StereoPicture.refresh() decodes the source again, for a program to call
     on FileChoice's changed().
   * A program with a FileChoice keeps a file's choice with the file when the

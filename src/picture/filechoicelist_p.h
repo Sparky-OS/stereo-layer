@@ -20,7 +20,10 @@ public:
     // the four sub-menus.
     enum class Group { Top, Whole, Interleaved, Sequence, Anaglyph, Depth };
     struct Entry {
-        // a name that does not change with the language, for a program's shortcut ("not-3d", "side-by-side-right")
+        // a name that does not change with the language, for a program's shortcut: the entry's Stereo3DLayout word, the
+        // one a file's mark uses for the same thing (stereo_policy_read_mark(): "sideBySideRightFirst", "topBottomLeftFirst",
+        // "rowInterleavedLeftFirst", "depthSideBySidePictureFirst", "anaglyphCyanRed", "mono" for Not 3D); "automatic" for
+        // no choice, and "anaglyphAmberBlue" for the pair no mark names yet
         QString id;
         QString text;
         Group group = Group::Top;

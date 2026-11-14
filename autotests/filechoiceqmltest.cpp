@@ -3,6 +3,7 @@
 #include "filechoice.h"
 #include "filechoicemenu.h"
 #include "picture.h"
+#include "stereo-policy.h"
 #include <QAbstractItemModel>
 #include <QAction>
 #include <QDBusConnection>
@@ -129,21 +130,63 @@ private Q_SLOTS:
         }
     }
 
+    void theNamesAreTheMarksWords()
+    {
+        // An entry's name is the Stereo3DLayout word a file's mark uses for the same thing, so the idea has one name: the
+        // layer's own mark reader gives, for each name, exactly what the entry keeps for the file. Two entries have no
+        // word of a mark: "automatic" (no choice) and the amber and blue pair.
+        FileChoice choice;
+        choice.setContent(FileChoice::Video);
+        choice.setSources({QUrl::fromLocalFile(m_picture)});
+        int checked = 0;
+        for (FileChoiceEntries *group : {choice.top(), choice.whole(), choice.interleaved(), choice.sequence(), choice.anaglyph(), choice.depth()}) {
+            for (int row = 0; row < group->rowCount(); ++row) {
+                const QString name = group->data(group->index(row, 0), FileChoiceEntries::EntryIdRole).toString();
+                QVERIFY(choice.choose(name));
+                QCOMPARE(choice.chosen(), name);
+                const Picture::Options kept = Picture::fileChoice(m_picture);
+                if (name == QLatin1String("automatic")) {
+                    QVERIFY(!Picture::hasFileChoice(m_picture));
+                    continue;
+                }
+                int layout = -1, order = -1, anaglyph = -1;
+                const int read = stereo_policy_read_mark(name.toLatin1().constData(), &layout, &order, &anaglyph);
+                if (name == QLatin1String("anaglyphAmberBlue")) {
+                    QCOMPARE(read, 0);
+                    QCOMPARE(kept.anaglyph, Picture::AnaglyphColorPair::AmberBlue);
+                    continue;
+                }
+                QVERIFY2(read == 1, qPrintable(name));
+                if (name == QLatin1String("mono")) {
+                    QCOMPARE(kept.view, Picture::View::Mono);
+                    continue;
+                }
+                QVERIFY2(int(kept.inputLayout) == layout, qPrintable(name));
+                QVERIFY2(int(kept.anaglyph) == anaglyph, qPrintable(name));
+                if (layout != STEREO_POLICY_LAYOUT_NONE) {
+                    QVERIFY2(int(kept.inputOrder) == order, qPrintable(name));
+                }
+                ++checked;
+            }
+        }
+        QCOMPARE(checked, 24);
+    }
+
     void choiceIsTheStores()
     {
         FileChoice choice;
         QSignalSpy changed(&choice, &FileChoice::changed);
         QVERIFY(!choice.available());
-        QVERIFY(!choice.choose(QStringLiteral("not-3d")) || changed.isEmpty());
+        QVERIFY(!choice.choose(QStringLiteral("mono")) || changed.isEmpty());
         choice.setSources({QUrl::fromLocalFile(m_picture)});
         QVERIFY(choice.available());
         QCOMPARE(choice.chosen(), QStringLiteral("automatic"));
         QVERIFY(!choice.saveEnabled());
         // by name, as a program's shortcut does
-        QVERIFY(choice.choose(QStringLiteral("side-by-side-right")));
+        QVERIFY(choice.choose(QStringLiteral("sideBySideRightFirst")));
         QCOMPARE(changed.count(), 1);
         QCOMPARE(changed.at(0).at(0).toStringList(), QStringList{m_picture});
-        QCOMPARE(choice.chosen(), QStringLiteral("side-by-side-right"));
+        QCOMPARE(choice.chosen(), QStringLiteral("sideBySideRightFirst"));
         Picture::Options kept = Picture::fileChoice(m_picture);
         QCOMPARE(kept.inputLayout, Picture::Layout::SideBySide);
         QCOMPARE(kept.inputOrder, Picture::EyeOrder::RightFirst);
@@ -172,7 +215,7 @@ private Q_SLOTS:
         QVERIFY(!choice.swapEyes());
         QCOMPARE(choice.chosen(), QStringLiteral("automatic"));
         // Not 3D: one flat picture has no eyes to swap
-        QVERIFY(choice.choose(QStringLiteral("not-3d")));
+        QVERIFY(choice.choose(QStringLiteral("mono")));
         QCOMPARE(Picture::fileChoice(m_picture).view, Picture::View::Mono);
         QVERIFY(!choice.swapEnabled());
     }
@@ -203,7 +246,7 @@ private Q_SLOTS:
         QVERIFY(!choice.available());
         QVERIFY(!choice.swapEnabled());
         QVERIFY(!choice.saveEnabled());
-        choice.choose(QStringLiteral("not-3d"));
+        choice.choose(QStringLiteral("mono"));
         choice.setSwapEyes(true);
         QVERIFY(changed.isEmpty());
     }
@@ -219,7 +262,7 @@ private Q_SLOTS:
         choice.refresh();
         QSignalSpy refused(&choice, &FileChoice::failed);
         QSignalSpy changed(&choice, &FileChoice::changed);
-        QVERIFY(choice.choose(QStringLiteral("not-3d")));
+        QVERIFY(choice.choose(QStringLiteral("mono")));
         QCOMPARE(refused.count(), 1);
         QVERIFY(refused.at(0).at(0).toString().contains(QStringLiteral("pair.png")));
         QVERIFY(changed.isEmpty());
@@ -288,15 +331,15 @@ private Q_SLOTS:
             return result.toBool();
         };
         QVERIFY(call("marked", QStringLiteral("automatic")));
-        QVERIFY(call("click", QStringLiteral("top-and-bottom-left")));
+        QVERIFY(call("click", QStringLiteral("topBottomLeftFirst")));
         QCOMPARE(Picture::fileChoice(m_picture).inputLayout, Picture::Layout::TopAndBottom);
-        QVERIFY(call("marked", QStringLiteral("top-and-bottom-left")));
+        QVERIFY(call("marked", QStringLiteral("topBottomLeftFirst")));
         QVERIFY(!call("marked", QStringLiteral("automatic")));
         // an entry in a sub-menu
-        QVERIFY(call("click", QStringLiteral("anaglyph-green-magenta")));
+        QVERIFY(call("click", QStringLiteral("anaglyphGreenMagenta")));
         QCOMPARE(Picture::fileChoice(m_picture).anaglyph, Picture::AnaglyphColorPair::GreenMagenta);
-        QVERIFY(call("marked", QStringLiteral("anaglyph-green-magenta")));
-        QVERIFY(!call("marked", QStringLiteral("top-and-bottom-left")));
+        QVERIFY(call("marked", QStringLiteral("anaglyphGreenMagenta")));
+        QVERIFY(!call("marked", QStringLiteral("topBottomLeftFirst")));
         // the save is offered once a choice is kept, and no swap on a picture shown flat
         QVERIFY(call("usable", QStringLiteral("save")));
         QVERIFY(call("usable", QStringLiteral("swap-eyes")));
@@ -309,7 +352,7 @@ private Q_SLOTS:
         choice->refresh();
         QVERIFY(QMetaObject::invokeMethod(root.get(), "rows", Q_RETURN_ARG(QVariant, rows)));
         QCOMPARE(rows.toString().split(QLatin1Char('|')), video);
-        QVERIFY(call("marked", QStringLiteral("frames-left")));
+        QVERIFY(call("marked", QStringLiteral("frameSequentialLeftFirst")));
         QVERIFY(root->property("failures").toList().isEmpty());
     }
 
@@ -326,7 +369,7 @@ private Q_SLOTS:
         QVERIFY(QFile::copy(m_picture, from));
         FileChoice choice;
         choice.setSources({QUrl::fromLocalFile(from)});
-        QVERIFY(choice.choose(QStringLiteral("not-3d")));
+        QVERIFY(choice.choose(QStringLiteral("mono")));
         QSignalSpy changed(&choice, &FileChoice::changed);
         QSignalSpy refused(&choice, &FileChoice::failed);
         QVERIFY(QFile::rename(from, to));
@@ -338,7 +381,7 @@ private Q_SLOTS:
         QVERIFY(bus.send(message));
         QVERIFY(changed.wait(5000));
         QCOMPARE(changed.at(0).at(0).toStringList(), QStringList{to});
-        QCOMPARE(choice.chosen(), QStringLiteral("not-3d"));
+        QCOMPARE(choice.chosen(), QStringLiteral("mono"));
         QVERIFY(!Picture::hasFileChoice(from));
         QVERIFY(refused.isEmpty());
         // a copy carries nothing: no announcement of a move, and the copy has no choice
@@ -367,12 +410,12 @@ private Q_SLOTS:
         QVERIFY(!item->property("stereo").toBool());
         FileChoice choice;
         choice.setSources({QUrl::fromLocalFile(path)});
-        QVERIFY(choice.choose(QStringLiteral("side-by-side-left")));
+        QVERIFY(choice.choose(QStringLiteral("sideBySideLeftFirst")));
         QVERIFY(!item->property("stereo").toBool());
         QVERIFY(QMetaObject::invokeMethod(item.get(), "refresh"));
         QVERIFY(item->property("stereo").toBool());
         QCOMPARE(item->property("pictureSize").toSize(), QSize(32, 16));
-        QVERIFY(choice.choose(QStringLiteral("not-3d")));
+        QVERIFY(choice.choose(QStringLiteral("mono")));
         QVERIFY(QMetaObject::invokeMethod(item.get(), "refresh"));
         QVERIFY(!item->property("stereo").toBool());
     }
