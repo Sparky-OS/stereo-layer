@@ -1,3 +1,29 @@
+stereo-layer (1.19.0-1) unstable; urgency=medium
+
+  * The per-file choice for QML programs (ORDER 551b; the shared photo
+    layer of 2026-10-07; Daniel, 2026-10-23: "never touch the user file"):
+    the QML types FileChoice and
+    FileChoiceMenu in org.sparky.stereo are the QML face of
+    Stereo::FileChoiceMenu. A program names the files it shows (sources),
+    says whether it shows them as a pair (shownAsPair) and shows
+    FileChoiceMenu { choice: ... } as a popup or a sub-menu; the choice is
+    kept in the shared store and never in the file, and save() writes the
+    file only because the person chose it.
+  * One list behind both faces: the entries, their words, which entry is
+    the file's and the writes to the store moved into one private list that
+    the widgets' menu and the QML type show, so a QML program offers every
+    packing the widgets' menu offers, in the same words of the same
+    catalogues, and no sentence is new. The widgets' menu behaves as before.
+  * FileChoice.choose(name) chooses an entry by a name that does not change
+    with the language ("not-3d", "side-by-side-right"), for a program's
+    shortcut; chosen names the file's entry; refresh() reads the store again.
+  * StereoPicture.refresh() decodes the source again, for a program to call
+    on FileChoice's changed().
+  * libstereo-layer1 depends on qml6-module-qtquick-controls and
+    qml6-module-qtqml-models, which the QML menu imports.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sat, 14 Nov 2026 16:18:14 +0000
+
 stereo-layer (1.18.0-1) unstable; urgency=medium
 
   * The person's per-file viewing choice has one store for every program on

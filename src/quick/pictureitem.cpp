@@ -95,6 +95,7 @@ void PictureItem::reload()
     update();
     Q_EMIT pictureChanged();
 }
+void PictureItem::refresh() { reload(); }
 bool PictureItem::swapEyes() const { return d->options.swapEyes; }
 void PictureItem::setSwapEyes(bool swap)
 {
