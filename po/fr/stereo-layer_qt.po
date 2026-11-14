@@ -366,3 +366,35 @@ msgstr "Ce fichier n'a aucune correction 3D à enregistrer."
 msgctxt "Stereo::Picture|"
 msgid "A correction can be saved into JPEG, JPS and MPO pictures only; this file has another format."
 msgstr "Une correction ne peut être enregistrée que dans les images JPEG, JPS et MPO ; ce fichier a un autre format."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "One view after the other"
+msgstr "Une vue après l'autre"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Frames in turn, left eye first"
+msgstr "Images alternées, œil gauche en premier"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Frames in turn, right eye first"
+msgstr "Images alternées, œil droit en premier"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Both views in one block, left eye first"
+msgstr "Les deux vues dans un bloc, œil gauche en premier"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Both views in one block, right eye first"
+msgstr "Les deux vues dans un bloc, œil droit en premier"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "%1 (one view shown here)"
+msgstr "%1 (une seule vue affichée ici)"
+
+msgctxt "Stereo::Picture|"
+msgid "The 3D choice of this file could not follow it to %1: %2."
+msgstr "Le choix 3D de ce fichier n'a pas pu le suivre vers %1 : %2."
+
+msgctxt "Stereo::FileChoiceMoves|"
+msgid "The 3D choice of a file cannot follow the file when it is renamed or moved: the session bus cannot be reached (%1)."
+msgstr "Le choix 3D d'un fichier ne peut pas le suivre quand il est renommé ou déplacé : le bus de session est injoignable (%1)."

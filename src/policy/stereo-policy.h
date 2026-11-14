@@ -378,9 +378,11 @@ STEREO_POLICY_EXPORT int stereo_policy_file_choice_entry(const char *path, char 
 /* Carries the choice of a file that a program renamed or moved from the path from to the path to; when to is a folder,
  * the choice of every file that was below from. Call it after the move, when to exists. A file still at from was
  * copied, not moved, and nothing is done. With no choice to carry, a choice kept at to for a file this one replaced is
- * dropped. Calling it twice for one move, from two programs that saw it, changes nothing the second time. Returns the
- * number of choices carried (0 when there was none), or -1 with errno set: the choices then stay where they were. */
-STEREO_POLICY_EXPORT int stereo_policy_move_file_choice(const char *from, const char *to);
+ * dropped. Calling it twice for one move, from two programs that saw it, changes nothing the second time. carried_to,
+ * when not null, is called with data for the new path of each choice carried. Returns the number of choices carried (0
+ * when there was none), or -1 with errno set: a choice is then at its old path, at its new one, or at both, never lost. */
+STEREO_POLICY_EXPORT int stereo_policy_move_file_choice(const char *from, const char *to, void (*carried_to)(const char *path, void *data),
+    void *data);
 
 /* Looks at up to limit entry files, as a write does with STEREO_POLICY_FILE_PRUNE_STEP, and drops the records of
  * files that are gone. Returns the number dropped, or -1 with errno set. */

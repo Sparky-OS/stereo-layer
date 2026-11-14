@@ -366,3 +366,35 @@ msgstr "이 파일에는 저장할 3D 보정이 없습니다."
 msgctxt "Stereo::Picture|"
 msgid "A correction can be saved into JPEG, JPS and MPO pictures only; this file has another format."
 msgstr "보정은 JPEG, JPS, MPO 사진에만 저장할 수 있습니다. 이 파일은 다른 형식입니다."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "One view after the other"
+msgstr "뷰를 하나씩 차례로"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Frames in turn, left eye first"
+msgstr "프레임 교대, 왼쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Frames in turn, right eye first"
+msgstr "프레임 교대, 오른쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Both views in one block, left eye first"
+msgstr "한 블록에 두 뷰, 왼쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Both views in one block, right eye first"
+msgstr "한 블록에 두 뷰, 오른쪽 눈 먼저"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "%1 (one view shown here)"
+msgstr "%1 (여기서는 한쪽 뷰만 표시)"
+
+msgctxt "Stereo::Picture|"
+msgid "The 3D choice of this file could not follow it to %1: %2."
+msgstr "이 파일의 3D 선택을 %1(으)로 옮기지 못했습니다: %2."
+
+msgctxt "Stereo::FileChoiceMoves|"
+msgid "The 3D choice of a file cannot follow the file when it is renamed or moved: the session bus cannot be reached (%1)."
+msgstr "파일의 이름을 바꾸거나 옮길 때 3D 선택이 따라갈 수 없습니다: 세션 버스에 연결할 수 없습니다 (%1)."

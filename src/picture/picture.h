@@ -91,6 +91,13 @@ public:
         const Options &options, OutputMode output);
     static Picture fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
         const Options &options, const DepthOptions &depthOptions, OutputMode output);
+    // The same two for a viewer that decodes the file path itself (a document already in memory): the person's stored
+    // choice for that file is applied with the caller's options exactly as load() applies it, a stored packing over
+    // the file's mark included. A viewer that shows files through these shows them as the file manager does.
+    static Picture fromReader(const QString &path, QImageReader &reader, const QImage &primary, const QString &metadata, const QByteArray &format,
+        const QByteArray &header, const Options &options, OutputMode output);
+    static Picture fromImages(const QString &path, const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format,
+        const QByteArray &header, const Options &options, OutputMode output);
     static Picture fromPackedImage(const QImage &image, Layout layout, EyeOrder order);
     // The two views of picture drawn from depth, a gray image of any size (8 or 16 bits), read by depthMark, the
     // Stereo3DDepth mark of docs/depth-marks.md ("nearness" when empty: larger samples nearer). layer and layerDepth,
@@ -134,6 +141,19 @@ public:
     static Options fileChoice(const QString &path);
     static bool hasFileChoice(const QString &path);
     static bool setFileChoice(const QString &path, const Options &choice, QString *error = nullptr);
+    // Carries the stored choice of a file that a program renamed or moved from from to to, and when to is a folder, of
+    // every file that was below it (stereo-policy.h, stereo_policy_move_file_choice()); call it after the move. A file
+    // still at from was copied and keeps nothing new. Returns the new paths whose choice was carried; their cached
+    // thumbnails are dropped, since one made before the choice arrived shows the file without it. When the store
+    // cannot be changed, failed (when given) is true and error says why: the choices are then still at the old paths.
+    // A program that renames or moves files through KIO needs no call of its own: FileChoiceMoves does it.
+    static QStringList moveFileChoice(const QString &from, const QString &to, QString *error = nullptr, bool *failed = nullptr);
+    // For a program's one-time move of its own per-file state onto the shared store: takes in a swap the program kept
+    // for path in a file of its own, so that the file shows with swap from now on for every program. The file is not
+    // touched: a swap an earlier version kept in the file's attribute stays there and is counted. A file that already
+    // has a stored choice keeps it (it is the newer word), and true is returned. False with the reason in error when
+    // the store cannot be written; the program then keeps its own state and tries again later.
+    static bool adoptSwapEyes(const QString &path, bool swap, QString *error = nullptr);
     // Removes the thumbnails the desktop's cache keeps of path (Thumbnail Managing Standard, "Thumbnail Directory":
     // $XDG_CACHE_HOME/thumbnails/<size>/<MD5 of the URI>.png), so the next request makes them again.
     static void dropThumbnails(const QString &path);
@@ -143,13 +163,15 @@ public:
         QString error;
     };
     // Only call after the person accepts Save to file. Rewrites metadata without recompression,
-    // verifies a temporary file before atomic replacement. On success clear the caller's saved
-    // packing/eye-order/swap correction (setFileChoice(path, {})); on failure keep it and show error. View::Mono writes a mono
+    // verifies a temporary file before atomic replacement. View::Mono writes a mono
     // descriptor; LeftOnly/RightOnly keep both views. The legacy swap xattr is consumed on success.
+    // What is saved is the file as load(path, options) shows it: the caller's options together with the file's
+    // stored choice (setFileChoice()), combined as load() combines them. On success the file carries all of it, so
+    // the stored choice is cleared here, for every program, and the file's thumbnails are made again; the caller clears
+    // only what it keeps itself. On failure the file, the stored choice and the caller's own stay, and error says why.
     static SaveResult saveCorrection(const QString &path, const Options &options);
-    // saveCorrection() of the file's stored choice (setFileChoice()), for a program's "save the correction into the
-    // file" action, called only after the person chose it: on success the file carries the correction, its entry in
-    // the store is cleared and its thumbnails are made again; on failure the file and the entry stay and error says why.
+    // saveCorrection(path, {}) for a program's "save the correction into the file" action, called only after the
+    // person chose it, with a plain reason for a file that has no stored choice or a format the save cannot write.
     static SaveResult saveFileChoice(const QString &path);
 
     bool isStereo() const;

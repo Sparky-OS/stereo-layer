@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
 #include "picture.h"
 #include "stereo-jpeg.h"
+#include "stereo-policy.h"
 #include <QBuffer>
 #include <QCoreApplication>
 #include <QFileInfo>
@@ -208,8 +209,24 @@ bool copyAttributes(int source, int destination)
     return true;
 }
 }
-Picture::SaveResult Picture::saveCorrection(const QString &path, const Options &requested)
+Picture::SaveResult Picture::saveCorrection(const QString &path, const Options &asked)
 {
+    // The file is saved as load(path, asked) shows it: the caller's options with the choice the person keeps for this
+    // file in the shared store, combined as load() combines them (the caller's own packing first, a stored one where
+    // the caller has none, the swaps added up; fileChoice() counts the legacy attribute in its swap).
+    Options requested = asked;
+    {
+        const Options stored = fileChoice(path);
+        const bool own = asked.inputLayout != Layout::None || asked.anaglyph != AnaglyphColorPair::None;
+        if (!own && (stored.inputLayout != Layout::None || stored.anaglyph != AnaglyphColorPair::None)) {
+            requested.inputLayout = stored.inputLayout;
+            requested.inputOrder = stored.inputOrder;
+            requested.anaglyph = stored.anaglyph;
+        }
+        if (!own && asked.view == View::Stereo)
+            requested.view = stored.view;
+        requested.swapEyes = asked.swapEyes != stored.swapEyes;
+    }
     QFile original(path);
     if (!original.open(QIODevice::ReadOnly))
         return { false, message(QT_TRANSLATE_NOOP("Stereo::PictureSave", "The original picture could not be read completely.")) };
@@ -247,7 +264,6 @@ Picture::SaveResult Picture::saveCorrection(const QString &path, const Options &
     Options options = requested;
     if (options.view != View::Mono)
         options.view = View::Stereo;
-    options.swapEyes = options.swapEyes != userSwapEyes(path);
     Picture chosen = decoded(bytes, format, options);
     if (chosen.original.isNull())
         return { false,
@@ -305,6 +321,10 @@ Picture::SaveResult Picture::saveCorrection(const QString &path, const Options &
             message(QT_TRANSLATE_NOOP(
                 "Stereo::PictureSave", "The temporary picture could not be written, read back or replaced; the original was kept.")) };
     temporary.setAutoRemove(false);
+    // The file carries the correction now, so the choice kept for it is unmarked again for every program; left in the
+    // store it would be applied a second time, over the file's new mark.
+    stereo_policy_set_file_choice(QFile::encodeName(path).constData(), nullptr);
+    dropThumbnails(path);
     return { true, {} };
 }
 }

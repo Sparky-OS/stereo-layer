@@ -366,3 +366,35 @@ msgstr "このファイルには保存する 3D 補正がありません。"
 msgctxt "Stereo::Picture|"
 msgid "A correction can be saved into JPEG, JPS and MPO pictures only; this file has another format."
 msgstr "補正を保存できるのは JPEG、JPS、MPO の画像だけです。このファイルは別の形式です。"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "One view after the other"
+msgstr "ビューを 1 つずつ順に"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Frames in turn, left eye first"
+msgstr "フレーム交互、左目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Frames in turn, right eye first"
+msgstr "フレーム交互、右目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Both views in one block, left eye first"
+msgstr "1 つのブロックに両方のビュー、左目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Both views in one block, right eye first"
+msgstr "1 つのブロックに両方のビュー、右目が先"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "%1 (one view shown here)"
+msgstr "%1(ここでは片方のビューを表示)"
+
+msgctxt "Stereo::Picture|"
+msgid "The 3D choice of this file could not follow it to %1: %2."
+msgstr "このファイルの 3D の選択を %1 に引き継げませんでした: %2。"
+
+msgctxt "Stereo::FileChoiceMoves|"
+msgid "The 3D choice of a file cannot follow the file when it is renamed or moved: the session bus cannot be reached (%1)."
+msgstr "名前の変更や移動のときにファイルの 3D の選択を引き継げません: セッションバスに接続できません (%1)。"

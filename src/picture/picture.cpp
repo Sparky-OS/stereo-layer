@@ -399,10 +399,33 @@ bool Picture::setFileChoice(const QString &path, const Options &choice, QString 
     return true;
 }
 
+bool Picture::adoptSwapEyes(const QString &path, bool swap, QString *error)
+{
+    const QByteArray name = QFile::encodeName(path);
+    struct stereo_policy_file_choice stored;
+    const int has = stereo_policy_file_choice(name.constData(), &stored);
+    if (has == 1) {
+        return true;
+    }
+    stored = {0, 0, 0, 0, swap != userSwapEyes(path)};
+    if (has < 0 || stereo_policy_set_file_choice(name.constData(), &stored) != 0) {
+        const int code = errno;
+        if (error) {
+            char entry[4096] = "";
+            stereo_policy_file_choice_entry(name.constData(), entry, sizeof(entry));
+            *error = QCoreApplication::translate("Stereo::Picture", "The choice for this file cannot be kept in %1: %2.")
+                         .arg(QFile::decodeName(entry), QString::fromLocal8Bit(strerror(code)));
+        }
+        return false;
+    }
+    dropThumbnails(path);
+    return true;
+}
+
 Picture::SaveResult Picture::saveFileChoice(const QString &path)
 {
     bool found = false;
-    const Options stored = storedChoice(path, &found);
+    storedChoice(path, &found);
     if (!found && !userSwapEyes(path)) {
         return {false, QCoreApplication::translate("Stereo::Picture", "This file has no 3D correction to save.")};
     }
@@ -414,13 +437,28 @@ Picture::SaveResult Picture::saveFileChoice(const QString &path)
             QCoreApplication::translate("Stereo::Picture", "A correction can be saved into JPEG, JPS and MPO pictures only; this file has another format.")};
     }
     file.close();
-    const SaveResult result = saveCorrection(path, stored);
-    if (result.success) {
-        // the file carries the correction now: the per-file choice is unmarked again
-        stereo_policy_set_file_choice(QFile::encodeName(path).constData(), nullptr);
+    // the shared save takes the stored choice itself and clears it when the file carries it
+    return saveCorrection(path, {});
+}
+
+QStringList Picture::moveFileChoice(const QString &from, const QString &to, QString *error, bool *failed)
+{
+    QStringList carried;
+    const auto note = [](const char *path, void *list) {
+        static_cast<QStringList *>(list)->append(QFile::decodeName(path));
+    };
+    const int moved = stereo_policy_move_file_choice(QFile::encodeName(from).constData(), QFile::encodeName(to).constData(), note, &carried);
+    if (failed) {
+        *failed = moved < 0;
+    }
+    if (moved < 0 && error) {
+        *error = QCoreApplication::translate("Stereo::Picture", "The 3D choice of this file could not follow it to %1: %2.")
+                     .arg(to, QString::fromLocal8Bit(strerror(errno)));
+    }
+    for (const QString &path : std::as_const(carried)) {
         dropThumbnails(path);
     }
-    return result;
+    return carried;
 }
 
 void Picture::dropThumbnails(const QString &path)
@@ -669,8 +707,39 @@ Picture fromImagesComparing(const QImage &image, const QImage &second, const QSt
 }
 }
 
+namespace
+{
+Picture readerPicture(QImageReader &reader, const QImage &primary, const QString &metadata, const QByteArray &format, const QByteArray &header,
+    const Picture::Options &options, OutputMode output, bool overMark);
+}
+
 Picture Picture::fromReader(QImageReader &reader, const QImage &primary, const QString &metadata, const QByteArray &format, const QByteArray &header,
     const Options &options, OutputMode output)
+{
+    return readerPicture(reader, primary, metadata, format, header, options, output, false);
+}
+
+Picture Picture::fromReader(const QString &path, QImageReader &reader, const QImage &primary, const QString &metadata, const QByteArray &format,
+    const QByteArray &header, const Options &fileOptions, OutputMode output)
+{
+    bool overMark = false;
+    const Options options = withFileChoice(path, fileOptions, &overMark);
+    return readerPicture(reader, primary, metadata, format, header, options, output, overMark);
+}
+
+Picture Picture::fromImages(const QString &path, const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format,
+    const QByteArray &header, const Options &fileOptions, OutputMode output)
+{
+    bool overMark = false;
+    const Options options = withFileChoice(path, fileOptions, &overMark);
+    return fromImagesComparing(image, second, metadata, format, header, options, output, {}, {}, overMark);
+}
+
+namespace
+{
+using View = Picture::View;
+Picture readerPicture(QImageReader &reader, const QImage &primary, const QString &metadata, const QByteArray &format, const QByteArray &header,
+    const Picture::Options &options, OutputMode output, bool overMark)
 {
     QImage first = primary;
     QImage second;
@@ -690,11 +759,12 @@ Picture Picture::fromReader(QImageReader &reader, const QImage &primary, const Q
     } else if (hasSecondImage(reader.imageCount(), format, metadata) && reader.jumpToImage(1)) {
         second = reader.read();
     }
-    Picture result = fromImages(first, second, metadata, format, header, options, output);
+    Picture result = fromImagesComparing(first, second, metadata, format, header, options, output, {}, {}, overMark);
     if (indexed && options.view == View::Stereo) {
         result.original = primary;
     }
     return result;
+}
 }
 
 Picture Picture::fromImages(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,

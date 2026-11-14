@@ -590,7 +590,7 @@ static int place_record(const struct record *moved)
     return result;
 }
 
-int stereo_policy_move_file_choice(const char *from, const char *to)
+int stereo_policy_move_file_choice(const char *from, const char *to, void (*carried_to)(const char *path, void *data), void *data)
 {
     char key_from[PATH_MAX], key_to[PATH_MAX], entry[PATH_MAX], directory[PATH_MAX], name[PATH_MAX + 64];
     struct stat gone, target;
@@ -625,10 +625,13 @@ int stereo_policy_move_file_choice(const char *from, const char *to)
                 carried.choice = record->choice;
                 carried.path = key_to;
                 drop_record(&records, record);
-                if (place_record(&carried) < 0 || write_records(entry, &records) < 0)
+                if (place_record(&carried) < 0 || write_records(entry, &records) < 0) {
                     error = errno;
-                else
+                } else {
                     moved = 1;
+                    if (carried_to)
+                        carried_to(key_to, data);
+                }
             }
             free_records(&records);
         }
@@ -686,10 +689,13 @@ int stereo_policy_move_file_choice(const char *from, const char *to)
                 free_records(&records);
             }
             for (size_t r = 0; pass == 0 && r < carried.count && !error; ++r) {
-                if (place_record(&carried.list[r]) < 0)
+                if (place_record(&carried.list[r]) < 0) {
                     error = errno;
-                else
+                } else {
                     ++moved;
+                    if (carried_to)
+                        carried_to(carried.list[r].path, data);
+                }
             }
         }
         free_records(&carried);

@@ -366,3 +366,35 @@ msgstr "此檔案沒有可儲存的 3D 校正。"
 msgctxt "Stereo::Picture|"
 msgid "A correction can be saved into JPEG, JPS and MPO pictures only; this file has another format."
 msgstr "校正只能儲存到 JPEG、JPS 和 MPO 圖片中;此檔案是其他格式。"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "One view after the other"
+msgstr "視圖依序出現"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Frames in turn, left eye first"
+msgstr "影格交替,左眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Frames in turn, right eye first"
+msgstr "影格交替,右眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Both views in one block, left eye first"
+msgstr "兩個視圖在同一區塊中,左眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Both views in one block, right eye first"
+msgstr "兩個視圖在同一區塊中,右眼在前"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "%1 (one view shown here)"
+msgstr "%1(此處顯示一個視圖)"
+
+msgctxt "Stereo::Picture|"
+msgid "The 3D choice of this file could not follow it to %1: %2."
+msgstr "此檔案的 3D 選擇未能隨檔案移到 %1:%2。"
+
+msgctxt "Stereo::FileChoiceMoves|"
+msgid "The 3D choice of a file cannot follow the file when it is renamed or moved: the session bus cannot be reached (%1)."
+msgstr "重新命名或移動檔案時,檔案的 3D 選擇無法跟隨:無法連線到工作階段匯流排 (%1)。"

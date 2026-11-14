@@ -37,12 +37,23 @@ Input inputOf(const Picture::Options &options)
 }
 }
 
+struct Entry {
+    QAction *action = nullptr;
+    Input input;
+    QString text;
+    bool videoOnly = false;
+};
+
 struct FileChoiceMenu::Private {
     QStringList files;
     QActionGroup *inputs = nullptr;
-    QList<QPair<QAction *, Input>> entries;
+    QList<Entry> entries;
     QAction *swap = nullptr;
     QAction *save = nullptr;
+    QMenu *sequence = nullptr;
+    Content content = Content::Picture;
+    bool pair = true;
+    QList<Layout> oneView;
 };
 
 FileChoiceMenu::FileChoiceMenu(QWidget *parent)
@@ -51,11 +62,11 @@ FileChoiceMenu::FileChoiceMenu(QWidget *parent)
 {
     setTitle(tr("3D Input Format"));
     d->inputs = new QActionGroup(this);
-    const auto add = [this](QMenu *menu, const QString &text, const Input &input) {
+    const auto add = [this](QMenu *menu, const QString &text, const Input &input, bool videoOnly = false) {
         QAction *action = menu->addAction(text);
         action->setCheckable(true);
         d->inputs->addAction(action);
-        d->entries.append({action, input});
+        d->entries.append({action, input, text, videoOnly});
         connect(action, &QAction::triggered, this, [this, input] {
             QStringList done;
             for (const QString &file : std::as_const(d->files)) {
@@ -77,9 +88,10 @@ FileChoiceMenu::FileChoiceMenu(QWidget *parent)
             }
         });
     };
-    // The packings of RFC 9559 StereoMode and H.264/H.265 Table D-8 a still can hold (Picture::Layout: views that
-    // alternate in time or in a stream's blocks are not in one picture, and MultiView and DepthSeparate need a second
-    // image in the file), the anaglyph colour pairs, and the picture-with-depth layouts of docs/depth-marks.md.
+    // The packings of RFC 9559 StereoMode and H.264/H.265 Table D-8 (filechoicemenu.h has the list by clause), the
+    // anaglyph colour pairs, and the picture-with-depth layouts of docs/depth-marks.md. Views that alternate in time or
+    // in a stream's blocks are not in one picture, so those entries are a video's; MultiView and DepthSeparate need a
+    // second image, layer or track in the file and are nothing to choose by hand.
     add(this, tr("Automatic"), {});
     add(this, tr("Not 3D"), {Layout::None, Order::LeftFirst, Anaglyph::None, View::Mono});
     addSeparator();
@@ -96,6 +108,11 @@ FileChoiceMenu::FileChoiceMenu(QWidget *parent)
     add(interleaved, tr("Checkerboard, right eye first"), {Layout::Checkerboard, Order::RightFirst});
     add(interleaved, tr("Side by side quincunx, left eye first"), {Layout::SideBySideQuincunx, Order::LeftFirst});
     add(interleaved, tr("Side by side quincunx, right eye first"), {Layout::SideBySideQuincunx, Order::RightFirst});
+    d->sequence = addMenu(tr("One view after the other"));
+    add(d->sequence, tr("Frames in turn, left eye first"), {Layout::FrameSequential, Order::LeftFirst}, true);
+    add(d->sequence, tr("Frames in turn, right eye first"), {Layout::FrameSequential, Order::RightFirst}, true);
+    add(d->sequence, tr("Both views in one block, left eye first"), {Layout::BlockLaced, Order::LeftFirst}, true);
+    add(d->sequence, tr("Both views in one block, right eye first"), {Layout::BlockLaced, Order::RightFirst}, true);
     QMenu *anaglyph = addMenu(tr("Anaglyph"));
     add(anaglyph, tr("Red/cyan"), {Layout::None, Order::LeftFirst, Anaglyph::RedCyan});
     add(anaglyph, tr("Green/magenta"), {Layout::None, Order::LeftFirst, Anaglyph::GreenMagenta});
@@ -164,18 +181,49 @@ QStringList FileChoiceMenu::files() const { return d->files; }
 
 QAction *FileChoiceMenu::swapEyesAction() const { return d->swap; }
 
+FileChoiceMenu::Content FileChoiceMenu::content() const { return d->content; }
+
+void FileChoiceMenu::setContent(Content content)
+{
+    d->content = content;
+    setFiles(d->files);
+}
+
+void FileChoiceMenu::setShownAsPair(bool pair)
+{
+    d->pair = pair;
+    setFiles(d->files);
+}
+
+void FileChoiceMenu::setShownAsOneView(const QList<Picture::Layout> &layouts)
+{
+    d->oneView = layouts;
+    setFiles(d->files);
+}
+
 void FileChoiceMenu::setFiles(const QStringList &paths)
 {
     d->files = paths;
     const bool any = !paths.isEmpty();
     const Picture::Options first = any ? Picture::fileChoice(paths.first()) : Picture::Options();
     const Input input = inputOf(first);
+    const bool video = d->content == Content::Video;
+    d->sequence->menuAction()->setVisible(video);
     for (const auto &entry : std::as_const(d->entries)) {
-        entry.first->setEnabled(any);
-        entry.first->setChecked(any && entry.second == input);
+        const bool chosen = any && entry.input == input;
+        // an entry of the other kind of file is not offered; one that is this file's choice is always shown, so the
+        // menu never hides what is kept
+        entry.action->setVisible(video || !entry.videoOnly || chosen);
+        if (chosen && entry.videoOnly) {
+            d->sequence->menuAction()->setVisible(true);
+        }
+        entry.action->setEnabled(any);
+        entry.action->setChecked(chosen);
+        entry.action->setText(entry.input.layout != Layout::None && d->oneView.contains(entry.input.layout) ? tr("%1 (one view shown here)").arg(entry.text)
+                                                                                                             : entry.text);
     }
-    // one flat picture has no eyes to swap
-    d->swap->setEnabled(any && input.view != View::Mono);
+    // one flat picture has no eyes to swap; a swap that is kept can always be taken back
+    d->swap->setEnabled(any && input.view != View::Mono && (d->pair || first.swapEyes));
     d->swap->setChecked(any && first.swapEyes);
     d->save->setEnabled(std::any_of(paths.cbegin(), paths.cend(), [](const QString &file) {
         return Picture::hasFileChoice(file);

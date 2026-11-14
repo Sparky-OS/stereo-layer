@@ -214,3 +214,35 @@ msgstr "Este archivo no tiene ninguna corrección 3D que guardar."
 msgctxt "Stereo::Picture|"
 msgid "A correction can be saved into JPEG, JPS and MPO pictures only; this file has another format."
 msgstr "Una corrección solo se puede guardar en imágenes JPEG, JPS y MPO; este archivo tiene otro formato."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "One view after the other"
+msgstr "Una vista tras otra"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Frames in turn, left eye first"
+msgstr "Fotogramas alternos, ojo izquierdo primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Frames in turn, right eye first"
+msgstr "Fotogramas alternos, ojo derecho primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Both views in one block, left eye first"
+msgstr "Ambas vistas en un bloque, ojo izquierdo primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Both views in one block, right eye first"
+msgstr "Ambas vistas en un bloque, ojo derecho primero"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "%1 (one view shown here)"
+msgstr "%1 (aquí se muestra una vista)"
+
+msgctxt "Stereo::Picture|"
+msgid "The 3D choice of this file could not follow it to %1: %2."
+msgstr "La elección 3D de este archivo no pudo seguirlo a %1: %2."
+
+msgctxt "Stereo::FileChoiceMoves|"
+msgid "The 3D choice of a file cannot follow the file when it is renamed or moved: the session bus cannot be reached (%1)."
+msgstr "La elección 3D de un archivo no puede seguirlo cuando se renombra o se mueve: no se puede acceder al bus de sesión (%1)."

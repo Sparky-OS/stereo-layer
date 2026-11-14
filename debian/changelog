@@ -24,8 +24,36 @@ stereo-layer (1.18.0-1) unstable; urgency=medium
     (Automatic, Not 3D, every still packing in either order, anaglyph pairs,
     picture and depth, Swap left and right eyes, Save the correction into the
     file), in the ten languages.
+  * The choice follows its file (ORDER 551): stereo_policy_move_file_choice()
+    and Stereo::Picture::moveFileChoice() carry the choice of a file a
+    program renamed or moved, and of every file below a renamed or moved
+    folder; Stereo::FileChoiceMoves does it for a program by hearing the
+    desktop's file jobs on the session bus (org.kde.KDirNotify, FileMoved).
+    A copy carries nothing.
+  * The store tidies itself: each write that keeps a choice, and each move,
+    looks at up to 32 entries, going round the store, and drops the choices
+    of files that are gone. Only paths the store holds are looked at. A
+    file on a drive that is not connected keeps its choice: each entry
+    keeps the device its file was on.
+  * Two paths with one hash keep an entry each, and two programs writing at
+    once lose nothing (a lock file in the store's folder).
+  * saveCorrection() saves the file as load() shows it, the stored choice
+    included, and clears that choice when the file carries it: a program
+    that calls the shared save itself no longer leaves a choice behind that
+    would be applied a second time.
+  * Stereo::FileChoiceMenu lists a video's packings too (setContent()):
+    every packing of the frame packing SEI of H.264 and H.265, of
+    Matroska's StereoMode 0 to 14 and of st3d, frames in turn and both
+    views in one block included. A packing the program shows as one view
+    where the menu is (a thumbnail is one frame) stays in the list and
+    says so (setShownAsOneView()). setShownAsPair() tells the menu of a
+    viewer that a picture is shown flat: no swap is offered on it.
+  * fromReader() and fromImages() with a path apply the stored choice for a
+    viewer that decodes the file itself, and adoptSwapEyes() takes a
+    program's own per-file swap into the store once, without touching the
+    file.
 
- -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Fri, 13 Nov 2026 19:26:26 +0000
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sat, 14 Nov 2026 00:40:00 +0000
 
 stereo-layer (1.17.6-1) unstable; urgency=medium
 

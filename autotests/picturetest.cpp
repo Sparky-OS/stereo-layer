@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
+#include "filechoicemenu.h"
+#include "filechoicemoves.h"
 #include "picture.h"
 #include "render.h"
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QHash>
+#include <QMenu>
+#include <QSet>
+#include <QSignalSpy>
 #include <QCryptographicHash>
 #include <QScopeGuard>
 #include <QUrl>
@@ -60,6 +68,8 @@ private Q_SLOTS:
     void swapOverMark();
     void storedCorrection();
     void fileChoice();
+    void fileChoiceFollowsMoves();
+    void fileChoiceMenuLists();
     void depthLayouts_data();
     void depthLayouts();
     void packedDepthOptions_data();
@@ -1456,6 +1466,208 @@ static QByteArray fileState(const QString &path)
     const ssize_t length = listxattr(QFile::encodeName(path).constData(), names, sizeof(names));
     state += ' ' + QByteArray(names, length > 0 ? length : 0).toHex();
     return state;
+}
+
+void PictureTest::fileChoiceFollowsMoves()
+{
+    // A choice follows its file when a program renames or moves it (ORDER 551): by the call, and by the follower that
+    // hears the desktop's file jobs on the session bus.
+    QTemporaryDir dir(QDir::currentPath() + QStringLiteral("/moves-XXXXXX"));
+    QVERIFY(dir.isValid());
+    qputenv("XDG_STATE_HOME", QFile::encodeName(dir.filePath(QStringLiteral("state"))));
+    qputenv("XDG_CACHE_HOME", QFile::encodeName(dir.filePath(QStringLiteral("cache"))));
+    const auto restore = qScopeGuard([] {
+        qunsetenv("XDG_STATE_HOME");
+        qunsetenv("XDG_CACHE_HOME");
+    });
+    const QString wide = dir.filePath(QStringLiteral("screenshot.png"));
+    const QString renamed = dir.filePath(QStringLiteral("two monitors.png"));
+    QVERIFY(picture(QSize(384, 108), Content::Unrelated).save(wide));
+    Picture::Options flat;
+    flat.view = Picture::View::Mono;
+    QVERIFY(Picture::setFileChoice(wide, flat));
+    QVERIFY(!Picture::load(wide, {}, OutputMode::Stereo).isStereo());
+
+    // renamed behind the store's back: the file is a pair by its shape again
+    QVERIFY(QFile::rename(wide, renamed));
+    QVERIFY(Picture::load(renamed, {}, OutputMode::Stereo).isStereo());
+    // a thumbnail made in that moment, before the choice arrives, must not stay
+    const QString thumbnails = dir.filePath(QStringLiteral("cache/thumbnails/large/"));
+    QVERIFY(QDir().mkpath(thumbnails));
+    const QString thumbnail = thumbnails
+        + QString::fromLatin1(QCryptographicHash::hash(QUrl::fromLocalFile(renamed).toEncoded(QUrl::RemovePassword | QUrl::FullyEncoded), QCryptographicHash::Md5).toHex())
+        + QStringLiteral(".png");
+    QVERIFY(QImage(8, 8, QImage::Format_RGB32).save(thumbnail));
+    QString error;
+    bool failed = true;
+    QCOMPARE(Picture::moveFileChoice(wide, renamed, &error, &failed), QStringList{QFileInfo(renamed).canonicalFilePath()});
+    QVERIFY2(!failed, qPrintable(error));
+    QVERIFY(!Picture::load(renamed, {}, OutputMode::Stereo).isStereo());
+    QCOMPARE(Picture::fileChoice(renamed).view, Picture::View::Mono);
+    QVERIFY(!QFile::exists(thumbnail));
+    // a second call for the same move carries nothing and changes nothing
+    QVERIFY(Picture::moveFileChoice(wide, renamed).isEmpty());
+    QCOMPARE(Picture::fileChoice(renamed).view, Picture::View::Mono);
+    // a copy carries nothing
+    QVERIFY(QFile::copy(renamed, wide));
+    QVERIFY(Picture::moveFileChoice(renamed, wide).isEmpty());
+    QVERIFY(!Picture::hasFileChoice(wide));
+    QVERIFY(QFile::remove(wide));
+
+    // a program's own per-file swap taken into the store once: the file is not touched, and a newer stored choice stays
+    const QByteArray before = fileState(renamed);
+    const QString other = dir.filePath(QStringLiteral("pair.png"));
+    QVERIFY(picture(QSize(384, 108), Content::Pair).save(other));
+    const QByteArray otherBefore = fileState(other);
+    QVERIFY(Picture::adoptSwapEyes(other, true, &error));
+    QVERIFY(Picture::fileChoice(other).swapEyes);
+    QVERIFY(Picture::adoptSwapEyes(other, false, &error));
+    QVERIFY2(Picture::fileChoice(other).swapEyes, "a file that already has a stored choice keeps it");
+    QVERIFY(Picture::adoptSwapEyes(renamed, true, &error));
+    QCOMPARE(Picture::fileChoice(renamed).view, Picture::View::Mono);
+    QVERIFY(!Picture::fileChoice(renamed).swapEyes);
+    QCOMPARE(fileState(renamed), before);
+    QCOMPARE(fileState(other), otherBefore);
+    QVERIFY(Picture::setFileChoice(other, {}));
+
+    // The follower: a move announced as KIO announces it (org.kde.KDirNotify, FileMoved, two URLs)
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    if (!bus.isConnected()) {
+        QSKIP("no session bus in this run: the follower is tested where the suite has one (dbus-run-session)");
+    }
+    FileChoiceMoves moves;
+    QVERIFY(moves.listening());
+    QSignalSpy carried(&moves, &FileChoiceMoves::carried);
+    QSignalSpy refused(&moves, &FileChoiceMoves::failed);
+    QVERIFY(QDir().mkdir(dir.filePath(QStringLiteral("album"))));
+    const QString moved = dir.filePath(QStringLiteral("album/two monitors.png"));
+    const auto announce = [&bus](const QUrl &from, const QUrl &to) {
+        QDBusMessage message = QDBusMessage::createSignal(QStringLiteral("/"), QStringLiteral("org.kde.KDirNotify"), QStringLiteral("FileMoved"));
+        message << from.toString() << to.toString();
+        return bus.send(message);
+    };
+    QVERIFY(QFile::rename(renamed, moved));
+    QVERIFY(announce(QUrl::fromLocalFile(renamed), QUrl::fromLocalFile(moved)));
+    QVERIFY(carried.wait(5000));
+    QCOMPARE(carried.at(0).at(0).toStringList(), QStringList{QFileInfo(moved).canonicalFilePath()});
+    QCOMPARE(Picture::fileChoice(moved).view, Picture::View::Mono);
+    QVERIFY(!Picture::hasFileChoice(renamed));
+    // the folder renamed as a whole: one announcement, the file below keeps its choice
+    const QString album = dir.filePath(QStringLiteral("albums"));
+    QVERIFY(QDir().rename(dir.filePath(QStringLiteral("album")), album));
+    QVERIFY(announce(QUrl::fromLocalFile(dir.filePath(QStringLiteral("album"))), QUrl::fromLocalFile(album)));
+    QVERIFY(carried.wait(5000));
+    QCOMPARE(Picture::fileChoice(album + QStringLiteral("/two monitors.png")).view, Picture::View::Mono);
+    // a move to a place that is not a local file (the wastebin) is not this store's
+    QVERIFY(announce(QUrl::fromLocalFile(album + QStringLiteral("/two monitors.png")), QUrl(QStringLiteral("trash:/0-two monitors.png"))));
+    QTest::qWait(300);
+    QCOMPARE(carried.count(), 2);
+    QCOMPARE(refused.count(), 0);
+    QCOMPARE(Picture::fileChoice(album + QStringLiteral("/two monitors.png")).view, Picture::View::Mono);
+}
+
+void PictureTest::fileChoiceMenuLists()
+{
+    // One menu, two lists (ORDER 551): a picture's packings, and for a video every packing the video reader knows,
+    // frames in turn and views in one block included. A packing the program cannot show in 3D here stays, and says so.
+    QTemporaryDir dir(QDir::currentPath() + QStringLiteral("/menu-XXXXXX"));
+    QVERIFY(dir.isValid());
+    qputenv("XDG_STATE_HOME", QFile::encodeName(dir.filePath(QStringLiteral("state"))));
+    qputenv("XDG_CACHE_HOME", QFile::encodeName(dir.filePath(QStringLiteral("cache"))));
+    const auto restore = qScopeGuard([] {
+        qunsetenv("XDG_STATE_HOME");
+        qunsetenv("XDG_CACHE_HOME");
+    });
+    const QString film = dir.filePath(QStringLiteral("film.mkv"));
+    QFile file(film);
+    QVERIFY(file.open(QIODevice::WriteOnly) && file.write("not a real film") > 0);
+    file.close();
+    FileChoiceMenu menu;
+    const auto entries = [&menu] {
+        QHash<QString, QAction *> shown;
+        QList<QMenu *> menus{&menu};
+        while (!menus.isEmpty()) {
+            const QList<QAction *> actions = menus.takeFirst()->actions();
+            for (QAction *action : actions) {
+                if (!action->isVisible()) {
+                    continue;
+                }
+                if (action->menu()) {
+                    menus.append(action->menu());
+                } else if (action->isCheckable()) {
+                    shown.insert(action->text(), action);
+                }
+            }
+        }
+        return shown;
+    };
+    menu.setFiles({film});
+    // a picture's list holds no packing that needs more than one picture
+    QCOMPARE(menu.content(), FileChoiceMenu::Content::Picture);
+    QVERIFY(entries().contains(QStringLiteral("Rows, left eye first")));
+    QVERIFY(!entries().contains(QStringLiteral("Frames in turn, left eye first")));
+    QVERIFY(!entries().contains(QStringLiteral("Both views in one block, right eye first")));
+    // a video's list: every packing of the video reader with both orders, the anaglyph pairs, picture and depth
+    menu.setContent(FileChoiceMenu::Content::Video);
+    const QStringList video{QStringLiteral("Automatic"), QStringLiteral("Not 3D"), QStringLiteral("Side by side, left eye first"),
+        QStringLiteral("Side by side, right eye first"), QStringLiteral("Top and bottom, left eye first"), QStringLiteral("Top and bottom, right eye first"),
+        QStringLiteral("Rows, left eye first"), QStringLiteral("Rows, right eye first"), QStringLiteral("Columns, left eye first"),
+        QStringLiteral("Columns, right eye first"), QStringLiteral("Checkerboard, left eye first"), QStringLiteral("Checkerboard, right eye first"),
+        QStringLiteral("Side by side quincunx, left eye first"), QStringLiteral("Side by side quincunx, right eye first"),
+        QStringLiteral("Frames in turn, left eye first"), QStringLiteral("Frames in turn, right eye first"),
+        QStringLiteral("Both views in one block, left eye first"), QStringLiteral("Both views in one block, right eye first"), QStringLiteral("Red/cyan"),
+        QStringLiteral("Green/magenta"), QStringLiteral("Amber/blue"), QStringLiteral("Side by side, picture first"), QStringLiteral("Side by side, depth first"),
+        QStringLiteral("Top and bottom, picture first"), QStringLiteral("Top and bottom, depth first"),
+        QStringLiteral("Four rows: picture, depth, graphics, graphics depth"), QStringLiteral("Four quarters: picture, depth, background, background depth"),
+        QStringLiteral("Swap left and right eyes")};
+    QStringList listed = entries().keys();
+    QStringList expected = video;
+    listed.sort();
+    expected.sort();
+    QCOMPARE(listed, expected);
+    // every packing the store can hold for a video is in the list, or is one of the two that nothing chooses by hand
+    QSet<int> offered;
+    QSignalSpy changed(&menu, &FileChoiceMenu::changed);
+    for (const QString &text : video) {
+        if (text == QLatin1String("Swap left and right eyes")) {
+            continue;
+        }
+        entries().value(text)->trigger();
+        offered.insert(int(Picture::fileChoice(film).inputLayout));
+        QVERIFY2(entries().value(text)->isChecked(), qPrintable(text));
+    }
+    QCOMPARE(changed.count(), video.size() - 1);
+    for (int layout = int(Picture::Layout::None); layout <= int(Picture::Layout::DepthSeparate); ++layout) {
+        const bool byHand = layout != int(Picture::Layout::MultiView) && layout != int(Picture::Layout::DepthSeparate);
+        QVERIFY2(offered.contains(layout) == byHand, qPrintable(QString::number(layout)));
+    }
+    // frames in turn, right eye first, is kept as it was chosen
+    entries().value(QStringLiteral("Frames in turn, right eye first"))->trigger();
+    QCOMPARE(Picture::fileChoice(film).inputLayout, Picture::Layout::FrameSequential);
+    QCOMPARE(Picture::fileChoice(film).inputOrder, Picture::EyeOrder::RightFirst);
+    // where the program shows one view of it, the entry stays in the list and says so
+    menu.setShownAsOneView({Picture::Layout::FrameSequential, Picture::Layout::BlockLaced});
+    QVERIFY(!entries().contains(QStringLiteral("Frames in turn, right eye first")));
+    QAction *noted = entries().value(QStringLiteral("Frames in turn, right eye first (one view shown here)"));
+    QVERIFY(noted && noted->isChecked() && noted->isEnabled());
+    QVERIFY(entries().contains(QStringLiteral("Both views in one block, left eye first (one view shown here)")));
+    QVERIFY(entries().contains(QStringLiteral("Rows, left eye first")));
+    // a choice the other list does not offer is still shown as the file's, never hidden
+    menu.setContent(FileChoiceMenu::Content::Picture);
+    QVERIFY(entries().contains(QStringLiteral("Frames in turn, right eye first (one view shown here)")));
+    QVERIFY(!entries().contains(QStringLiteral("Frames in turn, left eye first (one view shown here)")));
+    // a store that cannot be written: the menu says so and does not show the choice as kept
+    QFile blocker(dir.filePath(QStringLiteral("blocked")));
+    QVERIFY(blocker.open(QIODevice::WriteOnly));
+    blocker.close();
+    qputenv("XDG_STATE_HOME", QFile::encodeName(blocker.fileName()));
+    QSignalSpy refused(&menu, &FileChoiceMenu::failed);
+    menu.setFiles({film});
+    entries().value(QStringLiteral("Not 3D"))->trigger();
+    QCOMPARE(refused.count(), 1);
+    QVERIFY(refused.at(0).at(0).toString().contains(QStringLiteral("film.mkv")));
+    QVERIFY(!entries().value(QStringLiteral("Not 3D"))->isChecked());
+    QVERIFY(entries().value(QStringLiteral("Automatic"))->isChecked());
 }
 
 void PictureTest::fileChoice()

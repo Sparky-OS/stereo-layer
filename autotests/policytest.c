@@ -455,6 +455,12 @@ static void writeFile(const char *path)
     }
 }
 
+static void countCarried(const char *path, void *data)
+{
+    if (strstr(path, "/albums/"))
+        ++*(int *)data;
+}
+
 /* The choice follows a file the program renamed or moved, and a folder's files follow the folder (ORDER 551). */
 static void fileChoiceMove(void)
 {
@@ -470,22 +476,22 @@ static void fileChoiceMove(void)
     CHECK(stereo_policy_set_file_choice(a, &choice) == 0);
     /* a copy: the file is still at its old path, nothing moves */
     writeFile(b);
-    CHECK(stereo_policy_move_file_choice(a, b) == 0);
+    CHECK(stereo_policy_move_file_choice(a, b, NULL, NULL) == 0);
     CHECK(stereo_policy_file_choice(a, &read) == 1 && stereo_policy_file_choice(b, &read) == 0);
     remove(b);
     /* a rename */
     CHECK(rename(a, b) == 0);
     CHECK(stereo_policy_file_choice(b, &read) == 0);
-    CHECK(stereo_policy_move_file_choice(a, b) == 1);
+    CHECK(stereo_policy_move_file_choice(a, b, NULL, NULL) == 1);
     CHECK(stereo_policy_file_choice(b, &read) == 1 && read.view == STEREO_POLICY_VIEW_MONO);
     CHECK(stereo_policy_file_choice(a, &read) == 0);
     /* a second program that saw the same rename changes nothing */
-    CHECK(stereo_policy_move_file_choice(a, b) == 0);
+    CHECK(stereo_policy_move_file_choice(a, b, NULL, NULL) == 0);
     CHECK(stereo_policy_file_choice(b, &read) == 1 && read.view == STEREO_POLICY_VIEW_MONO);
     /* a file with no choice moved over one that has one: that choice was for the file it replaced */
     writeFile(c);
     CHECK(rename(c, b) == 0);
-    CHECK(stereo_policy_move_file_choice(c, b) == 0);
+    CHECK(stereo_policy_move_file_choice(c, b, NULL, NULL) == 0);
     CHECK(stereo_policy_file_choice(b, &read) == 0);
     /* a file with a choice moved over one with another choice: the moved file's choice is the one kept */
     writeFile(a);
@@ -496,7 +502,7 @@ static void fileChoiceMove(void)
     choice.layout = STEREO_POLICY_LAYOUT_ROWS;
     CHECK(stereo_policy_set_file_choice(b, &choice) == 0);
     CHECK(rename(a, b) == 0);
-    CHECK(stereo_policy_move_file_choice(a, b) == 1);
+    CHECK(stereo_policy_move_file_choice(a, b, NULL, NULL) == 1);
     CHECK(stereo_policy_file_choice(b, &read) == 1 && read.swap_eyes == 1 && read.layout == 0);
     /* into another folder, and then the folder itself is renamed: the files below it keep their choices */
     snprintf(a, sizeof(a), "%s/%s/album", cwd, work);
@@ -504,7 +510,7 @@ static void fileChoiceMove(void)
     CHECK(mkdir(a, 0700) == 0 && mkdir(c, 0700) == 0);
     snprintf(c, sizeof(c), "%s/%s/album/deep/b.png", cwd, work);
     CHECK(rename(b, c) == 0);
-    CHECK(stereo_policy_move_file_choice(b, c) == 1);
+    CHECK(stereo_policy_move_file_choice(b, c, NULL, NULL) == 1);
     CHECK(stereo_policy_file_choice(c, &read) == 1 && read.swap_eyes == 1);
     snprintf(b, sizeof(b), "%s/%s/album/top.png", cwd, work);
     writeFile(b);
@@ -512,7 +518,8 @@ static void fileChoiceMove(void)
     CHECK(stereo_policy_set_file_choice(b, &choice) == 0);
     snprintf(b, sizeof(b), "%s/%s/albums", cwd, work);
     CHECK(rename(a, b) == 0);
-    CHECK(stereo_policy_move_file_choice(a, b) == 2);
+    int told = 0;
+    CHECK(stereo_policy_move_file_choice(a, b, countCarried, &told) == 2 && told == 2);
     snprintf(c, sizeof(c), "%s/%s/albums/deep/b.png", cwd, work);
     CHECK(stereo_policy_file_choice(c, &read) == 1 && read.swap_eyes == 1);
     snprintf(c, sizeof(c), "%s/%s/albums/top.png", cwd, work);
@@ -520,12 +527,12 @@ static void fileChoiceMove(void)
     snprintf(c, sizeof(c), "%s/%s/album/top.png", cwd, work);
     CHECK(stereo_policy_file_choice(c, &read) == 0);
     /* a folder whose name only starts like the moved one is another folder */
-    CHECK(stereo_policy_move_file_choice(a, b) == 0);
+    CHECK(stereo_policy_move_file_choice(a, b, NULL, NULL) == 0);
     /* bad arguments, and a target that is not there */
     errno = 0;
-    CHECK(stereo_policy_move_file_choice(NULL, b) == -1 && errno == EINVAL);
+    CHECK(stereo_policy_move_file_choice(NULL, b, NULL, NULL) == -1 && errno == EINVAL);
     snprintf(c, sizeof(c), "%s/%s/nowhere.png", cwd, work);
-    CHECK(stereo_policy_move_file_choice(a, c) == -1);
+    CHECK(stereo_policy_move_file_choice(a, c, NULL, NULL) == -1);
     unsetenv("XDG_STATE_HOME");
     snprintf(command, sizeof(command), "rm -rf '%s/%s'", cwd, work);
     CHECK(strstr(work, "policytest-move-") != NULL && system(command) == 0);

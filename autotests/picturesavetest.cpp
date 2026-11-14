@@ -8,6 +8,7 @@
 #include <QFile>
 #include <QImageReader>
 #include <QImageWriter>
+#include <QScopeGuard>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTranslator>
@@ -315,6 +316,81 @@ private Q_SLOTS:
         QVERIFY(found);
         QCOMPARE(after, bytes);
         QVERIFY(Picture::load(path, {}, Stereo::OutputMode::Stereo).isStereo());
+    }
+    void storedChoice_data()
+    {
+        QTest::addColumn<bool>("storedSwap");
+        QTest::addColumn<bool>("callerSwap");
+        QTest::addColumn<bool>("fileSwapped");
+        // the file is saved as the caller shows it, which is its own option with the stored choice (ORDER 551)
+        QTest::newRow("another program saves with no option of its own") << true << false << true;
+        QTest::newRow("another program swaps back what the store swaps") << true << true << false;
+        QTest::newRow("no stored choice, the caller's own swap") << false << true << true;
+    }
+    void storedChoice()
+    {
+        // A choice kept for the file in the shared store, and a program that calls the shared save itself: the save
+        // takes the stored choice with the caller's and clears it, so no program applies it a second time.
+        QFETCH(bool, storedSwap);
+        QFETCH(bool, callerSwap);
+        QFETCH(bool, fileSwapped);
+        QTemporaryDir dir;
+        qputenv("XDG_STATE_HOME", QFile::encodeName(dir.filePath(QStringLiteral("state"))));
+        qputenv("XDG_CACHE_HOME", QFile::encodeName(dir.filePath(QStringLiteral("cache"))));
+        const auto restore = qScopeGuard([] {
+            qunsetenv("XDG_STATE_HOME");
+            qunsetenv("XDG_CACHE_HOME");
+        });
+        const QString path = dir.filePath(QStringLiteral("picture.jps"));
+        QImage image(64, 24, QImage::Format_RGB888);
+        image.fill(Qt::red);
+        for (int y = 0; y < 24; ++y)
+            for (int x = 32; x < 64; ++x)
+                image.setPixelColor(x, y, Qt::blue);
+        image.setText(QStringLiteral("Stereo3DLayout"), QStringLiteral("sideBySideLeftFirst"));
+        QImageWriter writer(path, "jps");
+        QVERIFY2(writer.write(image), qPrintable(writer.errorString()));
+        const auto asStored = Picture::load(path, {}, Stereo::OutputMode::Stereo);
+        QVERIFY(asStored.isStereo());
+        Picture::Options kept;
+        kept.swapEyes = storedSwap;
+        QVERIFY(Picture::setFileChoice(path, kept));
+        QCOMPARE(Picture::hasFileChoice(path), storedSwap);
+        Picture::Options own;
+        own.swapEyes = callerSwap;
+        const auto shown = Picture::load(path, own, Stereo::OutputMode::Stereo);
+        QVERIFY(shown.isStereo());
+        const auto result = Picture::saveCorrection(path, own);
+        QVERIFY2(result.success, qPrintable(result.error));
+        // the stored choice is unmarked again, for every program
+        QVERIFY(!Picture::hasFileChoice(path));
+        // and the file alone now shows what the caller showed
+        const auto after = Picture::load(path, {}, Stereo::OutputMode::Stereo);
+        QVERIFY(after.isStereo());
+        QCOMPARE(after.left.convertToFormat(QImage::Format_RGBA8888), shown.left.convertToFormat(QImage::Format_RGBA8888));
+        QCOMPARE(after.right.convertToFormat(QImage::Format_RGBA8888), shown.right.convertToFormat(QImage::Format_RGBA8888));
+        const auto &first = fileSwapped ? asStored.right : asStored.left;
+        QCOMPARE(after.left.convertToFormat(QImage::Format_RGBA8888), first.convertToFormat(QImage::Format_RGBA8888));
+        // a refused save keeps the stored choice: a packing JPS cannot describe
+        kept.swapEyes = false;
+        kept.inputLayout = Picture::Layout::Columns;
+        QVERIFY(Picture::setFileChoice(path, kept));
+        const auto refused = Picture::saveCorrection(path, {});
+        QVERIFY(!refused.success);
+        QVERIFY(!refused.error.isEmpty());
+        QCOMPARE(Picture::fileChoice(path).inputLayout, Picture::Layout::Columns);
+        // and the menu's own save goes the same way
+        kept.inputLayout = Picture::Layout::TopAndBottom;
+        kept.inputOrder = Picture::EyeOrder::RightFirst;
+        QVERIFY(Picture::setFileChoice(path, kept));
+        const auto topBottom = Picture::load(path, {}, Stereo::OutputMode::Stereo);
+        const auto saved = Picture::saveFileChoice(path);
+        QVERIFY2(saved.success, qPrintable(saved.error));
+        QVERIFY(!Picture::hasFileChoice(path));
+        const auto reread = Picture::load(path, {}, Stereo::OutputMode::Stereo);
+        QCOMPARE(reread.layout, Picture::Layout::TopAndBottom);
+        QCOMPARE(reread.eyeOrder, Picture::EyeOrder::RightFirst);
+        QCOMPARE(reread.left.convertToFormat(QImage::Format_RGBA8888), topBottom.left.convertToFormat(QImage::Format_RGBA8888));
     }
     void malformed_data()
     {
