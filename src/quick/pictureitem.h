@@ -55,6 +55,8 @@ public:
     QSize pictureSize() const;
     bool approximateColor() const;
     QString colorDisclaimer() const;
+    // Decodes the source again: the person's stored choice for its file changed (FileChoice's changed()), or the file did
+    Q_INVOKABLE void refresh();
 Q_SIGNALS:
     void sourceChanged();
     void optionsChanged();
