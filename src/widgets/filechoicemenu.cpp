@@ -103,3 +103,14 @@ void FileChoiceMenu::setShownAsPair(bool pair) { d->list->setShownAsPair(pair); 
 void FileChoiceMenu::setShownAsOneView(const QList<Picture::Layout> &layouts) { d->list->setShownAsOneView(layouts); }
 
 void FileChoiceMenu::setFiles(const QStringList &paths) { d->list->setFiles(paths); }
+
+Enable3DAction::Enable3DAction(QObject *parent)
+    : QAction(FileChoiceList::enable3DText(), parent)
+{
+    setObjectName(QStringLiteral("stereo_enable_3d"));
+    setToolTip(FileChoiceList::enable3DToolTip());
+    setCheckable(true);
+    setChecked(true);
+}
+
+Enable3DAction::~Enable3DAction() = default;

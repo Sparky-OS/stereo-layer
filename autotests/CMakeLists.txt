@@ -121,11 +121,11 @@ add_custom_command(OUTPUT ${_french_qm}
 add_custom_target(translationtestqm DEPENDS ${_french_qm})
 add_dependencies(translationtest translationtestqm)
 add_test(NAME translationtest-fr
-    COMMAND translationtest "La couleur est reconstruite et approximative : un anaglyphe ne conserve qu'une partie de la couleur de chaque œil. Le fichier d'origine n'est jamais modifié." "Intensité de la profondeur")
+    COMMAND translationtest "La couleur est reconstruite et approximative : un anaglyphe ne conserve qu'une partie de la couleur de chaque œil. Le fichier d'origine n'est jamais modifié." "Intensité de la profondeur" "Activer la 3D")
 set_tests_properties(translationtest-fr PROPERTIES
     ENVIRONMENT "LANGUAGE=fr:en;LC_ALL=fr_FR.UTF-8;XDG_DATA_DIRS=${_translation_root}")
 add_test(NAME translationtest-c
-    COMMAND translationtest "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed." "Depth strength")
+    COMMAND translationtest "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed." "Depth strength" "Enable 3D")
 set_tests_properties(translationtest-c PROPERTIES ENVIRONMENT "LC_ALL=C")
 
 add_executable(picturesavetest picturesavetest.cpp)

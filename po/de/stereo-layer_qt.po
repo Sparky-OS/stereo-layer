@@ -398,3 +398,11 @@ msgstr "Die 3D-Wahl dieser Datei konnte ihr nicht nach %1 folgen: %2."
 msgctxt "Stereo::FileChoiceMoves|"
 msgid "The 3D choice of a file cannot follow the file when it is renamed or moved: the session bus cannot be reached (%1)."
 msgstr "Die 3D-Wahl einer Datei kann der Datei beim Umbenennen oder Verschieben nicht folgen: Der Sitzungsbus ist nicht erreichbar (%1)."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Enable 3D"
+msgstr "3D aktivieren"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Show stereo pictures in 3D. When it is off, every picture is shown flat; to show one file flat, choose Not 3D for it in 3D Input Format."
+msgstr "Stereobilder in 3D zeigen. Ist es aus, wird jedes Bild flach gezeigt; um eine einzelne Datei flach zu zeigen, wählen Sie für sie „Nicht 3D“ unter „3D-Eingabeformat“."

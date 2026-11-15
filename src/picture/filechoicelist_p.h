@@ -46,6 +46,10 @@ public:
     static QString swapWhatsThis();
     static QString saveText();
     static QString saveToolTip();
+    // The words of the program's own "Enable 3D" (filechoicemenu.h, Enable3DAction), which is not an entry of this list:
+    // they live here so that the widgets' and the QML face, and the catalogues, hold them once.
+    static QString enable3DText();
+    static QString enable3DToolTip();
 
     void setFiles(const QStringList &paths);
     QStringList files() const;

@@ -135,6 +135,15 @@ QString FileChoiceList::swapWhatsThis()
         "file. The choice is kept with the program's own state: the file is not changed.");
 }
 
+QString FileChoiceList::enable3DText() { return QCoreApplication::translate("Stereo::FileChoiceMenu", "Enable 3D"); }
+
+QString FileChoiceList::enable3DToolTip()
+{
+    return QCoreApplication::translate("Stereo::FileChoiceMenu",
+        "Show stereo pictures in 3D. When it is off, every picture is shown flat; to show one file flat, choose Not 3D for it "
+        "in 3D Input Format.");
+}
+
 QString FileChoiceList::saveText() { return QCoreApplication::translate("Stereo::FileChoiceMenu", "Save the correction into the file"); }
 
 QString FileChoiceList::saveToolTip()

@@ -398,3 +398,11 @@ msgstr "此檔案的 3D 選擇未能隨檔案移到 %1:%2。"
 msgctxt "Stereo::FileChoiceMoves|"
 msgid "The 3D choice of a file cannot follow the file when it is renamed or moved: the session bus cannot be reached (%1)."
 msgstr "重新命名或移動檔案時,檔案的 3D 選擇無法跟隨:無法連線到工作階段匯流排 (%1)。"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Enable 3D"
+msgstr "啟用 3D"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Show stereo pictures in 3D. When it is off, every picture is shown flat; to show one file flat, choose Not 3D for it in 3D Input Format."
+msgstr "以 3D 顯示立體圖片。關閉時，所有圖片都以平面顯示；若只想讓一個檔案以平面顯示，請在「3D 輸入格式」中為它選擇「非 3D」。"

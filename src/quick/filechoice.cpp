@@ -250,3 +250,14 @@ bool FileChoice::choose(const QString &entryId)
 void FileChoice::save() { d->list->save(); }
 
 void FileChoice::refresh() { d->list->refresh(); }
+
+Enable3D::Enable3D(QObject *parent)
+    : QObject(parent)
+{
+}
+
+Enable3D::~Enable3D() = default;
+
+QString Enable3D::text() const { return FileChoiceList::enable3DText(); }
+
+QString Enable3D::toolTip() const { return FileChoiceList::enable3DToolTip(); }
