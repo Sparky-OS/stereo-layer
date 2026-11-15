@@ -1,3 +1,31 @@
+stereo-layer (1.19.1-1) unstable; urgency=medium
+
+  * A 3D area in a window at a scale that is not whole (125 %, 150 %, 175 %):
+    the picture lies under its hole to the device pixel (ORDER 576; Daniel,
+    2026-11-14, on a 13.3 inch full HD notebook at 125 %: "in 3D they are alpha
+    to the desktop background"; "in 100% it works").
+  * cropEyes() copied each eye by drawing it at a point, and Qt draws an image
+    at its size divided by its device pixel ratio: an eye that a program had
+    rendered for its window at 125 % (Dolphin's icon view, information panel
+    and tooltip) reached the compositor at four fifths of its size, in a
+    corner of a buffer that was never cleared, and the rest of every cell
+    showed the desktop behind the window. Each sample now goes to its own
+    place whatever ratio the image carries, and the buffer is cleared first.
+  * A compositor rounds a subsurface to device pixels by a rule
+    fractional-scale-v1 does not define, so a hole and the picture under it
+    could be one device pixel out of step. A picture the compositor resizes
+    is now laid over the whole of its hole. A program that draws its area
+    once per eye draws on the window's own device pixels
+    (WidgetLayer::eyeCanvas(), eyeOffset(), setEyes()); that surface lies on
+    whole device pixels from corner to corner and is shown one to one, with
+    no resize at any scale. Eyes drawn for another place, size or scale are
+    let go before the window paints, so the area is flat until the new ones
+    come (eyesWanted()), never a hole.
+  * This is the fix of 1.18.1 (staged, never published) carried on 1.19.0,
+    which was made from 1.18.0.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sun, 15 Nov 2026 02:30:00 +0000
+
 stereo-layer (1.19.0-1) unstable; urgency=medium
 
   * The per-file choice for QML programs (ORDER 551b; the shared photo

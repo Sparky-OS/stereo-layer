@@ -9,7 +9,9 @@
 #include <QThread>
 #include <QWindow>
 #include <QtGui/qpa/qplatformwindow_p.h>
+#include <cmath>
 #include <cstring>
+#include <numeric>
 #include <stereo-declare.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -229,6 +231,57 @@ void Surface::fail(const QString &what)
     qCWarning(qLcLayer).noquote() << d->failureText;
 }
 QString Surface::failure() const { return d->failureText; }
+int Surface::wholePixelStep(qreal ratio)
+{
+    const int scale120 = qRound(ratio * 120);
+    if (scale120 <= 0 || qAbs(scale120 / 120.0 - ratio) > 1e-9)
+        return 0;
+    return 120 / std::gcd(scale120, 120);
+}
+QRect Surface::onWholePixels(const QWindow *parent, const QRect &rect, QRect *pixels)
+{
+    const qreal ratio = parent->devicePixelRatio();
+    const int step = wholePixelStep(ratio);
+    const auto down = [step](int v) { return step ? int(std::floor(double(v) / step)) * step : 0; };
+    const auto up = [step](int v) { return step ? int(std::ceil(double(v) / step)) * step : v; };
+    const QRect grown(QPoint(qMax(0, down(rect.x())), qMax(0, down(rect.y()))), QPoint(up(rect.x() + rect.width()) - 1, up(rect.y() + rect.height()) - 1));
+    if (pixels) {
+        *pixels = QRect(QPoint(qRound(grown.x() * ratio), qRound(grown.y() * ratio)),
+            QPoint(qRound((grown.x() + grown.width()) * ratio) - 1, qRound((grown.y() + grown.height()) * ratio) - 1));
+    }
+    return grown;
+}
+QRect Surface::covering(const QWindow *parent, const QRect &rect)
+{
+    const qreal ratio = parent->devicePixelRatio();
+    const QMargins frame = parent->frameMargins();
+    const auto edge = [ratio](int logical) { return qRound(logical * ratio); };
+    // one axis: the hole's device pixels as the window paints them, and the first place and size whose device pixels hold them
+    const auto axis = [&edge](int margin, int from, int length, int *start, int *size) {
+        const int holeFrom = edge(margin) + edge(from);
+        const int holeTo = edge(margin) + edge(from + length);
+        for (int grow = 0; grow <= 4; ++grow) {
+            for (int back = 0; back <= grow; ++back) {
+                const int at = from - back;
+                const int extent = length + grow;
+                const int placedFrom = edge(margin + at);
+                // the far edge under both roundings: the size rounded on its own, and the edge rounded from the parent's corner
+                const int placedTo = qMin(placedFrom + edge(extent), edge(margin + at + extent));
+                if (placedFrom <= holeFrom && placedTo >= holeTo) {
+                    *start = at;
+                    *size = extent;
+                    return;
+                }
+            }
+        }
+        *start = from;
+        *size = length;
+    };
+    int x = rect.x(), y = rect.y(), width = rect.width(), height = rect.height();
+    axis(frame.left(), rect.x(), rect.width(), &x, &width);
+    axis(frame.top(), rect.y(), rect.height(), &y, &height);
+    return QRect(x, y, width, height);
+}
 Surface::Surface()
     : d(std::make_unique<Private>())
 {
@@ -260,10 +313,10 @@ void Surface::hide()
         d->shown = false;
     }
 }
-bool Surface::show(QWindow *parent, const QRect &rect, const QImage &packed)
+bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, bool exact)
 {
     Q_ASSERT(QThread::currentThread() == qGuiApp->thread());
-    if (!parent || !parent->isVisible() || rect.isEmpty() || packed.isNull()) {
+    if (!parent || !parent->isVisible() || hole.isEmpty() || packed.isNull()) {
         hide();
         return false;
     }
@@ -271,6 +324,8 @@ bool Surface::show(QWindow *parent, const QRect &rect, const QImage &packed)
         return false;
     if (!d->failureText.isEmpty() && d->parent == parent)
         return false;
+    // where the surface lies: on whole device pixels for a buffer of the window's own pixels, else over the whole of its hole
+    const QRect rect = exact ? hole : covering(parent, hole);
     auto *native = parent->nativeInterface<QNativeInterface::Private::QWaylandWindow>();
     if (!native || !native->surface()) {
         d->parent = parent;
