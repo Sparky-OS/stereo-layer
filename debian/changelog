@@ -13,6 +13,15 @@ stereo-layer (1.19.2-1) unstable; urgency=medium
     for every program, and the switch for everything is another idea with
     another name. The words are those Haruna and sView ship for the same
     option, in the ten languages (Spanish added).
+  * The QML StereoPicture at a scale that is not whole: its hole lies on the
+    device pixels of the rectangle its surface is laid over, and that
+    rectangle has the picture's own size at the nearest whole pixel of the
+    window. Qt Quick's rasteriser takes a pixel whose centre is on a
+    rectangle's left or top edge, the compositor rounds that half up, and at
+    125 % the hole drawn at the item's own place could start a device column
+    before the surface: Koko showed the desktop in one column beside its
+    picture at one window size of four. The rectangle rounded outward also
+    made the compositor stretch the picture by up to a pixel on each side.
 
  -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sun, 15 Nov 2026 05:13:50 +0000
 

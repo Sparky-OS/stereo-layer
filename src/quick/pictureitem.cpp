@@ -29,6 +29,7 @@ struct PictureItem::Private {
     Surface surface;
     QImage packed;
     QRectF shown; // where the picture shows in the item, the rest of it black
+    QRect hole; // the window's hole, in the window's own pixels: the rectangle the surface is laid over (Surface::show())
     QSize pixels;
     bool dirty = true;
     QPointer<QQuickWindow> window;
@@ -208,7 +209,15 @@ void PictureItem::updatePolish()
             d->pixels = pixels;
             d->dirty = false;
         }
-        active = d->surface.show(window(), d->shown.translated(mapped.topLeft()).toAlignedRect(), d->packed);
+        // the picture's own size at the nearest whole pixel of the window: the compositor shows the eyes in it with no
+        // stretch (a rectangle rounded outward was up to a pixel larger on each side than the picture it holds)
+        const QRectF placed = d->shown.translated(mapped.topLeft());
+        const QRect hole(QPoint(qRound(placed.left()), qRound(placed.top())), QSize(qRound(placed.width()), qRound(placed.height())));
+        if (hole != d->hole) {
+            d->hole = hole;
+            update();
+        }
+        active = d->surface.show(window(), hole, d->packed);
     } else {
         d->surface.reset();
     }
@@ -231,7 +240,17 @@ QSGNode *PictureItem::updatePaintNode(QSGNode *node, UpdatePaintNodeData *)
     if (d->active) {
         // the picture's surface lies below the window: black around it, a hole where it shows
         auto *background = new QSGSimpleRectNode(boundingRect(), Qt::black);
-        auto *hole = new QSGSimpleRectNode(d->shown, Qt::transparent);
+        // The hole lies on whole device pixels, the ones Surface::covering() counts for the rectangle the surface is laid
+        // over (each edge at the nearest whole device pixel). The item itself may lie on parts of a pixel at a scale that
+        // is not whole (125 %), and the scene graph's rasteriser takes a pixel whose centre is on a rectangle's left or
+        // top edge: a hole drawn at the item's own place could start a device pixel before the surface, and the desktop
+        // showed through that column (Koko at 125 %, ORDER 551c).
+        const qreal ratio = window()->devicePixelRatio();
+        const QPointF origin = mapToScene(QPointF(0, 0));
+        const auto device = [ratio](int logical) { return qRound(logical * ratio) / ratio; };
+        const QRectF holeRect(QPointF(device(d->hole.left()), device(d->hole.top())) - origin,
+            QPointF(device(d->hole.left() + d->hole.width()), device(d->hole.top() + d->hole.height())) - origin);
+        auto *hole = new QSGSimpleRectNode(holeRect.intersected(boundingRect()), Qt::transparent);
         hole->material()->setFlag(QSGMaterial::Blending, false);
         background->appendChildNode(hole);
         return background;
