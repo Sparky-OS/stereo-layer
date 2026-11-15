@@ -94,6 +94,7 @@ The vocabulary: `3D` (the plain tag of 3D releases: says only that the video is 
 A word with half or full says both; a bare packing word leaves half or full to `stereo_policy_video_views()`, where a single picture's shape is half and twice that is full.
 A bare `3D` gives side by side when the shape rule says so, else what the caller's comparison of the picture's halves says, else the video stays 2D and the user's menu covers it.
 `Video::matroskaPlane()` (and `stereo_policy_matroska_plane()`) gives back the plane size that FFmpeg's Matroska demuxer folded into the sample aspect ratio, for `Video::views()`.
+A Matroska track's DisplayWidth and DisplayHeight are one plane's size (RFC 9559 section 18.10) or the whole frame's, which the elements default to and muxers commonly write: `stereo_policy_matroska_one_plane()` says which (ORDER 577: one plane only when a view of the whole frame could not be a whole picture, narrower than 4:3 side by side, 8:3 or wider stacked), and `stereo_policy_video_views()` takes a size that is the whole frame of two whole pictures as full views.
 `stereo_policy_video_layout_named()` puts the tag after the user's explicit choice and the stream's mark and before the shape: a tag never overrides a mark.
 Test vectors: `autotests/vectors/name-tags.tsv`.
 

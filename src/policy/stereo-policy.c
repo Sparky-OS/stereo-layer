@@ -363,13 +363,27 @@ static int same_shape(long long a_w, long long a_h, long long b_w, long long b_h
     return difference * 100 <= right;
 }
 
+int stereo_policy_matroska_one_plane(int display_width, int display_height, int layout)
+{
+    if (display_width <= 0 || display_height <= 0)
+        return -1;
+    /* the size is one plane when a view of the frame it would otherwise be could not be a whole picture: narrower than 4:3 side
+     * by side (the frame narrower than 8:3), 8:3 or wider stacked (the frame 4:3 or wider) */
+    if (layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE || layout == STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE)
+        return 3LL * display_width < 8LL * display_height;
+    if (layout == STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM || layout == STEREO_POLICY_LAYOUT_DEPTH_TOP_AND_BOTTOM)
+        return 3LL * display_width >= 4LL * display_height;
+    return -1;
+}
+
 int stereo_policy_matroska_plane(int coded_width, int coded_height, int sar_num, int sar_den, int layout, int *plane_width, int *plane_height)
 {
     if (coded_width <= 0 || coded_height <= 0 || sar_num <= 0 || sar_den <= 0 || !plane_width || !plane_height)
         return -1;
     /* FFmpeg's Matroska demuxer (libavformat/matroskadec.c) turns DisplayWidth and DisplayHeight into the stream's
-     * sample aspect ratio after multiplying the stacked axis of a side by side or top and bottom track by two, so that
-     * the frame as shown holds both planes: undo it. */
+     * sample aspect ratio, after multiplying the stacked axis of a side by side or top and bottom track by two when the
+     * size is one plane (the edition's FFmpeg: when one view of it as the whole frame could not be a whole picture), so
+     * that the frame as shown holds both planes: half of it is the shape one view is shown at. */
     const long long shown_width = ((long long)coded_width * sar_num + sar_den / 2) / sar_den;
     const long long shown_height = ((long long)coded_height * sar_den + sar_num / 2) / sar_num;
     if (layout == STEREO_POLICY_LAYOUT_SIDE_BY_SIDE || layout == STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE) {
@@ -401,8 +415,14 @@ int stereo_policy_video_views(int coded_width, int coded_height, int sar_num, in
 
     /* The container's mark: a Matroska plane size (DisplayWidth and DisplayHeight, RFC 9559 section 18.10, elements
      * 5.1.4.1.28.12 and .13) is the size of one plane, so it says how much of the frame one view is. A plane as large as the frame is
-     * the elements' default (the pixel size) and says nothing. */
+     * the elements' default (the pixel size) and says nothing. Muxers also write the whole frame's size: a size of which one view
+     * could not be a whole picture is one plane, and any other is the whole frame of two whole pictures, so its views are full
+     * (ORDER 577: one view of it narrower than 4:3 side by side, 8:3 or wider stacked, makes it one plane). */
     if (plane_width > 0 && plane_height > 0 && !(plane_width == coded_width && plane_height == coded_height)) {
+        if (!stereo_policy_matroska_one_plane(plane_width, plane_height, layout)) {
+            set(decided_by, STEREO_POLICY_VIEWS_BY_MARK);
+            return 1;
+        }
         const long long view_width = side_by_side ? coded_width / 2 : coded_width;
         const long long view_height = side_by_side ? coded_height : coded_height / 2;
         if (same_shape(view_width, view_height, plane_width, plane_height)) {

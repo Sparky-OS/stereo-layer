@@ -1,3 +1,19 @@
+stereo-layer (1.21.1-1) unstable; urgency=medium
+
+  * The shape of an eye from a Matroska pair (ORDER 577): a side by side or
+    top and bottom track's DisplayWidth and DisplayHeight are one plane's size
+    (RFC 9559 section 18.10) only when a view of the whole frame could not be a
+    whole picture, narrower than 4:3 side by side, 8:3 or wider stacked; any
+    other size is the whole frame, which the elements default to and muxers
+    commonly write. New stereo_policy_matroska_one_plane() says which, and
+    stereo_policy_video_views() takes a size that is the whole frame of two
+    whole pictures as full views: a 1920x540 film declared 1920x544 (and its
+    top and bottom twin) was read as half views and shown in strips by VLC
+    Stereo. The same rule as FFmpeg 10:9.0.2-dmo1+stereo3d14. Three new rows in
+    autotests/vectors/video-views.tsv.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sun, 15 Nov 2026 20:00:00 +0000
+
 stereo-layer (1.21.0-1) unstable; urgency=medium
 
   * NoSound, the one sentence "This film has no sound." of the players of the edition,

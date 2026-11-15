@@ -155,6 +155,26 @@ static void videoViewsTable(void)
     CHECK(rows >= 20);
 }
 
+static void matroskaOnePlane(void)
+{
+    /* ORDER 577: one plane only when a view of the whole frame could not be a whole picture */
+    CHECK(stereo_policy_matroska_one_plane(1920, 1080, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 1);  /* 960x1080, a squeezed half */
+    CHECK(stereo_policy_matroska_one_plane(1280, 720, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 1);   /* a 16:9 plane */
+    CHECK(stereo_policy_matroska_one_plane(2560, 720, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 0);   /* two 16:9 views */
+    CHECK(stereo_policy_matroska_one_plane(1707, 480, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 0);
+    CHECK(stereo_policy_matroska_one_plane(32, 9, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 0);       /* DisplayUnit 3 */
+    CHECK(stereo_policy_matroska_one_plane(8, 3, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 0);        /* a 4:3 view is whole */
+    CHECK(stereo_policy_matroska_one_plane(799, 300, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == 1);
+    CHECK(stereo_policy_matroska_one_plane(1920, 1080, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 1); /* 1920x540, a squeezed half */
+    CHECK(stereo_policy_matroska_one_plane(1280, 1440, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 0); /* two 16:9 views */
+    CHECK(stereo_policy_matroska_one_plane(854, 960, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 0);
+    CHECK(stereo_policy_matroska_one_plane(4, 3, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 1);       /* an 8:3 view is a half */
+    CHECK(stereo_policy_matroska_one_plane(399, 300, STEREO_POLICY_LAYOUT_TOP_AND_BOTTOM) == 0);
+    CHECK(stereo_policy_matroska_one_plane(1920, 1080, STEREO_POLICY_LAYOUT_DEPTH_SIDE_BY_SIDE) == 1);
+    CHECK(stereo_policy_matroska_one_plane(1920, 1080, STEREO_POLICY_LAYOUT_ROWS) == -1);
+    CHECK(stereo_policy_matroska_one_plane(0, 1080, STEREO_POLICY_LAYOUT_SIDE_BY_SIDE) == -1);
+}
+
 static void matroskaPlane(void)
 {
     int w, h;
@@ -926,6 +946,7 @@ int main(void)
     videoLayout();
     fullViews();
     videoViewsTable();
+    matroskaOnePlane();
     matroskaPlane();
     halvesTest();
     nameTags();

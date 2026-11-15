@@ -66,7 +66,8 @@ public:
     static Views views(QSize codedSize, QSize sampleAspectRatio, QSize planeSize, int upsampledAspectRatio, Picture::Layout layout);
     // The plane size (Matroska's DisplayWidth and DisplayHeight) of a side by side or top and bottom track, from the frame and the
     // sample aspect ratio FFmpeg gives it: FFmpeg's Matroska demuxer folds the plane size into the sample aspect ratio, doubled along the
-    // stacked axis (stereo_policy_matroska_plane()). Pass the result as planeSize to views() for a stream that comes from Matroska through
+    // stacked axis when the size is one plane (stereo_policy_matroska_plane(), stereo_policy_matroska_one_plane()), so the result is the
+    // shape one view is shown at. Pass the result as planeSize to views() for a stream that comes from Matroska through
     // FFmpeg. A null size when there is none (a bad argument, or a layout other than side by side and top and bottom).
     static QSize matroskaPlane(QSize codedSize, QSize sampleAspectRatio, Picture::Layout layout);
 };

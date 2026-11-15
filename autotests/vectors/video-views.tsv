@@ -30,6 +30,9 @@ full top and bottom, one plane shown	2	1920	2160	1	1	1920	1080	-1	1	1
 half top and bottom, plane is the default	2	1920	1080	1	1	1920	1080	-1	0	2
 half top and bottom, plane has the shape of the frame	2	1920	1080	1	1	1280	720	-1	0	1
 full top and bottom, nothing marked	2	1920	2160	1	1	0	0	-1	1	2
+full side by side, the plane is the whole frame (1920x544 for 1920x540, ORDER 577)	1	1920	540	1	1	1920	544	-1	1	1
+full side by side, a whole frame of its own (1707x480 for 854x480, ratio 1707:854)	1	854	480	1707	854	1707	480	-1	1	1
+full top and bottom, the plane is the whole frame (960x1088 for 960x1080, ORDER 577)	2	960	1080	1	1	960	1088	-1	1	1
 rows are always half	4	1920	1080	1	1	0	0	-1	0	0
 frame sequential is whole frames	8	1920	1080	1	1	0	0	-1	1	0
 no packing	0	1920	1080	1	1	0	0	-1	-1	0
