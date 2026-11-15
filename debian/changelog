@@ -1,3 +1,15 @@
+stereo-layer (1.21.0-1) unstable; urgency=medium
+
+  * NoSound, the one sentence "This film has no sound." of the players of the edition,
+    in the ten languages of the edition (en, de, es, fr, ja, ko, pl, pt_BR, zh_CN, zh_TW),
+    and the one rule of when it is said: the film is loaded, has a picture and has no
+    audio track (ORDER 579). Each player keeps knowing its file's tracks the way its own
+    engine does and shows the sentence in its own way of telling, beside its volume
+    control, which stays usable. C++ Stereo::NoSound::sentence() and applies(), QML
+    singleton org.sparky.stereo NoSound with text and saysFor().
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sun, 15 Nov 2026 12:00:00 +0000
+
 stereo-layer (1.20.0-1) unstable; urgency=medium
 
   * StereoDepth, an attached type of org.sparky.stereo: an item of a Qt Quick
