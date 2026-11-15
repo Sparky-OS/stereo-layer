@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.25)
-project(StereoLayer VERSION 1.19.2 LANGUAGES C CXX)
+project(StereoLayer VERSION 1.20.0 LANGUAGES C CXX)
 find_package(ECM 6.0 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 include(KDEInstallDirs6)
@@ -110,6 +110,7 @@ qt_add_qml_module(StereoLayer URI org.sparky.stereo VERSION 1.0
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml/org/sparky/stereo
     SOURCES src/quick/pictureitem.h src/quick/pictureitem.cpp src/quick/depthsettings.h src/quick/depthsettings.cpp
         src/quick/filechoice.h src/quick/filechoice.cpp
+        src/quick/stereodepth.h src/quick/stereodepth.cpp
     QML_FILES src/quick/DepthControls.qml src/quick/FileChoiceMenu.qml src/quick/Enable3DAction.qml)
 set_target_properties(StereoLayerplugin PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}")
 install(TARGETS StereoLayerplugin DESTINATION ${KDE_INSTALL_QMLDIR}/org/sparky/stereo)

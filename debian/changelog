@@ -1,3 +1,25 @@
+stereo-layer (1.20.0-1) unstable; urgency=medium
+
+  * StereoDepth, an attached type of org.sparky.stereo: an item of a Qt Quick
+    window sits at a depth of its own on a stereo output, in the desktop's
+    words, a fraction of the person's limits (1 the popped limit, -1 the sunk
+    limit, 0 the screen; StereoDepth.Popped, Screen, Sunk), so a window that
+    is not styled by Stereo Union, a layer-shell window such as the desktop's
+    loading screen, shows depth the way Stereo Union's windows do (ORDER 571).
+    The window's surface is followed through the declaration library on the
+    layer's own queue: while Stereo KWin says it is awake and its output's
+    limits are not both zero, the window's _q_stereo_depth is set and each
+    item gets its _q_stereo_parallax, the depth times the limit of its side,
+    scaled to the output's width and rounded to whole device pixels as Stereo
+    KWin and the boot splash round their levels. On a 2D output, asleep, at
+    limits of zero or on another compositor the window is drawn once, as
+    without depth. A window that should show depth and is still one picture
+    after 30 frames says why once in the program's log (the software
+    renderer, a Qt Quick that is not the edition's, a surface without two
+    views). StereoDepth.parallaxFor() is the sum, for a program's own use.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Sun, 15 Nov 2026 09:00:00 +0000
+
 stereo-layer (1.19.2-1) unstable; urgency=medium
 
   * "Enable 3D", a program's own switch for everything it shows, as one entry

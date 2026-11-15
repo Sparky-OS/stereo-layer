@@ -6,8 +6,21 @@
 #include <QString>
 #include <memory>
 class QWindow;
+struct wl_display;
+struct wl_event_queue;
 namespace Stereo
 {
+// The connection the layer's surfaces share, for the layer's code that follows a window's depth (StereoDepth): the declaration
+// library's state belongs to the thread and is bound to this queue, so whoever watches a surface through it dispatches this queue.
+// display and queue are null on a compositor that announces no stereo global, or when the library could not start (failure says why).
+struct SharedConnection {
+    wl_display *display = nullptr;
+    wl_event_queue *queue = nullptr;
+    QString failure;
+    std::shared_ptr<void> keep;
+};
+SharedConnection sharedConnection();
+
 class Surface
 {
 public:

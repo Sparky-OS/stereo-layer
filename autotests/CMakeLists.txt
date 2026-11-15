@@ -86,6 +86,13 @@ else()
     add_test(NAME filechoiceqmltest COMMAND filechoiceqmltest)
 endif()
 set_tests_properties(filechoiceqmltest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_CONTROLS_STYLE=Basic;QML_IMPORT_PATH=${CMAKE_BINARY_DIR}/qml")
+# StereoDepth: the parallax of a depth against the boot splash's numbers, and a window flat where the desktop tells no depth
+add_executable(stereodepthtest stereodepthtest.cpp)
+target_link_libraries(stereodepthtest PRIVATE StereoLayer Qt6::Quick Qt6::Qml Qt6::Test)
+target_include_directories(stereodepthtest PRIVATE ${CMAKE_SOURCE_DIR}/src/quick)
+add_dependencies(stereodepthtest StereoLayerplugin)
+add_test(NAME stereodepthtest COMMAND stereodepthtest)
+set_tests_properties(stereodepthtest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QML_IMPORT_PATH=${CMAKE_BINARY_DIR}/qml")
 
 pkg_check_modules(AVFORMAT REQUIRED IMPORTED_TARGET libavformat>=63)
 add_executable(avtest avtest.c)

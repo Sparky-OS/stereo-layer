@@ -211,6 +211,19 @@ std::shared_ptr<Connection> connection()
 }
 }
 
+SharedConnection sharedConnection()
+{
+    auto shared = connection();
+    SharedConnection result;
+    result.keep = shared;
+    result.failure = shared->failure();
+    if (shared->supported()) {
+        result.display = shared->display;
+        result.queue = shared->queue;
+    }
+    return result;
+}
+
 struct Surface::Private {
     std::shared_ptr<Connection> connection;
     QPointer<QWindow> parent;

@@ -57,6 +57,9 @@ Programs that show pictures small call `Picture::loadPair(path, bound, options)`
 ## Quick clients
 
 Import `org.sparky.stereo 1.0` and use `StereoPicture`. Its properties are `source`, `swapEyes`, `inputLayout`, `inputOrder`, `anaglyph`, `view`, `zoom` and `pan`. Each item follows its own window's screen and active output mode. Local and qrc URLs are supported, with relative QML URLs resolved in their context. On a screen that shows one eye (a 2D output) a pair is drawn as its left view and declares nothing; only a stereo or anaglyph output takes the pair.
+An item of any Qt Quick window can sit at a depth of its own, as the desktop's surfaces do: `StereoDepth.depth` is a fraction of the person's limits (`StereoDepth.Popped` is 1, the popped limit; `StereoDepth.Sunk` is -1, the sunk limit; 0 is the screen), the limits Stereo KWin sends for the window's output.
+While the window's surface is awake on a stereo output and those limits are not both zero, the edition's Qt Quick draws the window once per eye, each item moved by its parallax, rounded to whole device pixels as Stereo KWin rounds its levels (`StereoDepth.parallax` and `StereoDepth.shown` say what is drawn; `StereoDepth.poppedLimit` and `sunkLimit` give the limits in pixels of a view 1920 wide); anywhere else the window is drawn once, as without depth.
+The desktop's loading screen uses it; a window styled by Stereo Union gets the same depth from its style.
 
 The item needs a window of the windowing system to itself. A `QQuickWidget` has none, so a program that embeds QML in a widget window runs it in a `QQuickView` inside `QWidget::createWindowContainer()` (Calamares does so for its slideshow when the branding sets `slideshowWindow`).
 
