@@ -147,4 +147,21 @@ private:
     struct Private;
     std::unique_ptr<Private> d;
 };
+
+// The words of the program's own "Enable 3D" for a QML program: Enable3DAction (Enable3DAction.qml) shows them. The
+// widgets' face is Stereo::Enable3DAction (filechoicemenu.h), which says what the switch is and how it differs from a
+// file's "Not 3D".
+class STEREO_LAYER_EXPORT Enable3D : public QObject
+{
+    Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
+    Q_PROPERTY(QString text READ text CONSTANT)
+    Q_PROPERTY(QString toolTip READ toolTip CONSTANT)
+public:
+    explicit Enable3D(QObject *parent = nullptr);
+    ~Enable3D() override;
+    QString text() const;
+    QString toolTip() const;
+};
 }

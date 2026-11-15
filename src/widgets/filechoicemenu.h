@@ -72,4 +72,19 @@ private:
     struct Private;
     Private *d;
 };
+
+// The program's own "Enable 3D", the first of a program's 3D options: checked, the program shows the pairs it shows in
+// 3D (declared to the compositor); unchecked, it shows every picture flat and declares nothing. It is the program's
+// switch for everything it shows, kept for as long as the program keeps it (the session, or its settings), and it
+// corrects no file: "Not 3D" in FileChoiceMenu is the other thing, the input correction of one file, kept in the shared
+// store for every program. One wording in every program on the layer; the QML face is Enable3DAction (org.sparky.stereo).
+// Checkable and checked when made; its objectName is "stereo_enable_3d". The program connects toggled() to what it shows
+// and sets the state it kept with setChecked(); a shortcut is the program's.
+class STEREO_LAYER_EXPORT Enable3DAction : public QAction
+{
+    Q_OBJECT
+public:
+    explicit Enable3DAction(QObject *parent = nullptr);
+    ~Enable3DAction() override;
+};
 }

@@ -393,6 +393,35 @@ private Q_SLOTS:
         QCOMPARE(Picture::fileChoice(to).view, Picture::View::Mono);
     }
 
+    void enable3DInBothFaces()
+    {
+        // The program's "Enable 3D" has one wording in both faces, is checked when made, and is not the file's "Not 3D"
+        // (a correction of one file, kept in the store): two ideas, two names.
+        Enable3DAction widgets;
+        QQmlEngine engine;
+        const std::unique_ptr<QObject> action(create(engine, "import QtQuick\nimport org.sparky.stereo\nEnable3DAction {}"));
+        QVERIFY(action);
+        QCOMPARE(action->property("text").toString(), widgets.text());
+        QCOMPARE(action->property("toolTip").toString(), widgets.toolTip());
+        QCOMPARE(action->objectName(), widgets.objectName());
+        QCOMPARE(widgets.objectName(), QStringLiteral("stereo_enable_3d"));
+        QVERIFY(widgets.isCheckable() && widgets.isChecked());
+        QVERIFY(action->property("checkable").toBool() && action->property("checked").toBool());
+        QVERIFY(!widgets.toolTip().isEmpty());
+        FileChoiceMenu menu;
+        const QStringList entries = widgetEntries(&menu);
+        QVERIFY(!entries.contains(widgets.text()));
+        QVERIFY(widgets.text() != entries.at(1));
+        // toggled by the person, it says so, and nothing is written to the store
+        const QDir store(m_dir.filePath(QStringLiteral("state/stereo-policy/files")));
+        const QStringList before = store.entryList(QDir::Files, QDir::Name);
+        QSignalSpy toggled(&widgets, &QAction::toggled);
+        widgets.trigger();
+        QCOMPARE(toggled.count(), 1);
+        QVERIFY(!widgets.isChecked());
+        QCOMPARE(store.entryList(QDir::Files, QDir::Name), before);
+    }
+
     void thePictureShowsTheChoice()
     {
         // StereoPicture decodes through the layer with the file's path, so the stored choice applies; refresh() is what
