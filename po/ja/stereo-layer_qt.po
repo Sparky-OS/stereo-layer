@@ -406,3 +406,7 @@ msgstr "3D を有効にする"
 msgctxt "Stereo::FileChoiceMenu|"
 msgid "Show stereo pictures in 3D. When it is off, every picture is shown flat; to show one file flat, choose Not 3D for it in 3D Input Format."
 msgstr "ステレオ画像を 3D で表示します。オフのときはすべての画像を平面で表示します。1 つのファイルだけを平面で表示するには、「3D 入力形式」でそのファイルに「3D ではない」を選びます。"
+
+msgctxt "Stereo::NoSound|"
+msgid "This film has no sound."
+msgstr "この映像には音声がありません。"

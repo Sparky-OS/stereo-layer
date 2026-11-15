@@ -406,3 +406,7 @@ msgstr "3D 사용"
 msgctxt "Stereo::FileChoiceMenu|"
 msgid "Show stereo pictures in 3D. When it is off, every picture is shown flat; to show one file flat, choose Not 3D for it in 3D Input Format."
 msgstr "스테레오 그림을 3D로 표시합니다. 끄면 모든 그림을 평면으로 표시합니다. 파일 하나만 평면으로 표시하려면 '3D 입력 형식'에서 그 파일에 '3D 아님'을 선택하십시오."
+
+msgctxt "Stereo::NoSound|"
+msgid "This film has no sound."
+msgstr "이 영상에는 소리가 없습니다."

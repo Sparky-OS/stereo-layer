@@ -135,6 +135,85 @@ add_test(NAME translationtest-c
     COMMAND translationtest "Colour is reconstructed and approximate: an anaglyph keeps only some of each eye's colour. The original file is never changed." "Depth strength" "Enable 3D")
 set_tests_properties(translationtest-c PROPERTIES ENVIRONMENT "LC_ALL=C")
 
+# A film with a picture and no audio track says so, in one sentence of the layer's catalogue (ORDER 579): the rule and the ten languages
+add_executable(nosoundtest nosoundtest.cpp)
+target_link_libraries(nosoundtest PRIVATE StereoLayer Qt6::Core)
+target_include_directories(nosoundtest PRIVATE ${CMAKE_SOURCE_DIR}/src/quick)
+add_test(NAME nosoundtest-c COMMAND nosoundtest "This film has no sound.")
+set_tests_properties(nosoundtest-c PROPERTIES ENVIRONMENT "LC_ALL=C")
+set(_ns_fr_qm ${_translation_root}/locale/fr/LC_MESSAGES/stereo-layer_qt.qm)
+add_custom_command(OUTPUT ${_ns_fr_qm}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/ECMPoQm/fr/stereo-layer_qt.qm ${_ns_fr_qm}
+    DEPENDS ${CMAKE_BINARY_DIR}/ECMPoQm/fr/stereo-layer_qt.qm)
+add_custom_target(nosoundqm-fr DEPENDS ${_ns_fr_qm})
+add_dependencies(nosoundtest nosoundqm-fr)
+add_test(NAME nosoundtest-fr COMMAND nosoundtest "Ce film n’a pas de son.")
+set_tests_properties(nosoundtest-fr PROPERTIES ENVIRONMENT "LANGUAGE=fr:en;LC_ALL=fr_FR.UTF-8;XDG_DATA_DIRS=${_translation_root}")
+set(_ns_de_qm ${_translation_root}/locale/de/LC_MESSAGES/stereo-layer_qt.qm)
+add_custom_command(OUTPUT ${_ns_de_qm}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/ECMPoQm/de/stereo-layer_qt.qm ${_ns_de_qm}
+    DEPENDS ${CMAKE_BINARY_DIR}/ECMPoQm/de/stereo-layer_qt.qm)
+add_custom_target(nosoundqm-de DEPENDS ${_ns_de_qm})
+add_dependencies(nosoundtest nosoundqm-de)
+add_test(NAME nosoundtest-de COMMAND nosoundtest "Dieser Film hat keinen Ton.")
+set_tests_properties(nosoundtest-de PROPERTIES ENVIRONMENT "LANGUAGE=de:en;LC_ALL=de_DE.UTF-8;XDG_DATA_DIRS=${_translation_root}")
+set(_ns_es_qm ${_translation_root}/locale/es/LC_MESSAGES/stereo-layer_qt.qm)
+add_custom_command(OUTPUT ${_ns_es_qm}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/ECMPoQm/es/stereo-layer_qt.qm ${_ns_es_qm}
+    DEPENDS ${CMAKE_BINARY_DIR}/ECMPoQm/es/stereo-layer_qt.qm)
+add_custom_target(nosoundqm-es DEPENDS ${_ns_es_qm})
+add_dependencies(nosoundtest nosoundqm-es)
+add_test(NAME nosoundtest-es COMMAND nosoundtest "Esta película no tiene sonido.")
+set_tests_properties(nosoundtest-es PROPERTIES ENVIRONMENT "LANGUAGE=es:en;LC_ALL=es_ES.UTF-8;XDG_DATA_DIRS=${_translation_root}")
+set(_ns_ja_qm ${_translation_root}/locale/ja/LC_MESSAGES/stereo-layer_qt.qm)
+add_custom_command(OUTPUT ${_ns_ja_qm}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/ECMPoQm/ja/stereo-layer_qt.qm ${_ns_ja_qm}
+    DEPENDS ${CMAKE_BINARY_DIR}/ECMPoQm/ja/stereo-layer_qt.qm)
+add_custom_target(nosoundqm-ja DEPENDS ${_ns_ja_qm})
+add_dependencies(nosoundtest nosoundqm-ja)
+add_test(NAME nosoundtest-ja COMMAND nosoundtest "この映像には音声がありません。")
+set_tests_properties(nosoundtest-ja PROPERTIES ENVIRONMENT "LANGUAGE=ja:en;LC_ALL=ja_JP.UTF-8;XDG_DATA_DIRS=${_translation_root}")
+set(_ns_ko_qm ${_translation_root}/locale/ko/LC_MESSAGES/stereo-layer_qt.qm)
+add_custom_command(OUTPUT ${_ns_ko_qm}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/ECMPoQm/ko/stereo-layer_qt.qm ${_ns_ko_qm}
+    DEPENDS ${CMAKE_BINARY_DIR}/ECMPoQm/ko/stereo-layer_qt.qm)
+add_custom_target(nosoundqm-ko DEPENDS ${_ns_ko_qm})
+add_dependencies(nosoundtest nosoundqm-ko)
+add_test(NAME nosoundtest-ko COMMAND nosoundtest "이 영상에는 소리가 없습니다.")
+set_tests_properties(nosoundtest-ko PROPERTIES ENVIRONMENT "LANGUAGE=ko:en;LC_ALL=ko_KR.UTF-8;XDG_DATA_DIRS=${_translation_root}")
+set(_ns_pl_qm ${_translation_root}/locale/pl/LC_MESSAGES/stereo-layer_qt.qm)
+add_custom_command(OUTPUT ${_ns_pl_qm}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/ECMPoQm/pl/stereo-layer_qt.qm ${_ns_pl_qm}
+    DEPENDS ${CMAKE_BINARY_DIR}/ECMPoQm/pl/stereo-layer_qt.qm)
+add_custom_target(nosoundqm-pl DEPENDS ${_ns_pl_qm})
+add_dependencies(nosoundtest nosoundqm-pl)
+add_test(NAME nosoundtest-pl COMMAND nosoundtest "Ten film nie ma dźwięku.")
+set_tests_properties(nosoundtest-pl PROPERTIES ENVIRONMENT "LANGUAGE=pl:en;LC_ALL=pl_PL.UTF-8;XDG_DATA_DIRS=${_translation_root}")
+set(_ns_pt_BR_qm ${_translation_root}/locale/pt_BR/LC_MESSAGES/stereo-layer_qt.qm)
+add_custom_command(OUTPUT ${_ns_pt_BR_qm}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/ECMPoQm/pt_BR/stereo-layer_qt.qm ${_ns_pt_BR_qm}
+    DEPENDS ${CMAKE_BINARY_DIR}/ECMPoQm/pt_BR/stereo-layer_qt.qm)
+add_custom_target(nosoundqm-pt_BR DEPENDS ${_ns_pt_BR_qm})
+add_dependencies(nosoundtest nosoundqm-pt_BR)
+add_test(NAME nosoundtest-pt_BR COMMAND nosoundtest "Este filme não tem som.")
+set_tests_properties(nosoundtest-pt_BR PROPERTIES ENVIRONMENT "LANGUAGE=pt_BR:en;LC_ALL=pt_BR.UTF-8;XDG_DATA_DIRS=${_translation_root}")
+set(_ns_zh_CN_qm ${_translation_root}/locale/zh_CN/LC_MESSAGES/stereo-layer_qt.qm)
+add_custom_command(OUTPUT ${_ns_zh_CN_qm}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/ECMPoQm/zh_CN/stereo-layer_qt.qm ${_ns_zh_CN_qm}
+    DEPENDS ${CMAKE_BINARY_DIR}/ECMPoQm/zh_CN/stereo-layer_qt.qm)
+add_custom_target(nosoundqm-zh_CN DEPENDS ${_ns_zh_CN_qm})
+add_dependencies(nosoundtest nosoundqm-zh_CN)
+add_test(NAME nosoundtest-zh_CN COMMAND nosoundtest "此影片没有声音。")
+set_tests_properties(nosoundtest-zh_CN PROPERTIES ENVIRONMENT "LANGUAGE=zh_CN:en;LC_ALL=zh_CN.UTF-8;XDG_DATA_DIRS=${_translation_root}")
+set(_ns_zh_TW_qm ${_translation_root}/locale/zh_TW/LC_MESSAGES/stereo-layer_qt.qm)
+add_custom_command(OUTPUT ${_ns_zh_TW_qm}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/ECMPoQm/zh_TW/stereo-layer_qt.qm ${_ns_zh_TW_qm}
+    DEPENDS ${CMAKE_BINARY_DIR}/ECMPoQm/zh_TW/stereo-layer_qt.qm)
+add_custom_target(nosoundqm-zh_TW DEPENDS ${_ns_zh_TW_qm})
+add_dependencies(nosoundtest nosoundqm-zh_TW)
+add_test(NAME nosoundtest-zh_TW COMMAND nosoundtest "此影片沒有聲音。")
+set_tests_properties(nosoundtest-zh_TW PROPERTIES ENVIRONMENT "LANGUAGE=zh_TW:en;LC_ALL=zh_TW.UTF-8;XDG_DATA_DIRS=${_translation_root}")
+
 add_executable(picturesavetest picturesavetest.cpp)
 add_executable(jpegcorrecttest jpegcorrecttest.c)
 target_link_libraries(jpegcorrecttest PRIVATE StereoPolicy)

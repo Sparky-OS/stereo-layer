@@ -406,3 +406,7 @@ msgstr "Włącz 3D"
 msgctxt "Stereo::FileChoiceMenu|"
 msgid "Show stereo pictures in 3D. When it is off, every picture is shown flat; to show one file flat, choose Not 3D for it in 3D Input Format."
 msgstr "Pokazuj obrazy stereo w 3D. Gdy jest wyłączone, każdy obraz jest pokazywany płasko; aby pokazać płasko jeden plik, wybierz dla niego „Nie 3D” w „Format wejściowy 3D”."
+
+msgctxt "Stereo::NoSound|"
+msgid "This film has no sound."
+msgstr "Ten film nie ma dźwięku."
