@@ -280,6 +280,22 @@ void DepthAttached::setDepth(qreal depth)
         update();
 }
 
+qreal DepthAttached::artworkDepthMultiple() const
+{
+    const QVariant multiple = property("_stereo_artwork_depth_multiple");
+    return multiple.isValid() ? multiple.toReal() : 1;
+}
+
+void DepthAttached::setArtworkDepthMultiple(qreal multiple)
+{
+    if (!std::isfinite(multiple) || multiple < 1 || multiple == artworkDepthMultiple())
+        return;
+    // QObject stores the optional artwork value without changing this exported class's layout.
+    setProperty("_stereo_artwork_depth_multiple", multiple);
+    Q_EMIT artworkDepthMultipleChanged();
+    update();
+}
+
 bool DepthAttached::shown() const
 {
     return m_shown;
@@ -314,7 +330,7 @@ void DepthAttached::update()
     const bool shown = m_window && m_window->shown();
     qreal parallax = 0;
     if (shown)
-        parallax = Depth::parallaxFor(m_depth, m_window->popped(), m_window->sunk(), m_window->viewWidth());
+        parallax = Depth::parallaxFor(m_depth, m_window->popped(), m_window->sunk(), m_window->viewWidth(), artworkDepthMultiple());
     // Qt Quick reads the item's parallax as a dynamic property, set only while the window shows depth
     m_item->setProperty(ParallaxProperty, shown ? QVariant(parallax) : QVariant());
     if (parallax != m_parallax) {
@@ -329,9 +345,16 @@ void DepthAttached::update()
 
 qreal Depth::parallaxFor(qreal depth, qreal popped, qreal sunk, qreal viewWidth)
 {
+    return parallaxFor(depth, popped, sunk, viewWidth, 1);
+}
+
+qreal Depth::parallaxFor(qreal depth, qreal popped, qreal sunk, qreal viewWidth, qreal artworkDepthMultiple)
+{
     depth = std::clamp(depth, qreal(-1), qreal(1));
+    if (!std::isfinite(artworkDepthMultiple) || artworkDepthMultiple < 1)
+        artworkDepthMultiple = 1;
     const qreal limit = depth >= 0 ? popped : sunk;
-    return std::round(depth * limit * viewWidth / 1920);
+    return std::round(depth * limit * viewWidth * artworkDepthMultiple / 1920);
 }
 
 DepthAttached *Depth::qmlAttachedProperties(QObject *object)

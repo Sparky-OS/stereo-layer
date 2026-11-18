@@ -8,6 +8,9 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QTest>
+#include <QSignalSpy>
+#include <cmath>
+#include <limits>
 
 class StereoDepthTest : public QObject
 {
@@ -46,6 +49,72 @@ private Q_SLOTS:
         QFETCH(qreal, expected);
         QCOMPARE(Stereo::Depth::parallaxFor(depth, popped, sunk, width), expected);
     }
+    void artworkParallax_data()
+    {
+        QTest::addColumn<qreal>("popped");
+        QTest::addColumn<qreal>("sunk");
+        QTest::addColumn<qreal>("width");
+        QTest::addColumn<qreal>("multiple");
+        QTest::addColumn<qreal>("expected");
+        QTest::newRow("default logo") << 4.0 << 10.0 << 1920.0 << 2.0 << 8.0;
+        QTest::newRow("changed logo") << 8.0 << 20.0 << 1920.0 << 2.0 << 16.0;
+        QTest::newRow("zero limits") << 0.0 << 0.0 << 1920.0 << 2.0 << 0.0;
+        QTest::newRow("125 percent") << 4.0 << 10.0 << (1536.0 * 1.25) << 2.0 << 8.0;
+        QTest::newRow("multiply before rounding") << 4.0 << 10.0 << 1600.0 << 2.0 << 7.0;
+        QTest::newRow("ordinary multiple") << 4.0 << 10.0 << 1920.0 << 1.0 << 4.0;
+        QTest::newRow("invalid multiple") << 4.0 << 10.0 << 1920.0 << 0.0 << 4.0;
+    }
+    void artworkParallax()
+    {
+        QFETCH(qreal, popped);
+        QFETCH(qreal, sunk);
+        QFETCH(qreal, width);
+        QFETCH(qreal, multiple);
+        QFETCH(qreal, expected);
+        QCOMPARE(Stereo::Depth::parallaxFor(1, popped, sunk, width, multiple), expected);
+        QCOMPARE(Stereo::Depth::parallaxFor(2, popped, sunk, width), std::round(popped * width / 1920));
+    }
+    void artworkCppApi()
+    {
+        QQuickItem item;
+        Stereo::DepthAttached depth(&item);
+        QSignalSpy changed(&depth, &Stereo::DepthAttached::artworkDepthMultipleChanged);
+        QCOMPARE(depth.artworkDepthMultiple(), 1.0);
+        depth.setDepth(2);
+        QCOMPARE(depth.depth(), 1.0);
+        depth.setArtworkDepthMultiple(2);
+        QCOMPARE(depth.artworkDepthMultiple(), 2.0);
+        QCOMPARE(changed.count(), 1);
+        depth.setArtworkDepthMultiple(2);
+        depth.setArtworkDepthMultiple(0);
+        depth.setArtworkDepthMultiple(std::numeric_limits<qreal>::infinity());
+        depth.setArtworkDepthMultiple(std::numeric_limits<qreal>::quiet_NaN());
+        QCOMPARE(depth.artworkDepthMultiple(), 2.0);
+        QCOMPARE(changed.count(), 1);
+        depth.setArtworkDepthMultiple(1);
+        QCOMPARE(depth.artworkDepthMultiple(), 1.0);
+        QCOMPARE(changed.count(), 2);
+        QCOMPARE(depth.parallax(), 0.0);
+    }
+    void artworkQmlApi()
+    {
+        QQmlEngine engine;
+        QQmlComponent component(&engine);
+        component.setData(R"(import QtQuick
+import org.sparky.stereo
+Item {
+    StereoDepth.depth: StereoDepth.Popped
+    StereoDepth.artworkDepthMultiple: 2
+})", QUrl());
+        std::unique_ptr<QObject> object(component.create());
+        QVERIFY2(object, qPrintable(component.errorString()));
+        auto attached = qobject_cast<Stereo::DepthAttached *>(qmlAttachedPropertiesObject<Stereo::Depth>(object.get(), false));
+        QVERIFY(attached);
+        QCOMPARE(attached->depth(), 1.0);
+        QCOMPARE(attached->artworkDepthMultiple(), 2.0);
+        QCOMPARE(attached->shown(), false);
+        QCOMPARE(attached->parallax(), 0.0);
+    }
     void flatWhereNoDepthIsTold()
     {
         QQmlEngine engine;
@@ -55,7 +124,7 @@ import org.sparky.stereo
 Window {
     width: 320; height: 200; visible: true
     property alias logo: logo
-    Rectangle { id: logo; objectName: "logo"; width: 40; height: 40; color: "white"; StereoDepth.depth: StereoDepth.Popped }
+    Rectangle { id: logo; objectName: "logo"; width: 40; height: 40; color: "white"; StereoDepth.depth: StereoDepth.Popped; StereoDepth.artworkDepthMultiple: 2 }
     Rectangle { objectName: "base"; x: 100; width: 40; height: 40; color: "grey"; StereoDepth.depth: 0.5 }
     Rectangle { objectName: "deep"; x: 200; width: 40; height: 40; color: "black"; StereoDepth.depth: StereoDepth.Sunk * 0.6 }
 })",

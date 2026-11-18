@@ -60,6 +60,12 @@ Import `org.sparky.stereo 1.0` and use `StereoPicture`. Its properties are `sour
 An item of any Qt Quick window can sit at a depth of its own, as the desktop's surfaces do: `StereoDepth.depth` is a fraction of the person's limits (`StereoDepth.Popped` is 1, the popped limit; `StereoDepth.Sunk` is -1, the sunk limit; 0 is the screen), the limits Stereo KWin sends for the window's output.
 While the window's surface is awake on a stereo output and those limits are not both zero, the edition's Qt Quick draws the window once per eye, each item moved by its parallax, rounded to whole device pixels as Stereo KWin rounds its levels (`StereoDepth.parallax` and `StereoDepth.shown` say what is drawn; `StereoDepth.poppedLimit` and `sunkLimit` give the limits in pixels of a view 1920 wide); anywhere else the window is drawn once, as without depth.
 The desktop's loading screen uses it; a window styled by Stereo Union gets the same depth from its style.
+The edition's own artwork can explicitly set `StereoDepth.artworkDepthMultiple: 2` alongside `StereoDepth.depth: StereoDepth.Popped` to stand at twice the popped limit.
+The default multiple is 1, ordinary depth values remain clamped to `[-1, 1]`, and nesting does not add the parent's depth.
+This is an authored per-item exception for the edition's own artwork, never read from media metadata and never a new setting for a person.
+The multiple is applied before rounding to output pixels; zero limits and a 2D or sleeping surface still show no depth.
+C++ clients use `DepthAttached::setArtworkDepthMultiple()` and the five-argument `Depth::parallaxFor()`; the original four-argument function remains bounded and binary compatible.
+Multiples must be finite and at least 1; invalid attached-property assignments leave the previous value unchanged.
 
 The item needs a window of the windowing system to itself. A `QQuickWidget` has none, so a program that embeds QML in a widget window runs it in a `QQuickView` inside `QWidget::createWindowContainer()` (Calamares does so for its slideshow when the branding sets `slideshowWindow`).
 
