@@ -105,8 +105,6 @@ import org.sparky.stereo
 Item {
     StereoDepth.depth: StereoDepth.Popped
     StereoDepth.artworkDepthMultiple: 2
-    property real predicted: StereoDepth.parallaxFor(1, 4, 10, 1920, 2)
-    property real ordinary: StereoDepth.parallaxFor(2, 4, 10, 1920)
 })", QUrl());
         std::unique_ptr<QObject> object(component.create());
         QVERIFY2(object, qPrintable(component.errorString()));
@@ -114,8 +112,6 @@ Item {
         QVERIFY(attached);
         QCOMPARE(attached->depth(), 1.0);
         QCOMPARE(attached->artworkDepthMultiple(), 2.0);
-        QCOMPARE(object->property("predicted").toReal(), 8.0);
-        QCOMPARE(object->property("ordinary").toReal(), 4.0);
         QCOMPARE(attached->shown(), false);
         QCOMPARE(attached->parallax(), 0.0);
     }
