@@ -32,7 +32,6 @@ class STEREO_LAYER_EXPORT DepthAttached : public QObject
     Q_OBJECT
     QML_ANONYMOUS
     Q_PROPERTY(qreal depth READ depth WRITE setDepth NOTIFY depthChanged)
-    Q_PROPERTY(qreal artworkDepthMultiple READ artworkDepthMultiple WRITE setArtworkDepthMultiple NOTIFY artworkDepthMultipleChanged)
     // the parallax the item is drawn with now, device pixels of the output, positive in front of the screen; 0 while depth is not shown
     Q_PROPERTY(qreal parallax READ parallax NOTIFY parallaxChanged)
     // the window shows its items' depth now
@@ -40,6 +39,7 @@ class STEREO_LAYER_EXPORT DepthAttached : public QObject
     // the person's limits for the window's output, in pixels of a view 1920 wide, as Stereo KWin sends them; 0 until they arrive
     Q_PROPERTY(qreal poppedLimit READ poppedLimit NOTIFY limitsChanged)
     Q_PROPERTY(qreal sunkLimit READ sunkLimit NOTIFY limitsChanged)
+    Q_PROPERTY(qreal artworkDepthMultiple READ artworkDepthMultiple WRITE setArtworkDepthMultiple NOTIFY artworkDepthMultipleChanged)
 public:
     explicit DepthAttached(QQuickItem *item);
     ~DepthAttached() override;

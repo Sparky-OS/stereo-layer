@@ -8,6 +8,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QTest>
+#include <QSignalSpy>
 #include <cmath>
 #include <limits>
 
