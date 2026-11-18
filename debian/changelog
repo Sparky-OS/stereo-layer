@@ -1,3 +1,13 @@
+stereo-layer (1.22.0-1) unstable; urgency=medium
+
+  * Explicit per-item artworkDepthMultiple for the edition's own loading
+    screen artwork (ORDER 672). Ordinary depth remains bounded; the authored
+    multiple is applied before device-pixel rounding and defaults to 1.
+    Preserve the original C++ helper and exported class layout, add the QML
+    property and C++ overload, and install the public StereoDepth header.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Wed, 18 Nov 2026 04:00:00 +0000
+
 stereo-layer (1.21.1-1) unstable; urgency=medium
 
   * The shape of an eye from a Matroska pair (ORDER 577): a side by side or

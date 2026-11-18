@@ -14,7 +14,9 @@ class DepthWindow;
 // screen, popped in front of it, sunk behind it (Daniel, 2026-10-05), as a fraction of the person's limits, the ones Stereo KWin
 // gives the output the window mainly sits on (kde_stereo_depth_v1.depth_limits: the person's PoppedLimit and SunkLimit of kwinrc
 // [StereoDepth], built on that display). 1 is the popped limit, -1 the sunk limit, 0 the screen; anything between is valid, nothing
-// beyond. The depth is absolute, from the screen plane: an item stands at its own depth whatever its parent's.
+// beyond. The edition's own artwork can explicitly set artworkDepthMultiple (default 1) to stand at a stated multiple of
+// that depth. This is an authored per-item exception, never derived from media or exposed as a person's setting.
+// The depth is absolute, from the screen plane: an item stands at its own depth whatever its parent's.
 //
 // While the window's surface is awake on a stereo output (kde_stereo_depth_v1.depth_state) and the limits are not both zero, the
 // window's _q_stereo_depth is set and each item gets its _q_stereo_parallax, so the edition's Qt Quick draws the window once per eye,
@@ -30,6 +32,7 @@ class STEREO_LAYER_EXPORT DepthAttached : public QObject
     Q_OBJECT
     QML_ANONYMOUS
     Q_PROPERTY(qreal depth READ depth WRITE setDepth NOTIFY depthChanged)
+    Q_PROPERTY(qreal artworkDepthMultiple READ artworkDepthMultiple WRITE setArtworkDepthMultiple NOTIFY artworkDepthMultipleChanged)
     // the parallax the item is drawn with now, device pixels of the output, positive in front of the screen; 0 while depth is not shown
     Q_PROPERTY(qreal parallax READ parallax NOTIFY parallaxChanged)
     // the window shows its items' depth now
@@ -42,6 +45,8 @@ public:
     ~DepthAttached() override;
     qreal depth() const { return m_depth; }
     void setDepth(qreal depth);
+    qreal artworkDepthMultiple() const;
+    void setArtworkDepthMultiple(qreal multiple);
     qreal parallax() const { return m_parallax; }
     bool shown() const;
     qreal poppedLimit() const;
@@ -54,6 +59,7 @@ Q_SIGNALS:
     void parallaxChanged();
     void shownChanged();
     void limitsChanged();
+    void artworkDepthMultipleChanged();
 
 private:
     void join(QQuickWindow *window);
@@ -77,5 +83,7 @@ public:
     // The parallax of a depth in device pixels of an output whose eye is viewWidth wide: the fraction of the popped limit (depth 0 to
     // 1) or of the sunk limit (depth -1 to 0), limits in pixels of a view 1920 wide, rounded half away from zero to whole pixels.
     Q_INVOKABLE static qreal parallaxFor(qreal depth, qreal popped, qreal sunk, qreal viewWidth);
+    // An explicit exception for the edition's own artwork, multiplied before rounding; the ordinary overload stays bounded.
+    Q_INVOKABLE static qreal parallaxFor(qreal depth, qreal popped, qreal sunk, qreal viewWidth, qreal artworkDepthMultiple);
 };
 }
