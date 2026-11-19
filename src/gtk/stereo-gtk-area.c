@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "stereo-gtk.h"
 #include "stereo-gtk-native.h"
+#include <errno.h>
 
 typedef struct {
     GtkWidget parent;
@@ -112,7 +113,7 @@ static void map(GtkWidget *widget)
     if (!G_TYPE_CHECK_INSTANCE_TYPE(self->owner, stereo_gtk_window_get_type()) &&
         !G_TYPE_CHECK_INSTANCE_TYPE(self->owner, stereo_gtk_application_window_get_type())) {
         self->failed = TRUE;
-        g_signal_emit(self, signals[1], 0, "A stereo media area requires a stereo GTK window");
+        g_signal_emit(self, signals[1], 0, g_strerror(ENOTSUP));
         return;
     }
     g_ptr_array_add(areas(self->owner), self);
