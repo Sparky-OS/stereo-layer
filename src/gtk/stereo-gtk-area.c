@@ -16,6 +16,17 @@ typedef GtkWidgetClass StereoGtkAreaClass;
 G_DEFINE_TYPE(StereoGtkArea, stereo_gtk_area, GTK_TYPE_WIDGET)
 
 static guint signals[2];
+static graphene_rect_t content_rect(StereoGtkArea *self, graphene_rect_t allocation)
+{
+    if (!self->left) return allocation;
+    double aspect = (double)gdk_texture_get_width(self->left) / gdk_texture_get_height(self->left);
+    int width = MIN((int)allocation.size.width, (int)(allocation.size.height * aspect + 0.5));
+    int height = MIN((int)allocation.size.height, (int)(width / aspect + 0.5));
+    allocation.origin.x += (int)(allocation.size.width - width) / 2;
+    allocation.origin.y += (int)(allocation.size.height - height) / 2;
+    allocation.size.width = width; allocation.size.height = height;
+    return allocation;
+}
 
 static GPtrArray *areas(GtkWidget *window)
 {
@@ -65,6 +76,7 @@ static gboolean update(GtkWidget *widget, GdkFrameClock *clock, gpointer data)
             return G_SOURCE_CONTINUE;
         }
     }
+    rect = content_rect(self, rect);
     GError *error = NULL;
     if (!self->native) {
         self->native = stereo_gtk_native_new(widget, &error);
@@ -72,7 +84,11 @@ static gboolean update(GtkWidget *widget, GdkFrameClock *clock, gpointer data)
         self->repeat = 10; /* Xwayland may redirect the declared child a frame later. */
     }
     if (self->native && (self->dirty || self->repeat || !graphene_rect_equal(&rect, &self->last_rect))) {
-        if (stereo_gtk_native_present(self->native, &rect, self->left, self->right, &error)) {
+        graphene_rect_t surface_rect = rect;
+        double x, y;
+        gtk_native_get_surface_transform(GTK_NATIVE(self->owner), &x, &y);
+        surface_rect.origin.x += x; surface_rect.origin.y += y;
+        if (stereo_gtk_native_present(self->native, &surface_rect, self->left, self->right, &error)) {
             self->last_rect = rect;
             self->dirty = FALSE;
             if (self->repeat) self->repeat--;
@@ -93,6 +109,12 @@ static void map(GtkWidget *widget)
     StereoGtkArea *self = (StereoGtkArea *)widget;
     GTK_WIDGET_CLASS(stereo_gtk_area_parent_class)->map(widget);
     self->owner = GTK_WIDGET(gtk_widget_get_native(widget));
+    if (!G_TYPE_CHECK_INSTANCE_TYPE(self->owner, stereo_gtk_window_get_type()) &&
+        !G_TYPE_CHECK_INSTANCE_TYPE(self->owner, stereo_gtk_application_window_get_type())) {
+        self->failed = TRUE;
+        g_signal_emit(self, signals[1], 0, "A stereo media area requires a stereo GTK window");
+        return;
+    }
     g_ptr_array_add(areas(self->owner), self);
     self->tick = gtk_widget_add_tick_callback(widget, update, NULL, NULL);
 }
@@ -123,6 +145,7 @@ static void snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
     StereoGtkArea *self = (StereoGtkArea *)widget;
     if (self->left && !self->shown) {
         graphene_rect_t rect = GRAPHENE_RECT_INIT(0, 0, gtk_widget_get_width(widget), gtk_widget_get_height(widget));
+        rect = content_rect(self, rect);
         gtk_snapshot_append_texture(snapshot, self->left, &rect);
     }
 }
@@ -186,7 +209,8 @@ static void window_snapshot(GtkWidget *widget, GtkSnapshot *snapshot, GtkWidgetC
         for (guint i = 0; i < list->len; ++i) {
             StereoGtkArea *area = g_ptr_array_index(list, i);
             graphene_rect_t rect;
-            if (area->shown && gtk_widget_compute_bounds(GTK_WIDGET(area), widget, &rect)) {
+            if (area->shown) {
+                rect = area->last_rect;
                 const GdkRGBA white = {1, 1, 1, 1};
                 gtk_snapshot_append_color(snapshot, &white, &rect);
             }
