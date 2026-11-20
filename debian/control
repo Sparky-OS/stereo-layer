@@ -2,7 +2,7 @@ Source: stereo-layer
 Section: libs
 Priority: optional
 Maintainer: Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>
-Build-Depends: debhelper-compat (= 13), libavcodec-dev (>= 10:9.0.2), libavformat-dev (>= 10:9.0.2), libavutil-dev (>= 10:9.0.2), cmake, extra-cmake-modules, ninja-build, pkgconf, qt6-base-dev, qt6-base-private-dev, qt6-declarative-dev, qt6-tools-dev, qt6-l10n-tools, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtqml-models, qt6-wayland-dev, libwayland-dev, wayland-protocols, libstereo-declare-dev, zlib1g-dev, libkscreen-dev (>= 4:6.7.4-1+stereo3d4), libkscreen-bin (>= 4:6.7.4-1+stereo3d4), kimageformat6-plugins (>= 6.30.0-1+stereo3d6) <!nocheck>, dbus-daemon <!nocheck>, qt6-svg-plugins <!nocheck>, libegl-dev <!nocheck>, libegl-mesa0 <!nocheck>, libgl1-mesa-dri <!nocheck>, ffmpeg <!nocheck>, mkvtoolnix <!nocheck>
+Build-Depends: debhelper-compat (= 13), libavcodec-dev (>= 10:9.0.2), libavformat-dev (>= 10:9.0.2), libavutil-dev (>= 10:9.0.2), cmake, extra-cmake-modules, ninja-build, pkgconf, qt6-base-dev, qt6-base-private-dev, qt6-declarative-dev, qt6-tools-dev, qt6-l10n-tools, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtqml-models, qt6-wayland-dev, libwayland-dev, wayland-protocols, libstereo-declare-dev, libgtk-4-dev, libx11-dev, gettext, zlib1g-dev, libkscreen-dev (>= 4:6.7.4-1+stereo3d4), libkscreen-bin (>= 4:6.7.4-1+stereo3d4), kimageformat6-plugins (>= 6.30.0-1+stereo3d6) <!nocheck>, dbus-daemon <!nocheck>, qt6-svg-plugins <!nocheck>, libegl-dev <!nocheck>, libegl-mesa0 <!nocheck>, libgl1-mesa-dri <!nocheck>, ffmpeg <!nocheck>, mkvtoolnix <!nocheck>
 Standards-Version: 4.7.3
 Rules-Requires-Root: no
 Homepage: https://sparkylinux.org
@@ -95,3 +95,23 @@ Multi-Arch: same
 Depends: libstereo-av1 (= ${binary:Version}), libavcodec-dev, libavutil-dev, ${misc:Depends}
 Description: Development files for native FFmpeg multiview frame assembly
  The stereo-av C interface and pkg-config description, independent of Qt.
+
+Package: libstereo-gtk1
+Architecture: any
+Multi-Arch: same
+Build-Profiles: <!pkg.stereo-layer.av>
+Depends: ${shlibs:Depends}, ${misc:Depends}, libstereo-policy1 (= ${binary:Version}), libstereo-declare1
+Description: Stereo layer for GTK 4 programs
+ The input formats menu on the shared per-file store, the "Enable 3D" switch and
+ the Display Settings shortcut, the views of a packed picture, and a media area
+ that hands Stereo KWin the two views as one declared full side-by-side surface
+ inside an ordinary window.
+
+Package: libstereo-gtk-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Build-Profiles: <!pkg.stereo-layer.av>
+Depends: libstereo-gtk1 (= ${binary:Version}), libstereo-policy-dev (= ${binary:Version}), libgtk-4-dev, ${misc:Depends}
+Description: Development files for the stereo layer for GTK 4 programs
+ The C header stereo-gtk.h and the pkg-config file stereo-gtk.pc.

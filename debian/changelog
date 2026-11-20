@@ -1,3 +1,16 @@
+stereo-layer (1.23.0-1) unstable; urgency=medium
+
+  * libstereo-gtk1 and libstereo-gtk-dev: the stereo layer for GTK 4
+    programs (ORDER 742, Stereo HandBrake's preview). The input formats menu
+    on the shared per-file store with "Enable 3D" and "Display Settings…",
+    the views of one packed picture (stereo_gtk_unpack, the Qt layer's rule),
+    a view's display aspect, and a media area: a declared full side-by-side
+    subsurface under a hole in an ordinary window, the controls drawn over it
+    kept in the window.
+  * policy: the input format list in C, shared by the Qt, QML and GTK menus.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Fri, 20 Nov 2026 06:00:00 +0000
+
 stereo-layer (1.22.0-1) unstable; urgency=medium
 
   * Explicit per-item artworkDepthMultiple for the edition's own loading

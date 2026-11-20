@@ -1,0 +1,3 @@
+usr/lib/*/libstereo-gtk.so
+usr/include/stereo-gtk/*
+usr/lib/*/pkgconfig/stereo-gtk.pc
