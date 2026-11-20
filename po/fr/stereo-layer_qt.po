@@ -333,7 +333,7 @@ msgstr "Quatre quarts : image, profondeur, arrière-plan, profondeur de l'arriè
 
 msgctxt "Stereo::FileChoiceMenu|"
 msgid "Swap left and right eyes"
-msgstr "Inverser les yeux gauche et droit"
+msgstr "Échanger les yeux gauche et droit"
 
 msgctxt "Stereo::FileChoiceMenu|"
 msgid "Show each eye the other view of this file"
