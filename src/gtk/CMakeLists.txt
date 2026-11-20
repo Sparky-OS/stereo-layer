@@ -9,7 +9,7 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/viewporter-client-protocol
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/viewporter-protocol.c
     COMMAND ${WAYLAND_SCANNER} private-code ${WAYLAND_PROTOCOLS_DIR}/stable/viewporter/viewporter.xml
         ${CMAKE_CURRENT_BINARY_DIR}/viewporter-protocol.c VERBATIM)
-add_library(StereoGtk SHARED stereo-gtk-file-menu.c stereo-gtk-area.c stereo-gtk-native.c
+add_library(StereoGtk SHARED stereo-gtk-file-menu.c stereo-gtk-area.c stereo-gtk-native.c stereo-gtk-unpack.c
     ${CMAKE_CURRENT_BINARY_DIR}/viewporter-client-protocol.h ${CMAKE_CURRENT_BINARY_DIR}/viewporter-protocol.c)
 set_target_properties(StereoGtk PROPERTIES OUTPUT_NAME stereo-gtk VERSION ${PROJECT_VERSION} SOVERSION 1
     C_STANDARD 11 C_VISIBILITY_PRESET hidden)

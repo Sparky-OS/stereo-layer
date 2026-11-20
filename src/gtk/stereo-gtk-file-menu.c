@@ -8,8 +8,9 @@ typedef struct {
     GtkWidget *button;
     char *path;
     struct stereo_policy_file_choice choice;
-    GSimpleAction *input, *swap;
+    GSimpleAction *input, *swap, *enable, *display;
     StereoGtkFileChanged changed;
+    StereoGtkEnableChanged enable_changed;
     gpointer data;
 } FileMenu;
 
@@ -74,31 +75,88 @@ static void swap(GSimpleAction *action, GVariant *parameter, gpointer data)
     keep(menu, &choice);
 }
 
+static void enable(GSimpleAction *action, GVariant *parameter, gpointer data)
+{
+    FileMenu *menu = data;
+    (void)parameter;
+    GVariant *state = g_action_get_state(G_ACTION(action));
+    gboolean on = !g_variant_get_boolean(state);
+    g_variant_unref(state);
+    g_simple_action_set_state(action, g_variant_new_boolean(on));
+    if (menu->enable_changed)
+        menu->enable_changed(menu->button, on, menu->data);
+}
+
+static void display(GSimpleAction *action, GVariant *parameter, gpointer data)
+{
+    FileMenu *menu = data;
+    GError *error = NULL;
+    const char *argv[] = {"kcmshell6", "kcm_kscreen", NULL};
+    (void)action; (void)parameter;
+    if (!g_spawn_async(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, &error)) {
+        g_warning("Display Settings: %s", error->message);
+        if (menu->changed)
+            menu->changed(menu->button, ENOENT, menu->data);
+        g_error_free(error);
+    }
+}
+
+gboolean stereo_gtk_file_menu_get_enabled(GtkWidget *button)
+{
+    FileMenu *menu = g_object_get_data(G_OBJECT(button), "stereo-file-menu");
+    g_return_val_if_fail(menu != NULL, FALSE);
+    GVariant *state = g_action_get_state(G_ACTION(menu->enable));
+    gboolean on = g_variant_get_boolean(state);
+    g_variant_unref(state);
+    return on;
+}
+
+gboolean stereo_gtk_file_menu_get_choice(GtkWidget *button, struct stereo_policy_file_choice *choice)
+{
+    FileMenu *menu = g_object_get_data(G_OBJECT(button), "stereo-file-menu");
+    g_return_val_if_fail(menu != NULL && choice != NULL, FALSE);
+    *choice = menu->choice;
+    return menu->path != NULL;
+}
+
 static void destroy(gpointer data)
 {
     FileMenu *menu = data;
     g_free(menu->path);
     g_object_unref(menu->input);
     g_object_unref(menu->swap);
+    g_object_unref(menu->enable);
+    g_object_unref(menu->display);
     g_free(menu);
 }
 
-GtkWidget *stereo_gtk_file_menu_new(StereoGtkFileChanged changed, gpointer data)
+GtkWidget *stereo_gtk_file_menu_new(StereoGtkFileChanged changed, StereoGtkEnableChanged enable_changed, gpointer data)
 {
     FileMenu *menu = g_new0(FileMenu, 1);
     menu->button = gtk_menu_button_new();
-    menu->changed = changed; menu->data = data;
+    menu->changed = changed; menu->enable_changed = enable_changed; menu->data = data;
     gtk_menu_button_set_label(GTK_MENU_BUTTON(menu->button), tr("3D Input Format"));
     GSimpleActionGroup *actions = g_simple_action_group_new();
     menu->input = g_simple_action_new_stateful("input", G_VARIANT_TYPE_STRING, g_variant_new_string("automatic"));
     menu->swap = g_simple_action_new_stateful("swap", NULL, g_variant_new_boolean(FALSE));
     g_signal_connect(menu->input, "activate", G_CALLBACK(choose), menu);
     g_signal_connect(menu->swap, "activate", G_CALLBACK(swap), menu);
+    menu->enable = g_simple_action_new_stateful("enable", NULL, g_variant_new_boolean(TRUE));
+    menu->display = g_simple_action_new("display", NULL);
+    g_signal_connect(menu->enable, "activate", G_CALLBACK(enable), menu);
+    g_signal_connect(menu->display, "activate", G_CALLBACK(display), menu);
     g_action_map_add_action(G_ACTION_MAP(actions), G_ACTION(menu->input));
     g_action_map_add_action(G_ACTION_MAP(actions), G_ACTION(menu->swap));
+    g_action_map_add_action(G_ACTION_MAP(actions), G_ACTION(menu->enable));
+    g_action_map_add_action(G_ACTION_MAP(actions), G_ACTION(menu->display));
     gtk_widget_insert_action_group(menu->button, "stereo-file", G_ACTION_GROUP(actions));
     g_object_unref(actions);
     GMenu *model = g_menu_new();
+    GMenu *program = g_menu_new();
+    g_menu_append(program, tr("Enable 3D"), "stereo-file.enable");
+    g_menu_append(program, tr("Display Settings…"), "stereo-file.display");
+    g_menu_append_section(model, NULL, G_MENU_MODEL(program));
+    g_object_unref(program);
     const char *groups[] = {NULL, NULL, "Interleaved", "One view after the other", "Anaglyph", "Picture and depth"};
     for (int group = 0; group < 6; ++group) {
         GMenu *section = g_menu_new();

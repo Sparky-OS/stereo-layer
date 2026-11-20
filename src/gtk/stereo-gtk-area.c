@@ -2,6 +2,7 @@
 #include "stereo-gtk.h"
 #include "stereo-gtk-native.h"
 #include <errno.h>
+#include <math.h>
 
 typedef struct {
     GtkWidget parent;
@@ -9,6 +10,8 @@ typedef struct {
     GtkWidget *owner;
     StereoGtkNative *native;
     graphene_rect_t last_rect;
+    double aspect;
+    GPtrArray *above;
     gboolean enabled, shown, dirty, failed;
     guint repeat;
     guint tick;
@@ -20,7 +23,8 @@ static guint signals[2];
 static graphene_rect_t content_rect(StereoGtkArea *self, graphene_rect_t allocation)
 {
     if (!self->left) return allocation;
-    double aspect = (double)gdk_texture_get_width(self->left) / gdk_texture_get_height(self->left);
+    double aspect = self->aspect > 0 ? self->aspect
+                                     : (double)gdk_texture_get_width(self->left) / gdk_texture_get_height(self->left);
     int width = MIN((int)allocation.size.width, (int)(allocation.size.height * aspect + 0.5));
     int height = MIN((int)allocation.size.height, (int)(width / aspect + 0.5));
     allocation.origin.x += (int)(allocation.size.width - width) / 2;
@@ -133,8 +137,8 @@ static void measure(GtkWidget *widget, GtkOrientation orientation, int for_size,
                     int *minimum, int *natural, int *minimum_baseline, int *natural_baseline)
 {
     StereoGtkArea *self = (StereoGtkArea *)widget;
-    int width = self->left ? gdk_texture_get_width(self->left) : 640;
     int height = self->left ? gdk_texture_get_height(self->left) : 360;
+    int width = self->left ? (self->aspect > 0 ? (int)(height * self->aspect + 0.5) : gdk_texture_get_width(self->left)) : 640;
     *minimum = 1;
     *natural = orientation == GTK_ORIENTATION_HORIZONTAL ? width : height;
     if (for_size > 0)
@@ -156,6 +160,7 @@ static void dispose(GObject *object)
     clear_native(self);
     g_clear_object(&self->left);
     g_clear_object(&self->right);
+    g_clear_pointer(&self->above, g_ptr_array_unref);
     G_OBJECT_CLASS(stereo_gtk_area_parent_class)->dispose(object);
 }
 static void stereo_gtk_area_class_init(StereoGtkAreaClass *klass)
@@ -172,6 +177,7 @@ static void stereo_gtk_area_class_init(StereoGtkAreaClass *klass)
 static void stereo_gtk_area_init(StereoGtkArea *self)
 {
     self->dirty = TRUE;
+    self->above = g_ptr_array_new_with_free_func(g_object_unref);
 }
 GtkWidget *stereo_gtk_area_new(void) { return g_object_new(stereo_gtk_area_get_type(), NULL); }
 void stereo_gtk_area_set_pair(GtkWidget *widget, GdkTexture *left, GdkTexture *right)
@@ -191,6 +197,19 @@ void stereo_gtk_area_set_enabled(GtkWidget *widget, gboolean enabled)
     if (!enabled) clear_native(self);
     gtk_widget_queue_draw(widget);
 }
+void stereo_gtk_area_set_view_aspect(GtkWidget *widget, double aspect)
+{
+    g_return_if_fail(G_TYPE_CHECK_INSTANCE_TYPE(widget, stereo_gtk_area_get_type()));
+    StereoGtkArea *self = (StereoGtkArea *)widget;
+    self->aspect = aspect > 0 ? aspect : 0;
+    self->dirty = TRUE;
+    gtk_widget_queue_resize(widget);
+}
+void stereo_gtk_area_keep_above(GtkWidget *widget, GtkWidget *above)
+{
+    g_return_if_fail(G_TYPE_CHECK_INSTANCE_TYPE(widget, stereo_gtk_area_get_type()) && GTK_IS_WIDGET(above));
+    g_ptr_array_add(((StereoGtkArea *)widget)->above, g_object_ref(above));
+}
 gboolean stereo_gtk_area_get_shown(GtkWidget *widget)
 {
     g_return_val_if_fail(G_TYPE_CHECK_INSTANCE_TYPE(widget, stereo_gtk_area_get_type()), FALSE);
@@ -209,12 +228,31 @@ static void window_snapshot(GtkWidget *widget, GtkSnapshot *snapshot, GtkWidgetC
         gtk_snapshot_push_mask(snapshot, GSK_MASK_MODE_INVERTED_ALPHA);
         for (guint i = 0; i < list->len; ++i) {
             StereoGtkArea *area = g_ptr_array_index(list, i);
-            graphene_rect_t rect;
-            if (area->shown) {
-                rect = area->last_rect;
-                const GdkRGBA white = {1, 1, 1, 1};
+            if (!area->shown)
+                continue;
+            /* The hole is the media rectangle less the 2D widgets drawn over it (a player's controls), which stay
+             * in the window, the same in both eyes. */
+            cairo_rectangle_int_t hole = {(int)area->last_rect.origin.x, (int)area->last_rect.origin.y,
+                                          (int)area->last_rect.size.width, (int)area->last_rect.size.height};
+            cairo_region_t *region = cairo_region_create_rectangle(&hole);
+            for (guint j = 0; j < area->above->len; ++j) {
+                GtkWidget *above = g_ptr_array_index(area->above, j);
+                graphene_rect_t bounds;
+                if (gtk_widget_get_mapped(above) && gtk_widget_get_opacity(above) > 0 &&
+                    gtk_widget_compute_bounds(above, widget, &bounds)) {
+                    cairo_rectangle_int_t cut = {(int)floor(bounds.origin.x), (int)floor(bounds.origin.y),
+                                                 (int)ceil(bounds.size.width) + 1, (int)ceil(bounds.size.height) + 1};
+                    cairo_region_subtract_rectangle(region, &cut);
+                }
+            }
+            const GdkRGBA white = {1, 1, 1, 1};
+            for (int k = 0; k < cairo_region_num_rectangles(region); ++k) {
+                cairo_rectangle_int_t r;
+                cairo_region_get_rectangle(region, k, &r);
+                graphene_rect_t rect = GRAPHENE_RECT_INIT(r.x, r.y, r.width, r.height);
                 gtk_snapshot_append_color(snapshot, &white, &rect);
             }
+            cairo_region_destroy(region);
         }
         gtk_snapshot_pop(snapshot);
     }

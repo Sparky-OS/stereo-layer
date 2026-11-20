@@ -410,3 +410,15 @@ msgstr "Stereobilder in 3D zeigen. Ist es aus, wird jedes Bild flach gezeigt; um
 msgctxt "Stereo::NoSound|"
 msgid "This film has no sound."
 msgstr "Dieser Film hat keinen Ton."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Display Settings…"
+msgstr "Anzeigeeinstellungen …"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "This 3D packing needs more than one picture; it is shown flat here."
+msgstr "Diese 3D-Anordnung braucht mehr als ein Bild; sie wird hier flach gezeigt."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "The second view of this file cannot be decoded; it is shown flat."
+msgstr "Die zweite Ansicht dieser Datei kann nicht dekodiert werden; sie wird flach gezeigt."
