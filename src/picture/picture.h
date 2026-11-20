@@ -99,6 +99,10 @@ public:
     static Picture fromImages(const QString &path, const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format,
         const QByteArray &header, const Options &options, OutputMode output);
     static Picture fromPackedImage(const QImage &image, Layout layout, EyeOrder order);
+    // The two views of a packing that alternates them (FrameSequential, BlockLaced, MultiView): two decoded pictures in
+    // turn, the first the left eye unless order is RightFirst, each with its own samples. Null when the sizes differ. The
+    // same rule as stereo_gtk_unpack_pair() of the GTK layer.
+    static Picture fromViewsInTurn(const QImage &first, const QImage &second, EyeOrder order);
     // The two views of picture drawn from depth, a gray image of any size (8 or 16 bits), read by depthMark, the
     // Stereo3DDepth mark of docs/depth-marks.md ("nearness" when empty: larger samples nearer). layer and layerDepth,
     // when given, are a second layer of the picture's size: the background it hides (layerIsBackground) or graphics over

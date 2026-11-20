@@ -410,3 +410,15 @@ msgstr "ステレオ画像を 3D で表示します。オフのときはすべ�
 msgctxt "Stereo::NoSound|"
 msgid "This film has no sound."
 msgstr "この映像には音声がありません。"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Display Settings…"
+msgstr "ディスプレイの設定…"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "This 3D packing needs more than one picture; it is shown flat here."
+msgstr "この 3D 配置には複数の画像が必要なため、ここでは平面で表示します。"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "The second view of this file cannot be decoded; it is shown flat."
+msgstr "このファイルの 2 つ目のビューをデコードできないため、平面で表示します。"

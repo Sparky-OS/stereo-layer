@@ -406,3 +406,15 @@ msgstr "Muestra las imágenes estéreo en 3D. Desactivado, todas las imágenes s
 msgctxt "Stereo::NoSound|"
 msgid "This film has no sound."
 msgstr "Esta película no tiene sonido."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Display Settings…"
+msgstr "Configuración de pantalla…"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "This 3D packing needs more than one picture; it is shown flat here."
+msgstr "Esta disposición 3D necesita más de una imagen; aquí se muestra plana."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "The second view of this file cannot be decoded; it is shown flat."
+msgstr "La segunda vista de este archivo no se puede decodificar; se muestra plano."

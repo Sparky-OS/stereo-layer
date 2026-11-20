@@ -1,0 +1,9 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+libdir=@KDE_INSTALL_FULL_LIBDIR@
+includedir=@KDE_INSTALL_FULL_INCLUDEDIR@/stereo-gtk
+Name: stereo-gtk
+Description: Shared stereo file choices and media area for GTK
+Version: @PROJECT_VERSION@
+Requires: gtk4 stereo-policy
+Libs: -L${libdir} -lstereo-gtk
+Cflags: -I${includedir}

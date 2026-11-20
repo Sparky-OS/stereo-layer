@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.25)
-project(StereoLayer VERSION 1.22.0 LANGUAGES C CXX)
+project(StereoLayer VERSION 1.23.2 LANGUAGES C CXX)
 find_package(ECM 6.0 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 include(KDEInstallDirs6)
@@ -10,13 +10,8 @@ include(ECMGenerateExportHeader)
 include(ECMPoQmTools)
 include(CMakePackageConfigHelpers)
 include(CTest)
-ecm_install_po_files_as_qm(po)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Quick Qml WaylandClient DBus)
-find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
-qt_policy(SET QTP0001 NEW)
-find_package(KF6Screen REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(STEREO_DECLARE REQUIRED IMPORTED_TARGET stereo-declare)
@@ -60,7 +55,7 @@ if(STEREO_AV_ONLY)
 endif()
 
 # The policy without Qt, for any program; the Qt layer builds on it
-add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-jpeg.c src/policy/stereo-jpeg-correct.c src/policy/stereo-policy-site.c src/policy/stereo-policy-display.c src/policy/stereo-policy-picture.c src/policy/stereo-policy-file.c src/policy/stereo-policy.h)
+add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-policy-input.c src/policy/stereo-jpeg.c src/policy/stereo-jpeg-correct.c src/policy/stereo-policy-site.c src/policy/stereo-policy-display.c src/policy/stereo-policy-picture.c src/policy/stereo-policy-file.c src/policy/stereo-policy.h)
 add_library(Stereo::Policy ALIAS StereoPolicy)
 set_target_properties(StereoPolicy PROPERTIES OUTPUT_NAME stereo-policy VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Policy
     C_STANDARD 11 C_VISIBILITY_PRESET hidden)
@@ -89,6 +84,21 @@ install(FILES src/dibr/stereo-dibr.h src/dibr/stereo-dibr-gl.h DESTINATION ${KDE
 install(FILES ${STEREO_DIBR_GLSL} DESTINATION ${KDE_INSTALL_DATADIR}/stereo-dibr/glsl)
 configure_file(src/dibr/stereo-dibr.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
+
+option(STEREO_GTK_ONLY "Build the C policy and GTK integration without Qt" OFF)
+option(BUILD_GTK "Build the native GTK file menu and media area" ON)
+if(BUILD_GTK)
+    add_subdirectory(src/gtk)
+endif()
+if(STEREO_GTK_ONLY)
+    return()
+endif()
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Quick Qml WaylandClient DBus)
+find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
+qt_policy(SET QTP0001 NEW)
+find_package(KF6Screen REQUIRED)
+ecm_install_po_files_as_qm(po)
+
 
 add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/picturesave.cpp src/picture/mark.cpp src/picture/anaglyph.cpp src/picture/panorama.cpp src/picture/render.cpp
     src/video/video.cpp src/video/video.h

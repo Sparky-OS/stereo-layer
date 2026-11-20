@@ -410,3 +410,15 @@ msgstr "스테레오 그림을 3D로 표시합니다. 끄면 모든 그림을 �
 msgctxt "Stereo::NoSound|"
 msgid "This film has no sound."
 msgstr "이 영상에는 소리가 없습니다."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Display Settings…"
+msgstr "디스플레이 설정…"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "This 3D packing needs more than one picture; it is shown flat here."
+msgstr "이 3D 배치는 그림이 둘 이상 필요하므로 여기서는 평면으로 표시합니다."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "The second view of this file cannot be decoded; it is shown flat."
+msgstr "이 파일의 두 번째 보기를 디코딩할 수 없으므로 평면으로 표시합니다."

@@ -410,3 +410,15 @@ msgstr "以 3D 显示立体图片。关闭时，所有图片都以平面显示�
 msgctxt "Stereo::NoSound|"
 msgid "This film has no sound."
 msgstr "此影片没有声音。"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Display Settings…"
+msgstr "显示设置…"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "This 3D packing needs more than one picture; it is shown flat here."
+msgstr "此 3D 布局需要不止一幅图像，因此这里以平面显示。"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "The second view of this file cannot be decoded; it is shown flat."
+msgstr "无法解码此文件的第二个视图，因此以平面显示。"

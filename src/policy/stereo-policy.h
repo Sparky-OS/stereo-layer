@@ -375,6 +375,16 @@ struct stereo_policy_file_choice {
     int swap_eyes; /* 1 swaps the eyes of the file as stored */
 };
 
+/* Shared input menu entries. Labels use the Stereo::FileChoiceMenu translation
+ * context. Group values match the layer's existing Qt/QML groups. */
+struct stereo_policy_input_format {
+    const char *id;
+    const char *text;
+    int group, layout, order, anaglyph, view, video_only;
+};
+STEREO_POLICY_EXPORT size_t stereo_policy_input_format_count(void);
+STEREO_POLICY_EXPORT const struct stereo_policy_input_format *stereo_policy_input_format_at(size_t index);
+
 /* Reads the entry of path into choice (zeroed when there is none). Returns 1 when the file has an entry, 0 when it has
  * none, -1 with errno set when the store cannot be read or the argument is bad. */
 STEREO_POLICY_EXPORT int stereo_policy_file_choice(const char *path, struct stereo_policy_file_choice *choice);

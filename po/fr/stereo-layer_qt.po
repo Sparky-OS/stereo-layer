@@ -410,3 +410,15 @@ msgstr "Affiche les images stéréo en 3D. Désactivé, chaque image est affich�
 msgctxt "Stereo::NoSound|"
 msgid "This film has no sound."
 msgstr "Ce film n’a pas de son."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "Display Settings…"
+msgstr "Paramètres d’affichage…"
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "This 3D packing needs more than one picture; it is shown flat here."
+msgstr "Cette disposition 3D demande plus d’une image ; elle est affichée à plat ici."
+
+msgctxt "Stereo::FileChoiceMenu|"
+msgid "The second view of this file cannot be decoded; it is shown flat."
+msgstr "La deuxième vue de ce fichier ne peut pas être décodée ; il est affiché à plat."

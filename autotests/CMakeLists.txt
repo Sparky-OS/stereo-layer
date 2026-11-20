@@ -223,3 +223,8 @@ target_link_libraries(picturesavetest PRIVATE StereoLayer StereoPolicy Qt6::Test
 target_compile_definitions(picturesavetest PRIVATE SAVE_TRANSLATIONS_DIR="${CMAKE_BINARY_DIR}/ECMPoQm")
 add_test(NAME picturesavetest COMMAND picturesavetest)
 set_tests_properties(picturesavetest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_PLUGIN_PATH=${_picture_plugin_path}")
+if(BUILD_GTK)
+    add_executable(gtkunpacktest gtkunpacktest.c)
+    target_link_libraries(gtkunpacktest PRIVATE StereoGtk StereoPolicy)
+    add_test(NAME gtkunpacktest COMMAND gtkunpacktest)
+endif()
