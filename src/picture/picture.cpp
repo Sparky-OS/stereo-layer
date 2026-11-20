@@ -900,6 +900,19 @@ Picture unpackWithDepth(const QImage &image, Picture::Layout layout, Picture::Ey
 
 Picture Picture::fromPackedImage(const QImage &image, Layout layout, EyeOrder order) { return unpackWithDepth(image, layout, order, {}); }
 
+Picture Picture::fromViewsInTurn(const QImage &first, const QImage &second, EyeOrder order)
+{
+    Picture result;
+    result.original = first;
+    if (first.isNull() || second.isNull() || first.size() != second.size()) {
+        return result;
+    }
+    result.left = order == EyeOrder::RightFirst ? second : first;
+    result.right = order == EyeOrder::RightFirst ? first : second;
+    result.layout = Layout::FrameSequential;
+    return result;
+}
+
 namespace
 {
 // An image as planes for libstereo-dibr: RGBA, 8 or 16 bits a sample.

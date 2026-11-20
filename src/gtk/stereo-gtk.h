@@ -28,10 +28,19 @@ STEREO_GTK_EXPORT void stereo_gtk_area_set_view_aspect(GtkWidget *area, double a
 /* A 2D widget drawn over the area (a player's controls) stays visible in the window, the same in both eyes. */
 STEREO_GTK_EXPORT void stereo_gtk_area_keep_above(GtkWidget *area, GtkWidget *above);
 /* The views of one packed picture, each with its own samples, nothing resampled (the rule of the Qt layer's
- * storedView() and Picture::fromAnaglyph()). Packings that need another picture (multiview, frames in turn, block
- * laced, picture and depth) fail with G_IO_ERROR_NOT_SUPPORTED and a translated sentence to show the person. */
+ * storedView() and Picture::fromAnaglyph()); a picture and its depth map in one frame are drawn by libstereo-dibr as
+ * Picture::fromDepth() draws them, at the library's one default. Packings that need another picture (multiview, frames
+ * in turn, block laced, a separate depth map) fail with G_IO_ERROR_NOT_SUPPORTED and a translated sentence to show the
+ * person: give the two pictures to stereo_gtk_unpack_pair(). */
 STEREO_GTK_EXPORT gboolean stereo_gtk_unpack(GdkTexture *frame, int layout, int order, int anaglyph,
                                              GdkTexture **left, GdkTexture **right, GError **error);
+/* The views of a packing that needs two pictures: two decoded pictures in turn (frames in turn, both views in one
+ * block, the two views of a multiview stream), the first the left eye unless order is right first, sizes equal; or a
+ * picture and its separate depth map (STEREO_POLICY_LAYOUT_DEPTH_SEPARATE), drawn by libstereo-dibr. */
+STEREO_GTK_EXPORT gboolean stereo_gtk_unpack_pair(GdkTexture *first, GdkTexture *second, int layout, int order,
+                                                  GdkTexture **left, GdkTexture **right, GError **error);
+/* TRUE for the packings stereo_gtk_unpack_pair() takes. */
+STEREO_GTK_EXPORT gboolean stereo_gtk_layout_needs_two_pictures(int layout);
 /* The display aspect of one view of a frame shown at frame_aspect, by stereo_policy_video_full_views(). */
 STEREO_GTK_EXPORT double stereo_gtk_view_aspect(int width, int height, double frame_aspect, int layout);
 STEREO_GTK_EXPORT gboolean stereo_gtk_area_get_shown(GtkWidget *area);

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.25)
-project(StereoLayer VERSION 1.23.0 LANGUAGES C CXX)
+project(StereoLayer VERSION 1.23.1 LANGUAGES C CXX)
 find_package(ECM 6.0 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 include(KDEInstallDirs6)
@@ -66,20 +66,6 @@ install(FILES src/policy/stereo-policy.h src/policy/stereo-jpeg.h DESTINATION ${
 configure_file(src/policy/stereo-policy.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 
-option(STEREO_GTK_ONLY "Build the C policy and GTK integration without Qt" OFF)
-option(BUILD_GTK "Build the native GTK file menu and media area" ON)
-if(BUILD_GTK)
-    add_subdirectory(src/gtk)
-endif()
-if(STEREO_GTK_ONLY)
-    return()
-endif()
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Quick Qml WaylandClient DBus)
-find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
-qt_policy(SET QTP0001 NEW)
-find_package(KF6Screen REQUIRED)
-ecm_install_po_files_as_qm(po)
-
 # Depth-image-based rendering without Qt, for any program that turns a picture and its depth into stereo
 # The GLSL passes of the DIBR core, built into the library as byte arrays and installed for other programs
 file(GLOB STEREO_DIBR_GLSL CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/dibr/glsl/*.frag ${CMAKE_CURRENT_SOURCE_DIR}/src/dibr/glsl/*.vert)
@@ -98,6 +84,21 @@ install(FILES src/dibr/stereo-dibr.h src/dibr/stereo-dibr-gl.h DESTINATION ${KDE
 install(FILES ${STEREO_DIBR_GLSL} DESTINATION ${KDE_INSTALL_DATADIR}/stereo-dibr/glsl)
 configure_file(src/dibr/stereo-dibr.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-dibr.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
+
+option(STEREO_GTK_ONLY "Build the C policy and GTK integration without Qt" OFF)
+option(BUILD_GTK "Build the native GTK file menu and media area" ON)
+if(BUILD_GTK)
+    add_subdirectory(src/gtk)
+endif()
+if(STEREO_GTK_ONLY)
+    return()
+endif()
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Quick Qml WaylandClient DBus)
+find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
+qt_policy(SET QTP0001 NEW)
+find_package(KF6Screen REQUIRED)
+ecm_install_po_files_as_qm(po)
+
 
 add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/picturesave.cpp src/picture/mark.cpp src/picture/anaglyph.cpp src/picture/panorama.cpp src/picture/render.cpp
     src/video/video.cpp src/video/video.h

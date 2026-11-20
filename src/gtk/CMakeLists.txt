@@ -13,7 +13,7 @@ add_library(StereoGtk SHARED stereo-gtk-file-menu.c stereo-gtk-area.c stereo-gtk
     ${CMAKE_CURRENT_BINARY_DIR}/viewporter-client-protocol.h ${CMAKE_CURRENT_BINARY_DIR}/viewporter-protocol.c)
 set_target_properties(StereoGtk PROPERTIES OUTPUT_NAME stereo-gtk VERSION ${PROJECT_VERSION} SOVERSION 1
     C_STANDARD 11 C_VISIBILITY_PRESET hidden)
-target_link_libraries(StereoGtk PUBLIC PkgConfig::GTK4 PRIVATE StereoPolicy
+target_link_libraries(StereoGtk PUBLIC PkgConfig::GTK4 PRIVATE StereoPolicy StereoDibr
     PkgConfig::STEREO_DECLARE PkgConfig::WAYLAND_CLIENT PkgConfig::X11)
 target_include_directories(StereoGtk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(StereoGtk PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>

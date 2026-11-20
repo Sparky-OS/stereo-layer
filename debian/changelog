@@ -1,3 +1,18 @@
+stereo-layer (1.23.1-1) unstable; urgency=medium
+
+  * libstereo-gtk1: every packing of the input list for GTK 4 programs (ORDER
+    742). A picture and its depth map in one frame (side by side, top and
+    bottom, four rows with graphics, four quarters with the background) are
+    drawn by libstereo-dibr as Picture::fromDepth() draws them, at the
+    library's one default; stereo_gtk_unpack_pair() gives the eyes of two
+    pictures in turn (frames in turn, both views in one block, multiview) and
+    of a picture with its separate depth map.
+  * Picture::fromViewsInTurn(): the same rule for two pictures in turn in the
+    Qt layer.
+  * libstereo-dibr is built before the GTK part, so a GTK-only build has it.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Fri, 20 Nov 2026 09:00:00 +0000
+
 stereo-layer (1.23.0-1) unstable; urgency=medium
 
   * libstereo-gtk1 and libstereo-gtk-dev: the stereo layer for GTK 4

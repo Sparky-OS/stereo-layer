@@ -33,6 +33,7 @@ class PictureTest : public QObject
     Q_OBJECT
 private Q_SLOTS:
     void marksAndChoices();
+    void viewsInTurn();
     void mpoFallback();
     void padding();
     void sterPadding_data();
@@ -1872,6 +1873,25 @@ void PictureTest::fileChoice()
     QVERIFY2(error.contains(wide), qPrintable(error));
     QVERIFY(!Picture::hasFileChoice(wide));
     QCOMPARE(fileState(wide), untouched);
+}
+
+// Two decoded pictures in turn (frames in turn, both views in one block, multiview): the same rule as the GTK layer's
+// stereo_gtk_unpack_pair().
+void PictureTest::viewsInTurn()
+{
+    QImage red(64, 32, QImage::Format_RGB32), blue(64, 32, QImage::Format_RGB32), small(32, 32, QImage::Format_RGB32);
+    red.fill(Qt::red);
+    blue.fill(Qt::blue);
+    small.fill(Qt::green);
+    Picture pair = Picture::fromViewsInTurn(red, blue, Picture::EyeOrder::LeftFirst);
+    QVERIFY(pair.isStereo());
+    QCOMPARE(pair.left, red);
+    QCOMPARE(pair.right, blue);
+    pair = Picture::fromViewsInTurn(red, blue, Picture::EyeOrder::RightFirst);
+    QCOMPARE(pair.left, blue);
+    QCOMPARE(pair.right, red);
+    QVERIFY(!Picture::fromViewsInTurn(red, small, Picture::EyeOrder::LeftFirst).isStereo());
+    QVERIFY(!Picture::fromViewsInTurn(red, QImage(), Picture::EyeOrder::LeftFirst).isStereo());
 }
 
 QTEST_MAIN(PictureTest)
