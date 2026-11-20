@@ -1,3 +1,13 @@
+stereo-layer (1.23.2-1) unstable; urgency=medium
+
+  * libstereo-gtk1: a media area made again after it went (a program's
+    "Enable 3D" turned off, then on) is declared again. The declaration
+    library is set up once per display and kept for the application's
+    lifetime; the area set it up again each time and was refused with
+    "Device or resource busy", so the pair never came back (ORDER 742).
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Fri, 20 Nov 2026 20:58:04 +0000
+
 stereo-layer (1.23.1-1) unstable; urgency=medium
 
   * libstereo-gtk1: every packing of the input list for GTK 4 programs (ORDER

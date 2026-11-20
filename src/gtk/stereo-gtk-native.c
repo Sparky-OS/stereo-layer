@@ -70,7 +70,11 @@ static void release_buffer(void *data, struct wl_buffer *buffer)
     g_free(b);
 }
 static const struct wl_buffer_listener buffer_listener = { release_buffer };
+/* libstereo-declare keeps one state per thread for the application's lifetime on one display: it is set up with the
+ * first area and kept when an area goes ("Enable 3D" off), so the next area declares on it. Setting it up again
+ * answers EBUSY. */
 static struct wl_event_queue *declaration_queue;
+static struct wl_display *declaration_display;
 
 StereoGtkNative *stereo_gtk_native_new(GtkWidget *area, GError **error)
 {
@@ -89,7 +93,12 @@ StereoGtkNative *stereo_gtk_native_new(GtkWidget *area, GError **error)
         n->registry = wl_display_get_registry(n->display);
         wl_proxy_set_queue((struct wl_proxy *)n->registry, n->queue);
         wl_registry_add_listener(n->registry, &registry_listener, n);
-        int result = stereo_declare_wayland_init(n->display, n->queue);
+        int result = 0;
+        if (declaration_display != n->display) {
+            result = declaration_display ? -EBUSY : stereo_declare_wayland_init(n->display, n->queue);
+            if (result >= 0)
+                declaration_display = n->display;
+        }
         if (result < 0 || wl_display_roundtrip_queue(n->display, n->queue) < 0 ||
             !n->compositor || !n->subcompositor || !n->shm || !n->viewporter || !stereo_supported_wayland()) {
             fail(error, result < 0 ? -result : ENOTSUP);
