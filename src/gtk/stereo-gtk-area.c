@@ -94,6 +94,9 @@ static gboolean update(GtkWidget *widget, GdkFrameClock *clock, gpointer data)
         gtk_native_get_surface_transform(GTK_NATIVE(self->owner), &x, &y);
         surface_rect.origin.x += x; surface_rect.origin.y += y;
         if (stereo_gtk_native_present(self->native, &surface_rect, self->left, self->right, &error)) {
+            /* The window cuts its hole at last_rect: when the area moves or changes size, the window draws again. */
+            if (!graphene_rect_equal(&rect, &self->last_rect) && self->owner)
+                gtk_widget_queue_draw(self->owner);
             self->last_rect = rect;
             self->dirty = FALSE;
             if (self->repeat) self->repeat--;
