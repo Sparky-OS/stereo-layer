@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Daniel Campos Ramos <Capitain_Jack@yahoo.com>
 
 #include "picture.h"
+#include "jxlmark_p.h"
 #include "mark_p.h"
 #include "panorama_p.h"
 #include "stereo-dibr.h"
@@ -115,41 +116,29 @@ bool hasStereoMpfIndex(const QByteArray &data)
     return false;
 }
 
-// The SVGStereo mark: an attribute of the root svg element in a namespace of its own, layout="sideBySideLeftFirst" and the
-// other Stereo3DLayout values, with the viewBox holding both views. SVG renderers ignore attributes from other namespaces
-// (SVG 1.1 Second Edition, 23.1 "Foreign namespaces and private data"), so a marked file draws as before everywhere else.
-constexpr QLatin1StringView svgStereoNamespace("https://github.com/Sparky-OS/svgstereo");
-
-// The start of a gzip-compressed SVG (RFC 1952), inflated as far as the bytes at hand and the limit allow: the root element
-// is near the start of the document.
-QByteArray gunzipHeader(const QByteArray &data, qsizetype limit)
+// The JXLStereo mark of a JPEG XL file, read from all of it (a box may come after the codestream), for the picture as
+// presented: the reader's orientation applied (ISO/IEC 18181-1:2024 D.3.2).
+QString jxlFileLayout(const QString &path, const QSize &presented)
 {
-    z_stream stream = {};
-    if (inflateInit2(&stream, 16 + MAX_WBITS) != Z_OK)
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
         return {};
-    QByteArray result(limit, Qt::Uninitialized);
-    stream.next_in = reinterpret_cast<Bytef *>(const_cast<char *>(data.constData()));
-    stream.avail_in = uInt(data.size());
-    stream.next_out = reinterpret_cast<Bytef *>(result.data());
-    stream.avail_out = uInt(limit);
-    const int status = inflate(&stream, Z_SYNC_FLUSH);
-    result.truncate(status == Z_OK || status == Z_STREAM_END || status == Z_BUF_ERROR ? qsizetype(stream.total_out) : 0);
-    inflateEnd(&stream);
-    return result;
+    }
+    QString reason;
+    const QString word = jxlStereoLayout(readJxlMark(file), presented, &reason);
+    if (!reason.isEmpty()) {
+        qCDebug(qLcPicture).noquote() << path << "is shown as authored:" << reason;
+    }
+    return word;
 }
 
-QString svgStereoLayout(const QByteArray &header)
+QSize presentedSize(const QImageReader &reader)
 {
-    QXmlStreamReader xml(header);
-    while (!xml.atEnd()) {
-        if (xml.readNext() == QXmlStreamReader::StartElement) {
-            if (xml.name() != QLatin1String("svg") || xml.namespaceUri() != QLatin1String("http://www.w3.org/2000/svg")) {
-                return {};
-            }
-            return xml.attributes().value(svgStereoNamespace, QLatin1String("layout")).toString();
-        }
+    QSize size = reader.size();
+    if (reader.transformation().testFlag(QImageIOHandler::TransformationRotate90)) {
+        size.transpose();
     }
-    return {};
+    return size;
 }
 
 struct Decision {
@@ -506,11 +495,19 @@ Picture Picture::load(const QString &path, const Options &fileOptions, const Dep
     QString metadata = reader.text(QStringLiteral("Stereo3DLayout"));
     const QByteArray detectedFormat = reader.format();
     const QByteArray format = extension == "jps" || extension == "mpo" || extension == "pns" ? extension : detectedFormat;
+    // A JPEG XL reader keeps the orientation for the caller (KImageFormats' jxl.cpp): the views are taken from the
+    // picture as presented.
+    if (detectedFormat == "jxl") {
+        reader.setAutoTransform(true);
+    }
     const int imageCount = reader.imageCount();
     QImage image = reader.read();
     const QImage shown = image;
     if (metadata.isEmpty()) {
         metadata = image.text(QStringLiteral("Stereo3DLayout"));
+    }
+    if (metadata.isEmpty() && detectedFormat == "jxl" && !image.isNull()) {
+        metadata = jxlFileLayout(path, image.size());
     }
     QImage second;
     const bool indexed = metadata.startsWith(QLatin1String("multiView")) && !reader.text(QStringLiteral("Stereo3DViewIndices")).isEmpty()
@@ -563,6 +560,12 @@ Picture Picture::loadPair(
                                        : QByteArray());
     QString metadata = reader.text(QStringLiteral("Stereo3DLayout"));
     const QByteArray format = extension == "jps" || extension == "mpo" || extension == "pns" ? extension : reader.format();
+    if (format == "jxl") {
+        reader.setAutoTransform(true);
+        if (metadata.isEmpty()) {
+            metadata = jxlFileLayout(path, presentedSize(reader));
+        }
+    }
     const int imageCount = reader.imageCount();
     const bool multiView = hasSecondImage(imageCount, format, metadata);
     const QSize size = reader.size();
@@ -631,6 +634,18 @@ namespace
 Picture fromImagesComparing(const QImage &image, const QImage &second, const QString &metadata, const QByteArray &format, const QByteArray &header,
     const Picture::Options &options, OutputMode output, const Picture::DepthOptions &depthOptions, const QImage &depthPicture, bool overMark)
 {
+    // JPEG XL has no field of its own: the JXLStereo property in its XMP boxes (jxlmark_p.h), read here from the bytes
+    // at hand; load() and loadPair() read the whole file first.
+    if (metadata.isEmpty() && format == "jxl" && !image.isNull()) {
+        QString reason;
+        const QString word = jxlStereoLayout(readJxlMark(header), image.size(), &reason);
+        if (!reason.isEmpty()) {
+            qCDebug(qLcPicture).noquote() << "a JPEG XL picture is shown as authored:" << reason;
+        }
+        if (!word.isEmpty()) {
+            return fromImagesComparing(image, second, word, format, header, options, output, depthOptions, depthPicture, overMark);
+        }
+    }
     using Layout = Picture::Layout;
     using EyeOrder = Picture::EyeOrder;
     using Source = Picture::Source;
