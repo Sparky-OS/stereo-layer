@@ -10,6 +10,7 @@
 
 #include <QByteArrayView>
 #include <QCoreApplication>
+#include <QColorSpace>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
@@ -1084,6 +1085,9 @@ QImage Picture::sideBySide(QImage::Format format) const
     }
     image.fill(Qt::transparent);
     if (format == QImage::Format_RGBA64_Premultiplied || format == QImage::Format_RGBX64) {
+        if (left.colorSpace() == right.colorSpace()) {
+            image.setColorSpace(left.colorSpace());
+        }
         // The compositor consumes these exact 16-bit premultiplied samples.
         const auto place = [&](const QImage &view, int x) {
             const QImage converted = view.convertToFormat(format);
