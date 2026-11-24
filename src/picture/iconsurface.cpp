@@ -19,7 +19,7 @@ bool IconSurface::show(QWindow *window, const QRect &rect, const Picture &pictur
     const bool alpha = picture.left.hasAlphaChannel() || picture.right.hasAlphaChannel();
     const auto format = alpha ? QImage::Format_RGBA64_Premultiplied : QImage::Format_RGBX64;
     const QImage pair = deep ? picture.sideBySide(format) : picture.sideBySide();
-    return m_surface->show(window, rect, pair, true, true);
+    return m_surface->show(window, rect, pair, true, true, true, false);
 }
 
 bool IconSurface::showView(QWindow *window, const QRect &rect, const QImage &view)
@@ -27,7 +27,7 @@ bool IconSurface::showView(QWindow *window, const QRect &rect, const QImage &vie
     const auto format = view.depth() == 64
         ? (view.hasAlphaChannel() ? QImage::Format_RGBA64_Premultiplied : QImage::Format_RGBX64)
         : view.format();
-    return m_surface->show(window, rect, view.convertToFormat(format), true, true, false);
+    return m_surface->show(window, rect, view.convertToFormat(format), true, true, false, false);
 }
 
 void IconSurface::clear()

@@ -249,13 +249,16 @@ struct Surface::Private {
     bool shown = false;
     bool above = false;
     bool stereo = true;
+    bool reportFailure = true;
     QRect placed;
     bool alpha = false;
 };
 void Surface::fail(const QString &what)
 {
     d->failureText = failureMessage(what);
-    qCWarning(qLcLayer).noquote() << d->failureText;
+    if (d->reportFailure) {
+        qCWarning(qLcLayer).noquote() << d->failureText;
+    }
 }
 QString Surface::failure() const { return d->failureText; }
 int Surface::wholePixelStep(qreal ratio)
@@ -340,8 +343,9 @@ void Surface::hide()
         d->shown = false;
     }
 }
-bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, bool exact, bool above, bool stereo)
+bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, bool exact, bool above, bool stereo, bool reportFailure)
 {
+    d->reportFailure = reportFailure;
     Q_ASSERT(QThread::currentThread() == qGuiApp->thread());
     if (!parent || !parent->isVisible() || hole.isEmpty() || packed.isNull()) {
         hide();
@@ -368,7 +372,9 @@ bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, boo
             if (!text.isEmpty()) {
                 d->parent = parent;
                 d->failureText = text;
-                qCWarning(qLcLayer).noquote() << text;
+                if (reportFailure) {
+                    qCWarning(qLcLayer).noquote() << text;
+                }
             }
             return false;
         }
