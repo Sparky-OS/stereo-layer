@@ -109,7 +109,7 @@ private Q_SLOTS:
         QCOMPARE(frameGreen(pair.right, false), 1000 * (frame + 1));
     }
 
-    // A frame that cannot be decoded gives no picture and a reason; the frames before it are still the right ones.
+    // Premultiplication and packing preserve the 16-bit samples of both views.
     void jpegXlPackedPrecision()
     {
         AnimatedPicture animation(fixture(QStringLiteral("animated-pair.jxl")));
@@ -121,6 +121,7 @@ private Q_SLOTS:
         QCOMPARE(sbs.copy(pair.left.width(), 0, pair.right.width(), pair.right.height()), pair.right.convertToFormat(sbs.format()));
     }
 
+    // A frame that cannot be decoded gives no picture and a reason; the frames before it are still the right ones.
     void truncated()
     {
         AnimatedPicture animation(fixture(QStringLiteral("animated-pair-truncated.jxl")));

@@ -1079,12 +1079,26 @@ QImage Picture::sideBySide(QImage::Format format) const
         return {};
     }
     QImage image(left.width() + right.width(), qMax(left.height(), right.height()), format);
+    if (image.isNull()) {
+        return {};
+    }
     image.fill(Qt::transparent);
-    QPainter painter(&image);
-    painter.setCompositionMode(QPainter::CompositionMode_Source);
-    painter.drawImage(0, 0, left);
-    painter.drawImage(left.width(), 0, right);
-    painter.end();
+    if (format == QImage::Format_RGBA64_Premultiplied || format == QImage::Format_RGBX64) {
+        // The compositor consumes these exact 16-bit premultiplied samples.
+        const auto place = [&](const QImage &view, int x) {
+            const QImage converted = view.convertToFormat(format);
+            for (int row = 0; row < converted.height(); ++row) {
+                std::memcpy(image.scanLine(row) + x * sizeof(QRgba64), converted.constScanLine(row), converted.width() * sizeof(QRgba64));
+            }
+        };
+        place(left, 0);
+        place(right, left.width());
+    } else {
+        QPainter painter(&image);
+        painter.setCompositionMode(QPainter::CompositionMode_Source);
+        painter.drawImage(0, 0, left);
+        painter.drawImage(left.width(), 0, right);
+    }
     image.setText(QStringLiteral("Stereo3DLayout"), QStringLiteral("sideBySideLeftFirst"));
     return image;
 }
