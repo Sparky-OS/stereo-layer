@@ -248,6 +248,7 @@ struct Surface::Private {
     QString failureText;
     bool shown = false;
     bool above = false;
+    bool stereo = true;
     QRect placed;
     bool alpha = false;
 };
@@ -339,7 +340,7 @@ void Surface::hide()
         d->shown = false;
     }
 }
-bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, bool exact, bool above)
+bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, bool exact, bool above, bool stereo)
 {
     Q_ASSERT(QThread::currentThread() == qGuiApp->thread());
     if (!parent || !parent->isVisible() || hole.isEmpty() || packed.isNull()) {
@@ -358,7 +359,7 @@ bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, boo
         fail(QStringLiteral("the window has no wl_surface"));
         return false;
     }
-    if (d->parent != parent || d->parentSurface != native->surface() || d->above != above)
+    if (d->parent != parent || d->parentSurface != native->surface() || d->above != above || d->stereo != stereo)
         reset();
     if (!d->surface) {
         d->connection = connection();
@@ -377,6 +378,7 @@ bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, boo
         d->surface = wl_compositor_create_surface(globals.compositor);
         d->subsurface = wl_subcompositor_get_subsurface(globals.subcompositor, d->surface, native->surface());
         d->above = above;
+        d->stereo = stereo;
         if (above) {
             wl_subsurface_place_above(d->subsurface, native->surface());
         } else {
@@ -435,7 +437,7 @@ bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, boo
         d->alpha = alpha;
         parent->requestUpdate();
     }
-    if (!d->declared) {
+    if (stereo && !d->declared) {
         const int result = stereo_declare_wayland(d->surface, STEREO_SBS_FULL, STEREO_CLASS_NONE, STEREO_SUBCLASS_UNSPECIFIED);
         if (result < 0) {
             // nothing is attached to a surface the compositor did not take as stereo content, and it is not tried again until reset()

@@ -22,6 +22,14 @@ bool IconSurface::show(QWindow *window, const QRect &rect, const Picture &pictur
     return m_surface->show(window, rect, pair, true, true);
 }
 
+bool IconSurface::showView(QWindow *window, const QRect &rect, const QImage &view)
+{
+    const auto format = view.depth() == 64
+        ? (view.hasAlphaChannel() ? QImage::Format_RGBA64_Premultiplied : QImage::Format_RGBX64)
+        : view.format();
+    return m_surface->show(window, rect, view.convertToFormat(format), true, true, false);
+}
+
 void IconSurface::clear()
 {
     m_surface->reset();

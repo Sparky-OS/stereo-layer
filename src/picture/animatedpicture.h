@@ -40,6 +40,8 @@ public:
     qint64 duration() const;
     // The frame shown msecs after the start of the caller's clock; the last frame once the last play has ended.
     int frameAt(qint64 msecs) const;
+    // Clock time at which another frame can be shown, or -1 after the last frame.
+    qint64 nextFrameTime(qint64 msecs) const;
     // Both views of what is shown at msecs, taken from that one frame. A raster's views have the file's own size and
     // precision (QImage::Format_RGBA64 for samples of more than 8 bits); a drawing is drawn at eyeSize a view, or at its own
     // size when eyeSize is empty. Not stereo: original holds the frame. Null, with reason() set, when it cannot be produced.

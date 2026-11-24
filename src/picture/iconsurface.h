@@ -22,6 +22,7 @@ public:
     ~IconSurface();
 
     bool show(QWindow *window, const QRect &rect, const Picture &picture);
+    bool showView(QWindow *window, const QRect &rect, const QImage &view);
     void clear();
     QString failure() const;
 

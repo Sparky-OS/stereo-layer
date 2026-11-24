@@ -328,6 +328,34 @@ int AnimatedPicture::frameAt(qint64 msecs) const
     return int(d->frames.size()) - 1;
 }
 
+qint64 AnimatedPicture::nextFrameTime(qint64 msecs) const
+{
+    const qint64 total = duration();
+    if (isNull() || total <= 0) {
+        return -1;
+    }
+    msecs = std::max<qint64>(0, msecs);
+    if (loopCount() >= 0 && msecs >= total * (loopCount() + 1)) {
+        return -1;
+    }
+    if (d->document) {
+        // Qt SVG plays its continuous timeline at 30 frames per second.
+        constexpr qint64 framesPerSecond = 30;
+        return ((msecs * framesPerSecond / 1000 + 1) * 1000 + framesPerSecond - 1) / framesPerSecond;
+    }
+
+    const int index = frameAt(msecs);
+    if (index < 0 || index >= d->delays.size()) {
+        return -1;
+    }
+    const qint64 next = msecs - msecs % total + std::accumulate(d->delays.cbegin(), d->delays.cbegin() + index + 1, qint64(0));
+    const qint64 playable = d->playable();
+    if (playable >= 0) {
+        return next <= playable ? next : -1;
+    }
+    return loopCount() >= 0 && next >= total * (loopCount() + 1) ? -1 : next;
+}
+
 Picture AnimatedPicture::pairAt(qint64 msecs, const QSize &eyeSize)
 {
     if (d->null) {
