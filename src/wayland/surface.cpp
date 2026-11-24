@@ -255,7 +255,7 @@ struct Surface::Private {
 };
 void Surface::fail(const QString &what)
 {
-    d->failureText = failureMessage(what);
+    d->failureText = d->reportFailure ? failureMessage(what) : what;
     if (d->reportFailure) {
         qCWarning(qLcLayer).noquote() << d->failureText;
     }
@@ -363,8 +363,10 @@ bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, boo
         fail(QStringLiteral("the window has no wl_surface"));
         return false;
     }
-    if (d->parent != parent || d->parentSurface != native->surface() || d->above != above || d->stereo != stereo)
+    if (d->parent != parent || d->parentSurface != native->surface() || d->above != above || d->stereo != stereo) {
         reset();
+        d->reportFailure = reportFailure;
+    }
     if (!d->surface) {
         d->connection = connection();
         if (!d->connection->supported()) {
