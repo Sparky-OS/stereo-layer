@@ -93,6 +93,18 @@ private Q_SLOTS:
         QTest::newRow("long after") << qint64(50000) << 2;
     }
 
+    void frameDeadlines()
+    {
+        AnimatedPicture animation(fixture(QStringLiteral("animated-pair.jxl")));
+        QCOMPARE(animation.nextFrameTime(0), 100);
+        QCOMPARE(animation.nextFrameTime(99), 100);
+        QCOMPARE(animation.nextFrameTime(100), 300);
+        QCOMPARE(animation.nextFrameTime(300), 600);
+        QCOMPARE(animation.nextFrameTime(600), 700);
+        QCOMPARE(animation.nextFrameTime(1199), -1);
+        QCOMPARE(animation.nextFrameTime(1200), -1);
+    }
+
     // Both views from the one frame the clock names, at the file's 16 bits.
     void jpegXlClock()
     {
