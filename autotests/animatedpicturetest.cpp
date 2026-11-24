@@ -110,6 +110,17 @@ private Q_SLOTS:
     }
 
     // A frame that cannot be decoded gives no picture and a reason; the frames before it are still the right ones.
+    void jpegXlPackedPrecision()
+    {
+        AnimatedPicture animation(fixture(QStringLiteral("animated-pair.jxl")));
+        const Picture pair = animation.pairAt(100);
+        const QImage sbs = pair.sideBySide(QImage::Format_RGBA64_Premultiplied);
+        QCOMPARE(sbs.format(), QImage::Format_RGBA64_Premultiplied);
+        QCOMPARE(sbs.size(), QSize(2 * pair.left.width(), pair.left.height()));
+        QCOMPARE(sbs.copy(0, 0, pair.left.width(), pair.left.height()), pair.left.convertToFormat(sbs.format()));
+        QCOMPARE(sbs.copy(pair.left.width(), 0, pair.right.width(), pair.right.height()), pair.right.convertToFormat(sbs.format()));
+    }
+
     void truncated()
     {
         AnimatedPicture animation(fixture(QStringLiteral("animated-pair-truncated.jxl")));

@@ -29,7 +29,7 @@ public:
     static bool isSupported();
     // rect is where the picture shows, the window's hole (see covering()); with exact, rect and packed are those of onWholePixels() and
     // nothing is resized
-    bool show(QWindow *parent, const QRect &rect, const QImage &packed, bool exact = false);
+    bool show(QWindow *parent, const QRect &rect, const QImage &packed, bool exact = false, bool above = false);
     // A window paints an edge at the nearest whole device pixel, counted from the corner of its content. A compositor places a surface in the
     // window's own whole pixels and rounds it to device pixels by a rule fractional-scale-v1 does not define (wayland-protocols issue 132; KDE
     // bug 491725): KWin rounds a subsurface's corner from its parent's and its size on its own, others round both edges. At a scale that is not

@@ -182,6 +182,7 @@ public:
     // Both views side by side, left first, each at its own size, marked "sideBySideLeftFirst" in the image's
     // Stereo3DLayout text; a null image when this is not a pair.
     QImage sideBySide() const;
+    QImage sideBySide(QImage::Format format) const;
     Picture swapped() const;
     QImage original;
     QImage left;

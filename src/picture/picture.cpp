@@ -1069,12 +1069,16 @@ bool Picture::isStereo() const { return layout != Layout::None && !left.isNull()
 
 QImage Picture::sideBySide() const
 {
+    const bool alpha = left.hasAlphaChannel() || right.hasAlphaChannel();
+    return sideBySide(alpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32);
+}
+
+QImage Picture::sideBySide(QImage::Format format) const
+{
     if (!isStereo()) {
         return {};
     }
-    const bool alpha = left.hasAlphaChannel() || right.hasAlphaChannel();
-    QImage image(
-        left.width() + right.width(), qMax(left.height(), right.height()), alpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32);
+    QImage image(left.width() + right.width(), qMax(left.height(), right.height()), format);
     image.fill(Qt::transparent);
     QPainter painter(&image);
     painter.setCompositionMode(QPainter::CompositionMode_Source);

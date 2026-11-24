@@ -6,6 +6,7 @@
 #include <QLoggingCategory>
 #include <QPainter>
 #include <QPointer>
+#include <QSet>
 #include <QThread>
 #include <QWindow>
 #include <QtGui/qpa/qplatformwindow_p.h>
@@ -33,8 +34,15 @@ struct Globals {
     wl_subcompositor *subcompositor = nullptr;
     wl_shm *shm = nullptr;
     wp_viewporter *viewporter = nullptr;
+    QSet<uint32_t> shmFormats;
     bool stereo = false;
 };
+
+void shmFormat(void *data, wl_shm *, uint32_t format)
+{
+    static_cast<Globals *>(data)->shmFormats.insert(format);
+}
+const wl_shm_listener shmListener = {shmFormat};
 
 void registryGlobal(void *data, wl_registry *registry, uint32_t name, const char *interface, uint32_t version)
 {
@@ -45,6 +53,7 @@ void registryGlobal(void *data, wl_registry *registry, uint32_t name, const char
         globals->subcompositor = static_cast<wl_subcompositor *>(wl_registry_bind(registry, name, &wl_subcompositor_interface, 1));
     } else if (!strcmp(interface, wl_shm_interface.name)) {
         globals->shm = static_cast<wl_shm *>(wl_registry_bind(registry, name, &wl_shm_interface, 1));
+        wl_shm_add_listener(globals->shm, &shmListener, globals);
     } else if (!strcmp(interface, wp_viewporter_interface.name)) {
         globals->viewporter = static_cast<wp_viewporter *>(wl_registry_bind(registry, name, &wp_viewporter_interface, 1));
     } else if (!strcmp(interface, "kde_stereo_content_manager_v1")) {
@@ -99,6 +108,7 @@ struct Buffer {
     size_t size = 0;
     QSize pixels;
     bool alpha = false;
+    bool deep = false;
     bool busy = false;
 };
 
@@ -117,12 +127,12 @@ void destroyBuffer(Buffer &buffer)
     buffer = {};
 }
 
-bool createBuffer(Buffer &buffer, wl_shm *shm, wl_event_queue *queue, const QSize &pixels, bool alpha)
+bool createBuffer(Buffer &buffer, wl_shm *shm, wl_event_queue *queue, const QSize &pixels, bool alpha, bool deep)
 {
-    if (pixels.isEmpty() || pixels.width() > 16384 || pixels.height() > 16384 || qint64(pixels.width()) * pixels.height() > 128 * 1024 * 1024) {
+    if (pixels.isEmpty() || pixels.width() > 16384 || pixels.height() > 16384 || qint64(pixels.width()) * pixels.height() * (deep ? 8 : 4) > 512 * 1024 * 1024) {
         return false;
     }
-    const int stride = pixels.width() * 4;
+    const int stride = pixels.width() * (deep ? 8 : 4);
     const size_t size = size_t(stride) * pixels.height();
     const int fd = memfd_create("stereo-layer", MFD_CLOEXEC);
     if (fd < 0 || ftruncate(fd, off_t(size)) < 0) {
@@ -139,8 +149,9 @@ bool createBuffer(Buffer &buffer, wl_shm *shm, wl_event_queue *queue, const QSiz
     wl_shm_pool *pool = wl_shm_create_pool(shm, fd, int(size));
     close(fd);
     // Premultiplied alpha where the picture has some (wl_shm, ARGB8888), so that what is clear in it shows what is behind
-    wl_buffer *wlBuffer
-        = wl_shm_pool_create_buffer(pool, 0, pixels.width(), pixels.height(), stride, alpha ? WL_SHM_FORMAT_ARGB8888 : WL_SHM_FORMAT_XRGB8888);
+    const uint32_t format = deep ? (alpha ? WL_SHM_FORMAT_ABGR16161616 : WL_SHM_FORMAT_XBGR16161616)
+                                 : (alpha ? WL_SHM_FORMAT_ARGB8888 : WL_SHM_FORMAT_XRGB8888);
+    wl_buffer *wlBuffer = wl_shm_pool_create_buffer(pool, 0, pixels.width(), pixels.height(), stride, format);
     wl_shm_pool_destroy(pool);
     wl_proxy_set_queue(reinterpret_cast<wl_proxy *>(wlBuffer), queue);
     buffer.buffer = wlBuffer;
@@ -148,6 +159,7 @@ bool createBuffer(Buffer &buffer, wl_shm *shm, wl_event_queue *queue, const QSiz
     buffer.size = size;
     buffer.pixels = pixels;
     buffer.alpha = alpha;
+    buffer.deep = deep;
     wl_buffer_add_listener(wlBuffer, &bufferListener, &buffer);
     return true;
 }
@@ -235,6 +247,7 @@ struct Surface::Private {
     bool declared = false;
     QString failureText;
     bool shown = false;
+    bool above = false;
     QRect placed;
     bool alpha = false;
 };
@@ -326,7 +339,7 @@ void Surface::hide()
         d->shown = false;
     }
 }
-bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, bool exact)
+bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, bool exact, bool above)
 {
     Q_ASSERT(QThread::currentThread() == qGuiApp->thread());
     if (!parent || !parent->isVisible() || hole.isEmpty() || packed.isNull()) {
@@ -345,7 +358,7 @@ bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, boo
         fail(QStringLiteral("the window has no wl_surface"));
         return false;
     }
-    if (d->parent != parent || d->parentSurface != native->surface())
+    if (d->parent != parent || d->parentSurface != native->surface() || d->above != above)
         reset();
     if (!d->surface) {
         d->connection = connection();
@@ -363,7 +376,12 @@ bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, boo
         auto &globals = d->connection->globals;
         d->surface = wl_compositor_create_surface(globals.compositor);
         d->subsurface = wl_subcompositor_get_subsurface(globals.subcompositor, d->surface, native->surface());
-        wl_subsurface_place_below(d->subsurface, native->surface());
+        d->above = above;
+        if (above) {
+            wl_subsurface_place_above(d->subsurface, native->surface());
+        } else {
+            wl_subsurface_place_below(d->subsurface, native->surface());
+        }
         wl_subsurface_set_desync(d->subsurface);
         d->viewport = wp_viewporter_get_viewport(globals.viewporter, d->surface);
         wl_region *empty = wl_compositor_create_region(globals.compositor);
@@ -373,25 +391,36 @@ bool Surface::show(QWindow *parent, const QRect &hole, const QImage &packed, boo
     auto &c = *d->connection;
     wl_display_dispatch_queue_pending(c.display, c.queue);
     const bool alpha = packed.hasAlphaChannel();
+    const bool deep = above && (packed.format() == QImage::Format_RGBA64_Premultiplied || packed.format() == QImage::Format_RGBX64);
+    if (deep && !c.globals.shmFormats.contains(alpha ? WL_SHM_FORMAT_ABGR16161616 : WL_SHM_FORMAT_XBGR16161616)) {
+        fail(QStringLiteral("the compositor did not offer a 16-bit shared-memory format"));
+        return false;
+    }
     Buffer *buffer = nullptr;
     for (auto &candidate : d->buffers) {
         if (candidate.busy)
             continue;
-        if (candidate.buffer && (candidate.pixels != packed.size() || candidate.alpha != alpha))
+        if (candidate.buffer && (candidate.pixels != packed.size() || candidate.alpha != alpha || candidate.deep != deep))
             destroyBuffer(candidate);
-        if (!candidate.buffer && !createBuffer(candidate, c.globals.shm, c.queue, packed.size(), alpha))
+        if (!candidate.buffer && !createBuffer(candidate, c.globals.shm, c.queue, packed.size(), alpha, deep))
             continue;
         buffer = &candidate;
         break;
     }
     if (!buffer)
         return d->shown;
-    QImage target(
-        buffer->data, packed.width(), packed.height(), packed.width() * 4, alpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32);
-    QPainter painter(&target);
-    painter.setCompositionMode(QPainter::CompositionMode_Source);
-    painter.drawImage(0, 0, packed);
-    painter.end();
+    if (deep) {
+        const qsizetype rowBytes = qsizetype(packed.width()) * 8;
+        for (int row = 0; row < packed.height(); ++row) {
+            memcpy(buffer->data + row * rowBytes, packed.constScanLine(row), rowBytes);
+        }
+    } else {
+        QImage target(
+            buffer->data, packed.width(), packed.height(), packed.width() * 4, alpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32);
+        QPainter painter(&target);
+        painter.setCompositionMode(QPainter::CompositionMode_Source);
+        painter.drawImage(0, 0, packed);
+    }
     // The parent surface starts at Qt's own decoration, when it draws one.
     const QRect placed = rect.translated(parent->frameMargins().left(), parent->frameMargins().top());
     if (d->placed != placed || d->alpha != alpha) {
