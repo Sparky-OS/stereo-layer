@@ -167,7 +167,7 @@ public:
         }
         document = QSvgDocument::load(contents, {}, QtSvg::AnimatorType::Controlled);
         if (!document) {
-            reason = message("This drawing cannot be read as SVG.");
+            reason = message(QT_TRANSLATE_NOOP("Stereo::AnimatedPicture", "This drawing cannot be read as SVG."));
             return;
         }
         documentSize = document->size();
@@ -175,7 +175,7 @@ public:
         loops = drawingLoops(contents);
         null = documentSize.isEmpty();
         if (null) {
-            reason = message("This drawing has no size to be drawn at.");
+            reason = message(QT_TRANSLATE_NOOP("Stereo::AnimatedPicture", "This drawing has no size to be drawn at."));
             return;
         }
         decide(path, draw(0, documentSize), layout, "svg", header, options);
@@ -215,7 +215,7 @@ AnimatedPicture::AnimatedPicture(const QString &path, const Picture::Options &op
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        d->reason = message("This picture cannot be opened: %1.").arg(file.errorString());
+        d->reason = message(QT_TRANSLATE_NOOP("Stereo::AnimatedPicture", "This picture cannot be opened: %1.")).arg(file.errorString());
         return;
     }
     const QByteArray header = file.peek(1024 * 1024);
@@ -225,8 +225,8 @@ AnimatedPicture::AnimatedPicture(const QString &path, const Picture::Options &op
         return;
     }
     if (hasStereoVideoScheme(file)) {
-        d->reason = message("This animated picture keeps its two views as a stereo video track (ISO/IEC 14496-12, stereo video scheme), "
-                            "and its reader gives each frame only one view wide, so it cannot be shown as a pair.");
+        d->reason = message(QT_TRANSLATE_NOOP("Stereo::AnimatedPicture", "This animated picture keeps its two views as a stereo video track (ISO/IEC 14496-12, stereo video scheme), "
+                            "and its reader gives each frame only one view wide, so it cannot be shown as a pair."));
         return;
     }
     file.seek(0);
@@ -234,8 +234,8 @@ AnimatedPicture::AnimatedPicture(const QString &path, const Picture::Options &op
     reader.setAutoTransform(true);
     const QByteArray format = reader.format();
     if (format.isEmpty()) {
-        d->reason = isJxlFile(header) ? message("This JPEG XL picture cannot be shown: no JPEG XL image reader is installed (kimageformat6-plugins).")
-                                      : message("This picture cannot be shown: no image reader for its format is installed (%1).").arg(reader.errorString());
+        d->reason = isJxlFile(header) ? message(QT_TRANSLATE_NOOP("Stereo::AnimatedPicture", "This JPEG XL picture cannot be shown: no JPEG XL image reader is installed (kimageformat6-plugins)."))
+                                      : message(QT_TRANSLATE_NOOP("Stereo::AnimatedPicture", "This picture cannot be shown: no image reader for its format is installed (%1).")).arg(reader.errorString());
         return;
     }
     d->declared = reader.imageCount();
@@ -249,7 +249,7 @@ AnimatedPicture::AnimatedPicture(const QString &path, const Picture::Options &op
         if (image.isNull()) {
             // The end of a file that declared no count is not a failure; anything else is.
             if (d->declared > 0 || d->frames.isEmpty()) {
-                d->failure = message("Frame %1 of this animated picture cannot be decoded: %2.").arg(d->frames.size() + 1).arg(reader.errorString());
+                d->failure = message(QT_TRANSLATE_NOOP("Stereo::AnimatedPicture", "Frame %1 of this animated picture cannot be decoded: %2.")).arg(d->frames.size() + 1).arg(reader.errorString());
             }
             break;
         }
@@ -345,7 +345,7 @@ Picture AnimatedPicture::frame(int index)
         return {};
     }
     if (index < 0 || index >= d->frames.size()) {
-        d->reason = d->failure.isEmpty() ? message("This animated picture has no frame %1.").arg(index + 1) : d->failure;
+        d->reason = d->failure.isEmpty() ? message(QT_TRANSLATE_NOOP("Stereo::AnimatedPicture", "This animated picture has no frame %1.")).arg(index + 1) : d->failure;
         return {};
     }
     return d->split(d->frames.at(index));

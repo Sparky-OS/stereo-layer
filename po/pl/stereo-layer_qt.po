@@ -422,3 +422,35 @@ msgstr "Ten układ 3D wymaga więcej niż jednego obrazu; tutaj jest pokazywany 
 msgctxt "Stereo::FileChoiceMenu|"
 msgid "The second view of this file cannot be decoded; it is shown flat."
 msgstr "Drugiego widoku tego pliku nie można zdekodować; jest pokazywany płasko."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This drawing cannot be read as SVG."
+msgstr "Nie można odczytać tego rysunku jako SVG."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This drawing has no size to be drawn at."
+msgstr "Nie określono rozmiaru do wyświetlenia tego rysunku."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This picture cannot be opened: %1."
+msgstr "Nie można otworzyć tego obrazu: %1."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This animated picture keeps its two views as a stereo video track (ISO/IEC 14496-12, stereo video scheme), and its reader gives each frame only one view wide, so it cannot be shown as a pair."
+msgstr "Ten animowany obraz przechowuje oba widoki na stereoskopowej ścieżce wideo (ISO/IEC 14496-12, schemat wideo stereoskopowego). Czytnik zwraca każdą klatkę o szerokości tylko jednego widoku, więc nie można wyświetlić pary."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This JPEG XL picture cannot be shown: no JPEG XL image reader is installed (kimageformat6-plugins)."
+msgstr "Nie można wyświetlić tego obrazu JPEG XL: nie zainstalowano czytnika JPEG XL (kimageformat6-plugins)."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This picture cannot be shown: no image reader for its format is installed (%1)."
+msgstr "Nie można wyświetlić tego obrazu: nie zainstalowano czytnika dla jego formatu (%1)."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "Frame %1 of this animated picture cannot be decoded: %2."
+msgstr "Nie można zdekodować klatki %1 tego animowanego obrazu: %2."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This animated picture has no frame %1."
+msgstr "Ten animowany obraz nie ma klatki %1."

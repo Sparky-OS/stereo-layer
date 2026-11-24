@@ -422,3 +422,35 @@ msgstr "此 3D 配置需要不只一張圖像，因此這裡以平面顯示。"
 msgctxt "Stereo::FileChoiceMenu|"
 msgid "The second view of this file cannot be decoded; it is shown flat."
 msgstr "無法解碼此檔案的第二個視圖，因此以平面顯示。"
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This drawing cannot be read as SVG."
+msgstr "無法以 SVG 格式讀取這張圖形。"
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This drawing has no size to be drawn at."
+msgstr "這張圖形未指定繪製尺寸。"
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This picture cannot be opened: %1."
+msgstr "無法開啟這張圖片：%1。"
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This animated picture keeps its two views as a stereo video track (ISO/IEC 14496-12, stereo video scheme), and its reader gives each frame only one view wide, so it cannot be shown as a pair."
+msgstr "這張動畫圖片將兩個視圖儲存在立體影片軌道中（ISO/IEC 14496-12，立體影片配置）。讀取程式傳回的每一影格只有一個視圖的寬度，因此無法成對顯示。"
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This JPEG XL picture cannot be shown: no JPEG XL image reader is installed (kimageformat6-plugins)."
+msgstr "無法顯示這張 JPEG XL 圖片：未安裝 JPEG XL 圖片讀取元件（kimageformat6-plugins）。"
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This picture cannot be shown: no image reader for its format is installed (%1)."
+msgstr "無法顯示這張圖片：未安裝可讀取此格式的圖片讀取元件（%1）。"
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "Frame %1 of this animated picture cannot be decoded: %2."
+msgstr "無法解碼這張動畫圖片的第 %1 個影格：%2。"
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This animated picture has no frame %1."
+msgstr "這張動畫圖片沒有第 %1 個影格。"
