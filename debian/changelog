@@ -1,3 +1,11 @@
+stereo-layer (1.23.3-1) unstable; urgency=medium
+
+  * Read the JXLStereo mark and present animated stereo pairs on one clock.
+  * Translate the animated picture failure reasons in the edition languages.
+  * Present a deep-colour inline icon as a single full side-by-side surface.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Tue, 24 Nov 2026 19:48:16 +0000
+
 stereo-layer (1.23.2-1) unstable; urgency=medium
 
   * libstereo-gtk1: a media area made again after it went (a program's

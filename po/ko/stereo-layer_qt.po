@@ -422,3 +422,35 @@ msgstr "이 3D 배치는 그림이 둘 이상 필요하므로 여기서는 평�
 msgctxt "Stereo::FileChoiceMenu|"
 msgid "The second view of this file cannot be decoded; it is shown flat."
 msgstr "이 파일의 두 번째 보기를 디코딩할 수 없으므로 평면으로 표시합니다."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This drawing cannot be read as SVG."
+msgstr "이 그림을 SVG로 읽을 수 없습니다."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This drawing has no size to be drawn at."
+msgstr "이 그림에 그릴 크기가 지정되어 있지 않습니다."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This picture cannot be opened: %1."
+msgstr "이 그림을 열 수 없습니다: %1."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This animated picture keeps its two views as a stereo video track (ISO/IEC 14496-12, stereo video scheme), and its reader gives each frame only one view wide, so it cannot be shown as a pair."
+msgstr "이 애니메이션 그림은 두 보기를 스테레오 동영상 트랙(ISO/IEC 14496-12, 스테레오 동영상 방식)에 저장합니다. 읽기 기능이 각 프레임을 보기 하나의 너비로 반환하므로 두 보기를 한 쌍으로 표시할 수 없습니다."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This JPEG XL picture cannot be shown: no JPEG XL image reader is installed (kimageformat6-plugins)."
+msgstr "이 JPEG XL 그림을 표시할 수 없습니다. JPEG XL 읽기 기능(kimageformat6-plugins)이 설치되어 있지 않습니다."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This picture cannot be shown: no image reader for its format is installed (%1)."
+msgstr "이 그림을 표시할 수 없습니다. 이 형식의 읽기 기능이 설치되어 있지 않습니다(%1)."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "Frame %1 of this animated picture cannot be decoded: %2."
+msgstr "이 애니메이션 그림의 %1번 프레임을 디코딩할 수 없습니다: %2."
+
+msgctxt "Stereo::AnimatedPicture|"
+msgid "This animated picture has no frame %1."
+msgstr "이 애니메이션 그림에 %1번 프레임이 없습니다."

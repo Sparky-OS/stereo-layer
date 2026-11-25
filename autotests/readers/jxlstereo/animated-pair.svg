@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:stereo="https://github.com/Sparky-OS/svgstereo" stereo:layout="sideBySideLeftFirst" width="32" height="8" viewBox="0 0 32 8">
+  <g>
+    <animateTransform attributeName="transform" type="translate" values="0 0;4 0;8 0" dur="300ms" repeatCount="indefinite"/>
+    <rect x="0" y="0" width="4" height="8" fill="#ff0000"/>
+    <rect x="16" y="0" width="4" height="8" fill="#0000ff"/>
+  </g>
+</svg>

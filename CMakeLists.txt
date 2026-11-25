@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.25)
-project(StereoLayer VERSION 1.23.2 LANGUAGES C CXX)
+project(StereoLayer VERSION 1.23.3 LANGUAGES C CXX)
 find_package(ECM 6.0 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 include(KDEInstallDirs6)
@@ -94,13 +94,15 @@ if(STEREO_GTK_ONLY)
     return()
 endif()
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Quick Qml WaylandClient DBus)
-find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
+find_package(Qt6 REQUIRED COMPONENTS GuiPrivate Svg SvgPrivate)
+# JPEG XL keeps metadata Brotli-compressed in brob boxes (ISO/IEC 18181-2:2026 9.7)
+pkg_check_modules(BROTLIDEC REQUIRED IMPORTED_TARGET libbrotlidec)
 qt_policy(SET QTP0001 NEW)
 find_package(KF6Screen REQUIRED)
 ecm_install_po_files_as_qm(po)
 
 
-add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/picturesave.cpp src/picture/mark.cpp src/picture/anaglyph.cpp src/picture/panorama.cpp src/picture/render.cpp
+add_library(StereoLayer SHARED src/picture/picture.cpp src/picture/picturesave.cpp src/picture/animatedpicture.cpp src/picture/iconsurface.cpp src/picture/animatedpicture.h src/picture/jxlmark.cpp src/picture/jxlmark_p.h src/picture/mark.cpp src/picture/anaglyph.cpp src/picture/panorama.cpp src/picture/render.cpp
     src/video/video.cpp src/video/video.h
     src/output/screenmode.cpp src/output/screenmode.h
     src/wayland/surface.cpp src/wayland/surface_p.h
@@ -113,7 +115,7 @@ ecm_create_qm_loader(StereoLayer stereo-layer_qt)
 ecm_generate_export_header(StereoLayer BASE_NAME STEREO_LAYER VERSION ${PROJECT_VERSION} EXPORT_FILE_NAME stereo_layer_export.h)
 set_target_properties(StereoLayer PROPERTIES OUTPUT_NAME stereo-layer VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Layer)
 target_include_directories(StereoLayer PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/picture> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/video> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/widgets> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/output> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/quick> $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-layer>)
-target_link_libraries(StereoLayer PUBLIC Qt6::Gui Qt6::Quick PRIVATE StereoPolicy StereoDibr Qt6::Widgets Qt6::DBus Qt6::GuiPrivate KF6::Screen ZLIB::ZLIB PkgConfig::STEREO_DECLARE PkgConfig::WAYLAND)
+target_link_libraries(StereoLayer PUBLIC Qt6::Gui Qt6::Quick PRIVATE StereoPolicy StereoDibr Qt6::Widgets Qt6::DBus Qt6::GuiPrivate Qt6::Svg Qt6::SvgPrivate KF6::Screen ZLIB::ZLIB PkgConfig::BROTLIDEC PkgConfig::STEREO_DECLARE PkgConfig::WAYLAND)
 target_include_directories(StereoLayer PRIVATE src/wayland)
 qt6_generate_wayland_protocol_client_sources(StereoLayer FILES ${WAYLAND_PROTOCOLS_DIR}/stable/viewporter/viewporter.xml)
 qt_add_qml_module(StereoLayer URI org.sparky.stereo VERSION 1.0
@@ -126,7 +128,7 @@ set_target_properties(StereoLayerplugin PROPERTIES PREFIX "${CMAKE_SHARED_LIBRAR
 install(TARGETS StereoLayerplugin DESTINATION ${KDE_INSTALL_QMLDIR}/org/sparky/stereo)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/qml/org/sparky/stereo/qmldir ${CMAKE_CURRENT_BINARY_DIR}/qml/org/sparky/stereo/StereoLayer.qmltypes DESTINATION ${KDE_INSTALL_QMLDIR}/org/sparky/stereo)
 install(TARGETS StereoLayer EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
-install(FILES src/picture/picture.h src/picture/render.h src/video/video.h src/widgets/widgetlayer.h src/widgets/depthcontrols.h src/widgets/filechoicemenu.h src/picture/filechoicemoves.h src/output/screenmode.h src/quick/pictureitem.h src/quick/depthsettings.h src/quick/filechoice.h src/quick/nosound.h src/quick/stereodepth.h ${CMAKE_CURRENT_BINARY_DIR}/stereo_layer_export.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-layer)
+install(FILES src/picture/iconsurface.h src/picture/picture.h src/picture/animatedpicture.h src/picture/render.h src/video/video.h src/widgets/widgetlayer.h src/widgets/depthcontrols.h src/widgets/filechoicemenu.h src/picture/filechoicemoves.h src/output/screenmode.h src/quick/pictureitem.h src/quick/depthsettings.h src/quick/filechoice.h src/quick/nosound.h src/quick/stereodepth.h ${CMAKE_CURRENT_BINARY_DIR}/stereo_layer_export.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-layer)
 install(EXPORT StereoLayerTargets NAMESPACE Stereo:: DESTINATION ${KDE_INSTALL_CMAKEPACKAGEDIR}/StereoLayer)
 configure_package_config_file(cmake/StereoLayerConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/StereoLayerConfig.cmake INSTALL_DESTINATION ${KDE_INSTALL_CMAKEPACKAGEDIR}/StereoLayer)
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/StereoLayerConfigVersion.cmake VERSION ${PROJECT_VERSION} COMPATIBILITY SameMajorVersion)

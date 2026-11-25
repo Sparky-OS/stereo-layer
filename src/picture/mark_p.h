@@ -16,4 +16,10 @@ struct Mark {
     Picture::AnaglyphColorPair anaglyph = Picture::AnaglyphColorPair::None;
 };
 Mark readMark(const QString &value);
+// The SVGStereo mark of a drawing (its root svg element's layout attribute, SVGStereo 0.4): the value, empty when the
+// root has none. isSvgDocument() says whether the bytes start an SVG document at all; gunzipHeader() inflates the start
+// of an SVGZ file (RFC 1952) as far as the bytes at hand and limit allow.
+QString svgStereoLayout(const QByteArray &header);
+bool isSvgDocument(const QByteArray &header);
+QByteArray gunzipHeader(const QByteArray &data, qsizetype limit);
 }
