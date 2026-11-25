@@ -1,3 +1,15 @@
+stereo-layer (1.23.4-1) unstable; urgency=medium
+
+  * StereoPicture: a clip that holds the whole item takes nothing from the
+    picture and no longer keeps it flat; a Kirigami page and its ColumnView
+    both clip, so every picture in a Kirigami page was shown as one view
+    (ORDER 63). A clip that cuts the item, a rotation, a scale or an opacity
+    still draws it flat, and so does a window with no alpha channel; the log
+    now says which item and why, once for each reason, where before nothing
+    was said. PictureItem::flatReason() gives the item's reason.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Wed, 25 Nov 2026 08:45:00 +0000
+
 stereo-layer (1.23.3-1) unstable; urgency=medium
 
   * Read the JXLStereo mark and present animated stereo pairs on one clock.

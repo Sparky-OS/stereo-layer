@@ -32,6 +32,10 @@ public:
     explicit PictureItem(QQuickItem *parent = nullptr);
     ~PictureItem() override;
     static bool prepareWindow(QQuickWindow *window);
+    // Empty, or why a picture at item's place cannot be a surface of its own and is drawn flat: the item or an ancestor is rotated,
+    // scaled or not opaque, or clips it (its clipRect(), in the scene, leaves part of item out by half a device pixel or more). A clip
+    // that holds the whole item is no reason. The words name the item's type and objectName, for the log.
+    static QString flatReason(const QQuickItem *item);
     QUrl source() const;
     void setSource(const QUrl &source);
     bool swapEyes() const;

@@ -86,6 +86,13 @@ target_link_libraries(screenmodetest PRIVATE StereoLayer Qt6::Test Qt6::DBus KF6
 add_test(NAME screenmodetest COMMAND screenmodetest)
 set_tests_properties(screenmodetest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_SOURCE_DIR}/screens.json")
 
+# StereoPicture's place: a clip that holds the whole item is no reason to draw it flat, one that cuts it is, and the log says so once
+add_executable(pictureplacetest pictureplacetest.cpp)
+target_link_libraries(pictureplacetest PRIVATE StereoLayer Qt6::Quick Qt6::Qml Qt6::Test Qt6::DBus KF6::Screen)
+add_dependencies(pictureplacetest StereoLayerplugin)
+add_test(NAME pictureplacetest COMMAND pictureplacetest)
+set_tests_properties(pictureplacetest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_SOURCE_DIR}/screens.json;QML_IMPORT_PATH=${CMAKE_BINARY_DIR}/qml")
+
 add_executable(qmlimporttest qmlimporttest.cpp)
 target_link_libraries(qmlimporttest PRIVATE Qt6::Quick Qt6::Qml Qt6::Test)
 add_dependencies(qmlimporttest StereoLayerplugin)
