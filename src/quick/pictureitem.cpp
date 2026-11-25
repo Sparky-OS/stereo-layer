@@ -12,14 +12,41 @@
 #include <QSGSimpleRectNode>
 #include <QSGSimpleTextureNode>
 #include <QSurfaceFormat>
+#include <QLoggingCategory>
+#include <QSet>
 #include <QTimer>
 #include <cmath>
+Q_DECLARE_LOGGING_CATEGORY(qLcLayer)
 namespace Stereo
 {
 namespace
 {
 // Only a screen that shows two eyes takes the pair; any other shows the left view alone, as the file's flat picture.
 bool showsTwoEyes(OutputMode mode) { return mode == OutputMode::Stereo || mode == OutputMode::Anaglyph; }
+QString itemName(const QQuickItem *item)
+{
+    const QString type = QString::fromLatin1(item->metaObject()->className());
+    return item->objectName().isEmpty() ? type : QStringLiteral("%1 \"%2\"").arg(type, item->objectName());
+}
+}
+QString PictureItem::flatReason(const QQuickItem *item)
+{
+    const QRectF mapped = item->mapRectToScene(item->boundingRect());
+    const qreal ratio = item->window() ? item->window()->devicePixelRatio() : 1;
+    // less than half a device pixel of the item outside a clip shows no pixel the clip takes away
+    const qreal slack = 0.5 / ratio;
+    for (const QQuickItem *at = item; at; at = at->parentItem()) {
+        if (!qFuzzyIsNull(at->rotation()))
+            return QStringLiteral("%1 is rotated").arg(itemName(at));
+        if (!qFuzzyCompare(at->scale(), qreal(1)))
+            return QStringLiteral("%1 is scaled").arg(itemName(at));
+        if (!qFuzzyCompare(at->opacity(), qreal(1)))
+            return QStringLiteral("%1 is not opaque").arg(itemName(at));
+        // the rectangle the scene graph clips to (QQuickWindow's clip node takes clipRect(), not the bounding rectangle)
+        if (at->clip() && !at->mapRectToScene(at->clipRect()).adjusted(-slack, -slack, slack, slack).contains(mapped))
+            return QStringLiteral("%1 clips it").arg(itemName(at));
+    }
+    return {};
 }
 struct PictureItem::Private {
     QUrl source;
@@ -38,6 +65,7 @@ struct PictureItem::Private {
     QPointF pan;
     bool active = false;
     QString failure;
+    QSet<QString> told; // the reasons this item has already written to the log
 };
 PictureItem::PictureItem(QQuickItem *parent)
     : QQuickItem(parent)
@@ -178,13 +206,20 @@ void PictureItem::updatePolish()
     bool active = false;
     const bool twoEyes = showsTwoEyes(d->output.mode());
     const QRectF mapped = mapRectToScene(boundingRect());
-    // Native subsurfaces cannot follow scene-graph rotation, opacity or clipping.
-    bool aligned = qFuzzyIsNull(rotation()) && qFuzzyCompare(scale(), qreal(1)) && qFuzzyCompare(opacity(), qreal(1)) && !clip();
-    for (QQuickItem *ancestor = parentItem(); ancestor; ancestor = ancestor->parentItem()) {
-        aligned &= qFuzzyIsNull(ancestor->rotation()) && qFuzzyCompare(ancestor->scale(), qreal(1)) && qFuzzyCompare(ancestor->opacity(), qreal(1))
-            && !ancestor->clip();
+    const bool shown = window() && window()->isVisible() && isVisible() && twoEyes && d->picture.isStereo();
+    // A native subsurface cannot follow the scene graph's rotation, scale, opacity or a clip that cuts the item; a clip that holds the
+    // whole item (a Kirigami page, its ColumnView) takes nothing from it. Nor can it show through a window with no alpha channel (one
+    // made before the picture asked for it, prepareWindow()). Where one of these holds, the item draws the left view in the scene graph,
+    // where the clip and the rest apply as to any item, and the log says why once for each reason.
+    QString reason = shown ? flatReason(this) : QString();
+    if (shown && reason.isEmpty() && window()->format().alphaBufferSize() <= 0)
+        reason = QStringLiteral("its window has no alpha channel (it was made before the picture asked for one)");
+    if (!reason.isEmpty() && !d->told.contains(reason)) {
+        d->told.insert(reason);
+        qCWarning(qLcLayer).noquote() << QStringLiteral("StereoPicture %1: %2, so the picture is shown flat, one eye, not in 3D, while it is")
+                                             .arg(d->source.toDisplayString(), reason);
     }
-    if (window() && window()->isVisible() && isVisible() && aligned && twoEyes && d->picture.isStereo() && window()->format().alphaBufferSize() > 0) {
+    if (shown && reason.isEmpty()) {
         const qreal ratio = window()->devicePixelRatio();
         const QSize pixels(qRound(mapped.width() * ratio), qRound(mapped.height() * ratio));
         if (d->dirty || d->pixels != pixels) {
