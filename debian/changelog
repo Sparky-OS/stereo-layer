@@ -1,3 +1,18 @@
+stereo-layer (1.24.0-1) unstable; urgency=medium
+
+  * libstereo-policy: depth layers (queue row 148, Daniel's design of
+    2026-10-15), the model GIMP and Krita share, in stereo-depth.h: a depth
+    value as text with three decimals in the C locale whatever the program's
+    locale (stereo_depth_parse, stereo_depth_format, stereo_depth_round),
+    each eye's move by half the value, positive behind the screen
+    (stereo_depth_eye_shift), and the move of an RGBA picture of 8, 16 or
+    32-bit float samples, a copy for a whole move and a Lanczos window of
+    three lobes on premultiplied samples for a fractional one
+    (stereo_depth_shift_rgba). The value is never clamped. autotests:
+    depthlayertest.
+
+ -- Daniel Ramos (Capitain Jack) <Capitain_Jack@yahoo.com>  Thu, 26 Nov 2026 17:45:13 +0000
+
 stereo-layer (1.23.4-1) unstable; urgency=medium
 
   * StereoPicture: a clip that holds the whole item takes nothing from the

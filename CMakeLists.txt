@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.25)
-project(StereoLayer VERSION 1.23.4 LANGUAGES C CXX)
+project(StereoLayer VERSION 1.24.0 LANGUAGES C CXX)
 find_package(ECM 6.0 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 include(KDEInstallDirs6)
@@ -55,14 +55,14 @@ if(STEREO_AV_ONLY)
 endif()
 
 # The policy without Qt, for any program; the Qt layer builds on it
-add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-policy-input.c src/policy/stereo-jpeg.c src/policy/stereo-jpeg-correct.c src/policy/stereo-policy-site.c src/policy/stereo-policy-display.c src/policy/stereo-policy-picture.c src/policy/stereo-policy-file.c src/policy/stereo-policy.h)
+add_library(StereoPolicy SHARED src/policy/stereo-policy.c src/policy/stereo-policy-input.c src/policy/stereo-jpeg.c src/policy/stereo-jpeg-correct.c src/policy/stereo-policy-site.c src/policy/stereo-policy-display.c src/policy/stereo-policy-picture.c src/policy/stereo-policy-file.c src/policy/stereo-depth.c src/policy/stereo-policy.h src/policy/stereo-depth.h)
 add_library(Stereo::Policy ALIAS StereoPolicy)
 set_target_properties(StereoPolicy PROPERTIES OUTPUT_NAME stereo-policy VERSION ${PROJECT_VERSION} SOVERSION 1 EXPORT_NAME Policy
     C_STANDARD 11 C_VISIBILITY_PRESET hidden)
 target_link_libraries(StereoPolicy PRIVATE m)
 target_include_directories(StereoPolicy PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/policy> $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/stereo-policy>)
 install(TARGETS StereoPolicy EXPORT StereoLayerTargets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
-install(FILES src/policy/stereo-policy.h src/policy/stereo-jpeg.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-policy)
+install(FILES src/policy/stereo-policy.h src/policy/stereo-jpeg.h src/policy/stereo-depth.h DESTINATION ${KDE_INSTALL_INCLUDEDIR}/stereo-policy)
 configure_file(src/policy/stereo-policy.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stereo-policy.pc DESTINATION ${KDE_INSTALL_LIBDIR}/pkgconfig)
 

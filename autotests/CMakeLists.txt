@@ -3,6 +3,9 @@ add_executable(policytest policytest.c)
 target_link_libraries(policytest PRIVATE StereoPolicy m)
 target_compile_definitions(policytest PRIVATE VECTORS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/vectors")
 add_test(NAME policytest COMMAND policytest)
+add_executable(depthlayertest depthlayertest.c)
+target_link_libraries(depthlayertest PRIVATE StereoPolicy m)
+add_test(NAME depthlayertest COMMAND depthlayertest)
 # The per-file store with every path in one entry file and several writers at once; the same without the store's lock
 # must fail (it is the control that shows the first can).
 add_executable(policyfiletest policyfiletest.c)
